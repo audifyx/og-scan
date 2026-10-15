@@ -80,7 +80,7 @@ export default function TradeMore() {
   if (active) {
     return (
       <div className="flex h-full flex-col overflow-hidden bg-[#060606]">
-        <div className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2.5">
+        <div className="flex shrink-0 items-center gap-2 border-b border-white/18 px-3 py-2.5">
           <button
             type="button"
             onClick={() => setParams({})}
@@ -90,7 +90,7 @@ export default function TradeMore() {
           </button>
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-bold">{active.name}</div>
-            <div className="truncate text-[10px] text-white/40">{active.description}</div>
+            <div className="truncate text-[10px] text-white/65">{active.description}</div>
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
@@ -117,9 +117,9 @@ export default function TradeMore() {
           <h1 className="text-[26px] font-black tracking-tight" style={{ fontFamily: '"Bricolage Grotesque", system-ui' }}>
             More
           </h1>
-          <p className="mt-0.5 text-[12px] text-white/40">{TOOL_COUNT} tools · structured by category</p>
+          <p className="mt-0.5 text-[12px] text-white/65">{TOOL_COUNT} tools · structured by category</p>
         </div>
-        <Wrench className="h-5 w-5 text-white/25" />
+        <Wrench className="h-5 w-5 text-white/40" />
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -130,11 +130,11 @@ export default function TradeMore() {
               key={t.id}
               type="button"
               onClick={() => openTool(t)}
-              className="rounded-2xl border border-white/12 bg-white/[0.03] p-4 text-left transition hover:border-white/25 hover:bg-white/[0.05]"
+              className="rounded-2xl border border-white/20 bg-white/[0.07] p-4 text-left transition hover:border-white/25 hover:bg-white/[0.09]"
             >
               <Icon className="h-5 w-5 text-white" />
               <div className="mt-2 text-sm font-bold">{t.name}</div>
-              <div className="mt-0.5 text-[11px] leading-snug text-white/45">{t.description}</div>
+              <div className="mt-0.5 text-[11px] leading-snug text-white/70">{t.description}</div>
             </button>
           );
         })}
@@ -146,7 +146,7 @@ export default function TradeMore() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search tools…"
-          className="h-11 w-full rounded-2xl border border-white/10 bg-white/[0.03] pl-10 pr-3 text-sm outline-none focus:border-white/25"
+          className="h-11 w-full rounded-2xl border border-white/18 bg-white/[0.07] pl-10 pr-3 text-sm outline-none focus:border-white/25"
         />
       </div>
 
@@ -157,7 +157,7 @@ export default function TradeMore() {
             type="button"
             onClick={() => setCat(c)}
             className={`shrink-0 rounded-full px-3.5 py-1.5 text-[11px] font-semibold ${
-              cat === c ? "bg-white text-black" : "border border-white/10 text-white/45"
+              cat === c ? "bg-white text-black" : "border border-white/18 text-white/70"
             }`}
           >
             {c}
@@ -168,7 +168,7 @@ export default function TradeMore() {
       <div className="mt-5 space-y-6">
         {byCategory.map((g) => (
           <section key={g.cat}>
-            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/35">
+            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55">
               {g.cat}
             </h2>
             <div className="grid grid-cols-2 gap-2">
@@ -177,13 +177,13 @@ export default function TradeMore() {
                   key={t.id}
                   type="button"
                   onClick={() => openTool(t)}
-                  className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-3 text-left transition hover:border-white/20"
+                  className="rounded-2xl border border-white/15 bg-white/[0.09] p-3 text-left transition hover:border-white/20"
                 >
                   <div className="flex items-start justify-between gap-1">
                     <span className="text-[13px] font-bold leading-tight">{t.name}</span>
-                    {t.kind === "link" ? <ExternalLink className="h-3 w-3 shrink-0 text-white/25" /> : null}
+                    {t.kind === "link" ? <ExternalLink className="h-3 w-3 shrink-0 text-white/40" /> : null}
                   </div>
-                  <p className="mt-1 line-clamp-2 text-[10px] leading-snug text-white/40">{t.description}</p>
+                  <p className="mt-1 line-clamp-2 text-[10px] leading-snug text-white/65">{t.description}</p>
                 </button>
               ))}
             </div>
@@ -191,11 +191,11 @@ export default function TradeMore() {
         ))}
       </div>
 
-      {!filtered.length && <p className="mt-10 text-center text-sm text-white/35">No tools match</p>}
+      {!filtered.length && <p className="mt-10 text-center text-sm text-white/55">No tools match</p>}
 
-      <p className="mt-8 text-center text-[10px] text-white/25">
+      <p className="mt-8 text-center text-[10px] text-white/40">
         Full rescue suite →{" "}
-        <Link to="/orbitxlaunch/rescue" className="underline hover:text-white/45">
+        <Link to="/orbitxlaunch/rescue" className="underline hover:text-white/70">
           Rescue Console
         </Link>
       </p>

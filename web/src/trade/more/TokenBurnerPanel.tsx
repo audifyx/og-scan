@@ -108,9 +108,9 @@ export default function TokenBurnerPanel() {
 
   if (!ready || !publicKey) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-[#050505] p-6 text-center">
-        <Flame className="mx-auto h-8 w-8 text-white/30" />
-        <p className="mt-3 text-sm text-white/55">
+      <div className="rounded-2xl border border-white/20 bg-[#050505] p-6 text-center">
+        <Flame className="mx-auto h-8 w-8 text-white/70" />
+        <p className="mt-3 text-sm text-white/75">
           {localActive
             ? "Set a default local trading wallet to burn tokens"
             : "Connect a wallet to burn tokens from your wallet"}
@@ -143,19 +143,19 @@ export default function TokenBurnerPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-white/10 bg-[#050505] p-4">
+      <div className="rounded-2xl border border-white/20 bg-[#050505] p-4">
         <div className="flex items-center justify-between">
           <div>
             <span className="text-sm font-bold">Token Burner</span>
             {shortAddress ? (
-              <div className="mt-0.5 font-mono text-[10px] text-white/40">{label || shortAddress}</div>
+              <div className="mt-0.5 font-mono text-[10px] text-white/65">{label || shortAddress}</div>
             ) : null}
           </div>
           <button
             type="button"
             onClick={() => void scan()}
             disabled={loading}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/15 px-3 text-xs text-white/70"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/30 px-3 text-xs text-white/70"
           >
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
             Load holdings
@@ -166,7 +166,7 @@ export default function TokenBurnerPanel() {
           <select
             value={selected}
             onChange={(e) => setSelected(e.target.value)}
-            className="mt-3 w-full rounded-xl border border-white/15 bg-black px-3 py-2.5 text-sm"
+            className="mt-3 w-full rounded-xl border border-white/30 bg-black px-3 py-2.5 text-sm"
           >
             {tokens.map((t) => (
               <option key={t.mint} value={t.mint}>
@@ -176,7 +176,7 @@ export default function TokenBurnerPanel() {
             ))}
           </select>
         ) : (
-          <p className="mt-3 text-xs text-white/40">Scan to load burnable balances</p>
+          <p className="mt-3 text-xs text-white/65">Scan to load burnable balances</p>
         )}
 
         {token && (
@@ -196,7 +196,7 @@ export default function TokenBurnerPanel() {
                   className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
                     percent === p && !manual
                       ? "bg-white text-black"
-                      : "border border-white/15 text-white/60"
+                      : "border border-white/30 text-white/80"
                   }`}
                 >
                   {p}%
@@ -210,9 +210,9 @@ export default function TokenBurnerPanel() {
                 setPercent(null);
               }}
               placeholder="Or exact token amount"
-              className="mt-3 h-11 w-full rounded-xl border border-white/15 bg-black px-3 text-sm outline-none focus:border-white/40"
+              className="mt-3 h-11 w-full rounded-xl border border-white/30 bg-black px-3 text-sm outline-none focus:border-white/40"
             />
-            <p className="mt-2 text-xs text-white/40">
+            <p className="mt-2 text-xs text-white/65">
               Will burn {burnUi.toLocaleString(undefined, { maximumFractionDigits: 6 })}
               {burnReclaimsRent(token, amountRaw) ? " · closes ATA & refunds rent" : ""}
             </p>
@@ -237,7 +237,7 @@ export default function TokenBurnerPanel() {
             href={`https://solscan.io/tx/${sig}`}
             target="_blank"
             rel="noreferrer"
-            className="mt-3 inline-flex items-center gap-1 text-xs text-white/50"
+            className="mt-3 inline-flex items-center gap-1 text-xs text-white/70"
           >
             View tx <ExternalLink className="h-3 w-3" />
           </a>

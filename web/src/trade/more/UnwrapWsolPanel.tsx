@@ -73,9 +73,9 @@ export default function UnwrapWsolPanel() {
 
   if (!ready || !publicKey) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-[#050505] p-6 text-center">
-        <Droplets className="mx-auto h-8 w-8 text-white/30" />
-        <p className="mt-3 text-sm text-white/55">
+      <div className="rounded-2xl border border-white/20 bg-[#050505] p-6 text-center">
+        <Droplets className="mx-auto h-8 w-8 text-white/70" />
+        <p className="mt-3 text-sm text-white/75">
           {localActive
             ? "Set a default local trading wallet to unwrap wSOL"
             : "Connect a wallet to unwrap wSOL"}
@@ -104,26 +104,26 @@ export default function UnwrapWsolPanel() {
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#050505] p-4">
+    <div className="rounded-2xl border border-white/20 bg-[#050505] p-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-white/35">wSOL accounts</div>
+          <div className="text-[10px] uppercase tracking-widest text-white/75">wSOL accounts</div>
           <div className="text-xl font-bold">{accounts.length}</div>
           {shortAddress ? (
-            <div className="mt-0.5 font-mono text-[10px] text-white/40">{label || shortAddress}</div>
+            <div className="mt-0.5 font-mono text-[10px] text-white/65">{label || shortAddress}</div>
           ) : null}
         </div>
         <button
           type="button"
           onClick={() => void scan()}
           disabled={loading}
-          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/15 px-3 text-xs text-white/70"
+          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/30 px-3 text-xs text-white/70"
         >
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           Scan
         </button>
       </div>
-      <p className="mt-2 text-sm text-white/50">
+      <p className="mt-2 text-sm text-white/70">
         Closing returns wrapped balance + rent (~{total.toFixed(4)} SOL)
       </p>
       <button
@@ -139,7 +139,7 @@ export default function UnwrapWsolPanel() {
           href={`https://solscan.io/tx/${sig}`}
           target="_blank"
           rel="noreferrer"
-          className="mt-3 inline-flex items-center gap-1 text-xs text-white/50"
+          className="mt-3 inline-flex items-center gap-1 text-xs text-white/70"
         >
           View tx <ExternalLink className="h-3 w-3" /> · {short(sig)}
         </a>

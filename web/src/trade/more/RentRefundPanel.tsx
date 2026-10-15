@@ -74,9 +74,9 @@ export default function RentRefundPanel() {
 
   if (!ready || !publicKey) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-[#050505] p-6 text-center">
-        <Coins className="mx-auto h-8 w-8 text-white/30" />
-        <p className="mt-3 text-sm text-white/55">
+      <div className="rounded-2xl border border-white/20 bg-[#050505] p-6 text-center">
+        <Coins className="mx-auto h-8 w-8 text-white/70" />
+        <p className="mt-3 text-sm text-white/75">
           {localActive
             ? "Set a default local trading wallet to reclaim rent"
             : "Connect a wallet to scan empty ATAs and reclaim rent"}
@@ -106,30 +106,30 @@ export default function RentRefundPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-white/10 bg-[#050505] p-4">
+      <div className="rounded-2xl border border-white/20 bg-[#050505] p-4">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-white/35">Wallet</div>
+            <div className="text-[10px] uppercase tracking-widest text-white/75">Wallet</div>
             <div className="font-mono text-sm">{shortAddress || short(publicKey.toBase58())}</div>
-            {label ? <div className="mt-0.5 text-[10px] text-white/40">{label}</div> : null}
+            {label ? <div className="mt-0.5 text-[10px] text-white/65">{label}</div> : null}
           </div>
           <button
             type="button"
             onClick={() => void scan()}
             disabled={loading}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/15 px-3 text-xs text-white/70 hover:bg-white/5"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/30 px-3 text-xs text-white/70 hover:bg-white/5"
           >
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
             Scan
           </button>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-xl border border-white/10 bg-black/40 p-3">
-            <div className="text-[10px] uppercase tracking-widest text-white/35">Empty accounts</div>
+          <div className="rounded-xl border border-white/20 bg-black/40 p-3">
+            <div className="text-[10px] uppercase tracking-widest text-white/75">Empty accounts</div>
             <div className="mt-1 text-xl font-bold">{accounts.length}</div>
           </div>
-          <div className="rounded-xl border border-white/10 bg-black/40 p-3">
-            <div className="text-[10px] uppercase tracking-widest text-white/35">Reclaimable</div>
+          <div className="rounded-xl border border-white/20 bg-black/40 p-3">
+            <div className="text-[10px] uppercase tracking-widest text-white/75">Reclaimable</div>
             <div className="mt-1 text-xl font-bold">{sol.toFixed(4)} SOL</div>
           </div>
         </div>
@@ -152,18 +152,18 @@ export default function RentRefundPanel() {
             href={`https://solscan.io/tx/${sig}`}
             target="_blank"
             rel="noreferrer"
-            className="mt-3 inline-flex items-center gap-1 text-xs text-white/50 hover:text-white"
+            className="mt-3 inline-flex items-center gap-1 text-xs text-white/70 hover:text-white"
           >
             View last tx <ExternalLink className="h-3 w-3" />
           </a>
         ) : null}
       </div>
       {accounts.length > 0 && (
-        <div className="max-h-56 space-y-1 overflow-y-auto rounded-2xl border border-white/10 bg-[#050505] p-2">
+        <div className="max-h-56 space-y-1 overflow-y-auto rounded-2xl border border-white/20 bg-[#050505] p-2">
           {accounts.map((a) => (
             <div
               key={a.pubkey.toBase58()}
-              className="flex items-center justify-between rounded-xl px-3 py-2 text-xs text-white/60"
+              className="flex items-center justify-between rounded-xl px-3 py-2 text-xs text-white/80"
             >
               <span className="font-mono">{short(a.mint)}</span>
               <span>{(a.lamports / 1e9).toFixed(4)} SOL</span>

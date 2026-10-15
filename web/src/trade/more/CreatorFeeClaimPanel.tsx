@@ -138,9 +138,9 @@ export default function CreatorFeeClaimPanel() {
 
   if (!ready || !publicKey) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-[#050505] p-6 text-center">
-        <HandCoins className="mx-auto h-8 w-8 text-white/30" />
-        <p className="mt-3 text-sm text-white/55">
+      <div className="rounded-2xl border border-white/20 bg-[#050505] p-6 text-center">
+        <HandCoins className="mx-auto h-8 w-8 text-white/70" />
+        <p className="mt-3 text-sm text-white/75">
           {localActive
             ? "Set a default local trading wallet to claim creator fees"
             : "Connect the wallet you launched with to claim creator fees"}
@@ -172,7 +172,7 @@ export default function CreatorFeeClaimPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-white/10 bg-[#050505] p-4">
+      <div className="rounded-2xl border border-white/20 bg-[#050505] p-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Rocket className="h-4 w-4 text-white/70" />
@@ -180,7 +180,7 @@ export default function CreatorFeeClaimPanel() {
           </div>
           <div className="flex items-center gap-2">
             {shortAddress ? (
-              <span className="rounded-full border border-white/12 px-2 py-0.5 font-mono text-[10px] text-white/50">
+              <span className="rounded-full border border-white/25 px-2 py-0.5 font-mono text-[10px] text-white/70">
                 {label || shortAddress}
               </span>
             ) : null}
@@ -190,13 +190,13 @@ export default function CreatorFeeClaimPanel() {
                 void refreshPump();
                 void refreshTokens();
               }}
-              className="rounded-full border border-white/15 p-2 text-white/60"
+              className="rounded-full border border-white/30 p-2 text-white/80"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${pumpLoading ? "animate-spin" : ""}`} />
             </button>
           </div>
         </div>
-        <p className="mt-2 text-xs text-white/40">
+        <p className="mt-2 text-xs text-white/65">
           One claim collects fees across all pump coins this wallet created.
         </p>
         <div className="mt-3 text-2xl font-bold">
@@ -221,7 +221,7 @@ export default function CreatorFeeClaimPanel() {
             href={`https://solscan.io/tx/${pumpSig}`}
             target="_blank"
             rel="noreferrer"
-            className="mt-3 inline-flex items-center gap-1 text-xs text-white/50"
+            className="mt-3 inline-flex items-center gap-1 text-xs text-white/70"
           >
             View tx <ExternalLink className="h-3 w-3" />
           </a>
@@ -230,19 +230,19 @@ export default function CreatorFeeClaimPanel() {
 
       {custom.length > 0 && (
         <div className="space-y-2">
-          <div className="text-[10px] uppercase tracking-widest text-white/35">Custom lane (Token-2022)</div>
+          <div className="text-[10px] uppercase tracking-widest text-white/75">Custom lane (Token-2022)</div>
           {custom.map((t) => {
             const info = claimables[t.mint_address];
             const ui =
               info && info !== "loading" && info !== "error" ? `${info.totalUi.toFixed(4)} ${t.ticker}` : "—";
             return (
-              <div key={t.mint_address} className="rounded-2xl border border-white/10 bg-[#050505] p-3">
+              <div key={t.mint_address} className="rounded-2xl border border-white/20 bg-[#050505] p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <div className="text-sm font-bold">${t.ticker}</div>
-                    <div className="font-mono text-[10px] text-white/35">{short(t.mint_address)}</div>
+                    <div className="font-mono text-[10px] text-white/75">{short(t.mint_address)}</div>
                   </div>
-                  <div className="text-right text-xs text-white/60">{info === "loading" ? "…" : ui}</div>
+                  <div className="text-right text-xs text-white/80">{info === "loading" ? "…" : ui}</div>
                 </div>
                 <button
                   type="button"
