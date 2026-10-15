@@ -95,7 +95,7 @@ function RedirectPreserveSearch({ to }: { to: string }) {
 }
 const IntelLayout = lazyWithRetry(() => import("./crypto/pages/IntelLayout"));
 const IntelHome = lazyWithRetry(() => import("./crypto/pages/IntelHome"));
-const OrbitXOne = lazyWithRetry(() => import("./pages/OrbitXOne"));
+const OnePage = lazyWithRetry(() => import("./pages/one/OnePage"));
 const TokenScanner = lazyWithRetry(() => import("./crypto/pages/TokenScanner"));
 const PortfolioDesk = lazyWithRetry(() => import("./crypto/pages/PortfolioDesk"));
 const TrendingIntel = lazyWithRetry(() => import("./crypto/pages/TrendingIntel"));
@@ -485,7 +485,7 @@ const App = () => (
             <Route path="/hq/*" element={<Navigate to="/orbitx-social" replace />} />
 
             {/* ── Protected: App shell ── */}
-            <Route path="/one" element={<Suspense fallback={null}><OrbitXOne /></Suspense>} />
+            <Route path="/one" element={<Suspense fallback={null}><OnePage /></Suspense>} />
             <Route path="/app" element={<Hub />} />
             <Route path="/koltelebot" element={<OwnerPreviewRoute><ProtectedRoute><KOLTracker /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="/kol-tracker" element={<OwnerPreviewRoute><ProtectedRoute><KOLTracker /></ProtectedRoute></OwnerPreviewRoute>} />
