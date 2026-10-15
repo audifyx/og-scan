@@ -20,6 +20,7 @@ export const HolderAnalysis = () => {
   const [holders, setHolders] = useState<Holder[]>([]);
   const [totalSupply, setTotalSupply] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
+  const [concentration, setConcentration] = useState<{top10: number, top3: number, risk: string} | null>(null);
 
   const analyzeHolders = async () => {
     if (!tokenAddress || tokenAddress.length < 32) {
@@ -31,8 +32,17 @@ export const HolderAnalysis = () => {
     try {
       const { data, error } = await solanaTracker("getTokenHolders", { tokenAddress });
       if (error) throw error;
-      setHolders(data.holders || []);
+      const holderList = data.holders || [];
+      setHolders(holderList);
       setTotalSupply(data.totalSupply || 0);
+      // Whale concentration metrics
+      const top10Pct = holderList.slice(0, 10).reduce((s: number, h: any) => s + (h.percentage || 0), 0);
+      const top3Pct = holderList.slice(0, 3).reduce((s: number, h: any) => s + (h.percentage || 0), 0);
+      setConcentration({
+        top10: top10Pct,
+        top3: top3Pct,
+        risk: top10Pct > 80 ? "critical" : top10Pct > 60 ? "high" : top10Pct > 40 ? "medium" : "low",
+      });
       toast.success("Holders analyzed");
     } catch (error) {
       console.error('Error analyzing holders:', error);

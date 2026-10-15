@@ -65,7 +65,6 @@ export const TRADE_TOOLS: TradeTool[] = [
   { id: "holder-analysis", name: "Holder Analysis", description: "Holder concentration", category: "Analytics", kind: "advanced", advancedKey: "Holder Analysis" },
   { id: "liquidity-scanner", name: "Liquidity Scanner", description: "Pool depth scan", category: "Analytics", kind: "advanced", advancedKey: "Liquidity Scanner" },
   { id: "token-metadata", name: "Token Metadata", description: "On-chain metadata", category: "Analytics", kind: "advanced", advancedKey: "Token Metadata" },
-  { id: "whale-concentration", name: "Whale Concentration", description: "Whale holdings", category: "Analytics", kind: "advanced", advancedKey: "Whale Concentration" },
   { id: "mev-tracker", name: "MEV Tracker", description: "MEV activity", category: "Analytics", kind: "advanced", advancedKey: "MEV Tracker" },
   { id: "fee-analyzer", name: "Fee Analyzer", description: "Fee breakdowns", category: "Analytics", kind: "advanced", advancedKey: "Fee Analyzer" },
   { id: "program-monitor", name: "Program Monitor", description: "DEX program activity", category: "Analytics", kind: "advanced", advancedKey: "Program Monitor" },

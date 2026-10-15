@@ -63,16 +63,18 @@ export async function getTokenHolders(tokenAddress: string, limit = 20) {
     const usdPrice = priceMap[tokenAddress]?.usdPrice ?? 0;
     const totalSupply = supply?.uiAmount ?? 0;
 
-    return (accounts || []).slice(0, limit).map((a, i) => ({
+    const holders = (accounts || []).slice(0, limit).map((a, i) => ({
       rank: i + 1,
       address: a.address,
       amount: a.uiAmount,
+      percent: totalSupply > 0 ? ((a.uiAmount / totalSupply) * 100).toFixed(2) : "0.00",
       percentage: totalSupply > 0 ? (a.uiAmount / totalSupply) * 100 : 0,
       value: a.uiAmount * usdPrice,
     }));
+    return { holders, totalSupply, count: holders.length };
   } catch (e) {
     console.error("getTokenHolders error:", e);
-    return [];
+    return { holders: [], totalSupply: 0, count: 0 };
   }
 }
 
@@ -381,11 +383,13 @@ export async function getLiquidityPools(tokenAddress: string) {
       liquidity: p.liquidity?.usd ?? 0,
       fdv: p.fdv ?? 0,
       pairCreatedAt: p.pairCreatedAt,
+      url: p.url,
     }));
-    return pools;
+    const totalLiquidity = pools.reduce((s: number, p: any) => s + (p.liquidity || 0), 0);
+    return { pools, totalLiquidity, count: pools.length };
   } catch (e) {
     console.error("getLiquidityPools error:", e);
-    return [];
+    return { pools: [], totalLiquidity: 0, count: 0 };
   }
 }
 
