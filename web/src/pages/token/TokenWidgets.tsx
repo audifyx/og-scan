@@ -129,10 +129,11 @@ export function EvolutionCelebration({ stage }: { stage: number }) {
 
 /** Animated stat card with count-up value. */
 export function StatCard({ label, value, sub, subUp }: { label: string; value: string; sub?: string | null; subUp?: boolean }) {
+  const long = value.length > 10;
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-2 py-3 text-center transition-colors hover:border-teal-300/25">
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">{label}</p>
-      <p className="mt-1 truncate text-[15px] font-extrabold tabular-nums">{value}</p>
+      <p className={`mt-1 truncate font-extrabold tabular-nums ${long ? "text-[11px]" : "text-[15px]"}`}>{value}</p>
       {sub && <p className={cn("text-[11px] font-bold tabular-nums", subUp ? "text-emerald-400" : "text-rose-400")}>{sub}</p>}
     </div>
   );
