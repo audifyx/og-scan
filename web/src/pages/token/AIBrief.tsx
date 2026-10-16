@@ -47,24 +47,55 @@ function buildBrief(s: AvatarStats, burned: number | null): string[] {
   return lines;
 }
 
-/** AI analyst brief with typing effect. */
+const STAGE_MINS = [0, 10_000, 25_000, 100_000, 500_000, 2_000_000];
+
+/** Semantic key — only changes when the *meaning* of the brief changes, not on every price tick. */
+function semanticKey(s: AvatarStats, burned: number | null): string {
+  const chg = s.change24h ?? 0;
+  const trend = chg >= 15 ? "moon" : chg >= 5 ? "strong" : chg >= 0 ? "steady" : chg > -10 ? "cool" : "red";
+  const mcap = s.mcap ?? 0;
+  const liq = s.liquidity ?? 0;
+  const lr = mcap > 0 && liq > 0 ? liq / mcap : 0;
+  const liqb = lr >= 0.4 ? "deep" : lr >= 0.15 ? "ok" : "thin";
+  let stage = 0;
+  for (let i = 5; i >= 0; i--) if (mcap >= STAGE_MINS[i]) { stage = i; break; }
+  const burnM = burned != null && burned > 0 ? Math.floor(burned / 5_000_000) : 0;
+  return `${trend}|${liqb}|${stage}|${burnM}`;
+}
+
+/** AI analyst brief with typing effect. Only re-types when the story changes. */
 export function AIBrief({ stats, burned }: { stats: AvatarStats; burned: number | null }) {
   const lines = useMemo(() => buildBrief(stats, burned), [stats, burned]);
   const full = useMemo(() => lines.join("\n\n"), [lines]);
+  const key = useMemo(() => semanticKey(stats, burned), [stats, burned]);
   const [shown, setShown] = useState(0);
-  const key = useMemo(() => `${stats.price}-${stats.mcap}-${stats.change24h}`, [stats.price, stats.mcap, stats.change24h]);
+  const keyRef = useRef(key);
+  const fullRef = useRef(full);
+  fullRef.current = full;
 
+  // A new story -> restart typing from zero. Same story, new numbers -> no flash.
   useEffect(() => {
-    setShown(0);
-    let i = 0;
+    if (key !== keyRef.current) {
+      keyRef.current = key;
+      setShown(0);
+    }
+  }, [key]);
+
+  // Numbers ticked but story is the same: if we already finished typing,
+  // snap to the new end instantly instead of replaying.
+  const prevLenRef = useRef(full.length);
+  useEffect(() => {
+    setShown((s) => (s >= prevLenRef.current ? full.length : s));
+    prevLenRef.current = full.length;
+  }, [full]);
+
+  // Steady typing toward the current end.
+  useEffect(() => {
     const id = setInterval(() => {
-      i += 3;
-      setShown(i);
-      if (i >= full.length) clearInterval(id);
+      setShown((s) => Math.min(s + 5, fullRef.current.length));
     }, 24);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, []);
 
   const text = full.slice(0, shown);
   const done = shown >= full.length;

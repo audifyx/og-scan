@@ -161,10 +161,11 @@ export function LivingAvatar({ stats, size = 220, compact = false }: { stats: Av
       {/* Thought bubble */}
       {!compact && (
       <div className="relative mb-2 max-w-[260px] rounded-2xl rounded-bl-sm border border-white/10 bg-white/[0.06] px-4 py-2.5 text-center backdrop-blur-md">
-        <p key={thought} className="text-[13px] leading-snug text-white/85">{thought}</p>
+        <p key={thought} className="animate-[thoughtIn_0.5s_ease-out text-[13px] leading-snug text-white/85">{thought}</p>
         <div className="absolute -bottom-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b border-r border-white/10 bg-[#0b0f1a]" />
       </div>
       )}
+      <style>{`@keyframes thoughtIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
 
       <div className="relative" style={{ width: size, height: size }}>
         {/* aura */}
