@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, BadgeCheck, Bell, Copy, ExternalLink, Flame, Share2, CandlestickChart, Wallet, Info, Activity, Brain, Heart, Gem, Award, PieChart, Calculator, TrendingUp, Milestone, Clock, Lightbulb, MessageSquarePlus, Gift, BookOpen, Users, Bot, Link2 } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Bell, Copy, ExternalLink, Flame, Share2, CandlestickChart, Wallet, Info, Activity, Brain, Heart, Gem, Award, PieChart, Calculator, TrendingUp, Milestone, Clock, Lightbulb, MessageSquarePlus, Gift, BookOpen, Users, Bot, Link2, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LivingAvatar, type AvatarStats } from "./LivingAvatar";
@@ -31,7 +31,11 @@ import * as Chain1 from "./TokenChain1";
 import * as Chain2 from "./TokenChain2";
 import * as Chain3 from "./TokenChain3";
 import * as Chain4 from "./TokenChain4";
-/* WILD_IMPORTS_PLACEHOLDER */
+import * as Wild1 from "./TokenWild1";
+import * as Wild2 from "./TokenWild2";
+import * as Wild3 from "./TokenWild3";
+import * as Wild4 from "./TokenWild4";
+import * as Wild5 from "./TokenWild5";
 import { AgentDiary } from "./AgentDiary";
 import { useAgentMemory } from "./AgentMemory";
 import { stageForMcap } from "./LivingAvatar";
@@ -77,7 +81,7 @@ function fmtUsd(n: number | null | undefined): string {
 }
 
 
-type Tab = "about" | "chart" | "buys" | "burns" | "social" | "agents" | "chain";
+type Tab = "about" | "chart" | "buys" | "burns" | "social" | "agents" | "chain" | "wild";
 
 export default function TokenPage() {
   const navigate = useNavigate();
@@ -183,7 +187,7 @@ export default function TokenPage() {
     { id: "social", label: "Social", icon: Users },
     { id: "agents", label: "Agents", icon: Bot },
     { id: "chain", label: "Chain", icon: Link2 },
-    /* WILD_TAB_PLACEHOLDER */
+    { id: "wild", label: "Wild", icon: Sparkles },
   ];
 
 
@@ -325,7 +329,12 @@ export default function TokenPage() {
                   {renderWidgets([Chain1, Chain2, Chain3, Chain4], { trades: feed.trades, solPrice: null, loading: feed.loading })}
                 </div>
               )}
-              {/* WILD_PANEL_PLACEHOLDER */}
+              {tab === "wild" && (
+                <div className="space-y-2.5">
+                  <p className="px-1 text-xs text-white/40">110 wild ideas — fun over utility, always.</p>
+                  {renderWidgets([Wild1, Wild2, Wild3, Wild4, Wild5], { price: stats?.price ?? null, stats: avatarStats })}
+                </div>
+              )}
   </div>
 
   {/* theme switcher */}
