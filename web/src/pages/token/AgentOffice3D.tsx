@@ -202,6 +202,22 @@ function BlockyAgent({ mood, stage }: { mood: AvatarMood; stage: number }) {
 
 // ── Office ─────────────────────────────────────────────────────────────────
 import { useScreenTexture, type ScreenKind } from "./MonitorScreens";
+import { GameConsoles } from "./Consoles3D";
+import { HeroGuitars } from "./Guitars3D";
+import { RockBandDrums } from "./Drums3D";
+import { RockBandMic } from "./MicStand3D";
+import { ArcadeSection } from "./Arcade3D";
+import { KitchenCorner } from "./Kitchen3D";
+import { ViralMeals } from "./Meals3D";
+import { FridgeGlow } from "./FridgeLight3D";
+import { OfficePlant } from "./Plant3D";
+import { WallPosters } from "./Poster3D";
+import { ArcadeRug } from "./Rug3D";
+import { FloorLamp } from "./Lamp3D";
+import { MemoryBoard } from "./MemoryBoard3D";
+import { AgentChatter } from "./AgentChatter3D";
+import { ScreenGlare } from "./ScreenGlare3D";
+import type { AgentMemory } from "./AgentMemory";
 
 function Monitor({ position, rotationY = 0, hue = "#22d3ee", chart = false }: { position: [number, number, number]; rotationY?: number; hue?: string; chart?: boolean }) {
   return (
@@ -319,6 +335,139 @@ function MiniAgent({ seed, center, radius, color, speed = 0.4, role = "AGENT" }:
     </group>
   );
 }
+
+/** Wall-mounted big TV showing the live ORBITX DEX chart. */
+function BigTV({ stats }: { stats: AvatarStats }) {
+  const tex = useScreenTexture("dexchart", stats);
+  return (
+    <group position={[-5.6, 2.4, 0]} rotation={[0, Math.PI / 2, 0]}>
+      {/* wall mount */}
+      <mesh position={[0, 0, -0.12]}><boxGeometry args={[0.5, 0.5, 0.2]} /><meshStandardMaterial color="#0d1326" metalness={0.6} /></mesh>
+      {/* TV body */}
+      <mesh><boxGeometry args={[3.4, 1.95, 0.12]} /><meshStandardMaterial color="#05070d" roughness={0.3} metalness={0.5} /></mesh>
+      {/* screen */}
+      <mesh position={[0, 0, 0.065]}>
+        <planeGeometry args={[3.24, 1.79]} />
+        <meshBasicMaterial map={tex} toneMapped={false} />
+      </mesh>
+      {/* glow */}
+      <mesh position={[0, 0, -0.05]}>
+        <planeGeometry args={[3.8, 2.3]} />
+        <meshBasicMaterial color="#26a69a" transparent opacity={0.1} />
+      </mesh>
+      {/* LED */}
+      <mesh position={[1.55, -0.88, 0.07]}><boxGeometry args={[0.08, 0.03, 0.02]} /><meshStandardMaterial color="#000" emissive="#ef4444" emissiveIntensity={2} /></mesh>
+    </group>
+  );
+}
+
+/** An agent sitting and watching the TV — subtle head bob, eyes on screen. */
+function WatchingAgent({ position, color, role, delay = 0 }: { position: [number, number, number]; color: string; role: string; delay?: number }) {
+  const head = useRef<THREE.Group>(null);
+  const tag = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 256; c.height = 64;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "rgba(2,8,16,0.8)";
+    ctx.beginPath(); ctx.roundRect(2, 6, 252, 52, 14); ctx.fill();
+    ctx.strokeStyle = color; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.roundRect(2, 6, 252, 52, 14); ctx.stroke();
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 30px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(role, 128, 44);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, [role, color]);
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime() + delay;
+    if (head.current) {
+      head.current.rotation.y = Math.sin(t * 0.7) * 0.12;
+      head.current.rotation.x = Math.sin(t * 0.45) * 0.06;
+    }
+  });
+  return (
+    <group position={position} rotation={[0, -Math.PI / 2, 0]}>
+      {/* seated legs (folded) */}
+      <mesh position={[0, 0.18, 0.18]}><boxGeometry args={[0.44, 0.22, 0.5]} /><meshStandardMaterial color="#141a30" roughness={0.7} /></mesh>
+      {/* torso */}
+      <mesh position={[0, 0.62, 0]}><boxGeometry args={[0.52, 0.62, 0.32]} /><meshStandardMaterial color={color} roughness={0.5} metalness={0.2} /></mesh>
+      <mesh position={[0, 0.62, 0.17]}><boxGeometry args={[0.3, 0.3, 0.02]} /><meshStandardMaterial color="#0b0f1c" emissive={color} emissiveIntensity={0.7} /></mesh>
+      {/* head */}
+      <group ref={head} position={[0, 1.12, 0]}>
+        <mesh><boxGeometry args={[0.36, 0.32, 0.34]} /><meshStandardMaterial color="#1c2440" roughness={0.5} /></mesh>
+        <mesh position={[0, 0.01, 0.18]}><boxGeometry args={[0.26, 0.1, 0.02]} /><meshStandardMaterial color="#000" emissive="#7df9ff" emissiveIntensity={2.5} /></mesh>
+      </group>
+      {/* role tag */}
+      <mesh position={[0, 1.62, 0]}>
+        <planeGeometry args={[0.9, 0.225]} />
+        <meshBasicMaterial map={tag} transparent opacity={0.95} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+      {/* popcorn */}
+      <mesh position={[0.35, 0.45, 0.2]}><cylinderGeometry args={[0.09, 0.07, 0.14, 10]} /><meshStandardMaterial color="#fbbf24" roughness={0.8} /></mesh>
+    </group>
+  );
+}
+
+
+/** Small laptop on the coffee table showing the @orbitx_wrld X profile. */
+function XProfileLaptop({ position, rotationY = 0, stats }: { position: [number, number, number]; rotationY?: number; stats: AvatarStats }) {
+  const tex = useScreenTexture("xprofile", stats);
+  return (
+    <group position={position} rotation={[0, rotationY, 0]}>
+      {/* base */}
+      <mesh position={[0, -0.1, 0.1]}><boxGeometry args={[0.7, 0.03, 0.45]} /><meshStandardMaterial color="#1a2138" metalness={0.5} /></mesh>
+      {/* screen */}
+      <mesh position={[0, 0.12, -0.08]} rotation={[-0.25, 0, 0]}>
+        <boxGeometry args={[0.7, 0.45, 0.03]} />
+        <meshStandardMaterial color="#0d1220" roughness={0.4} />
+      </mesh>
+      <mesh position={[0, 0.175, -0.06]} rotation={[-0.25, 0, 0]}>
+        <planeGeometry args={[0.64, 0.39]} />
+        <meshBasicMaterial map={tex} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+/** TV lounge: couch, coffee table, and agents watching the big screen. */
+function TVLounge({ stats }: { stats: AvatarStats }) {
+  return (
+    <group>
+      <BigTV stats={stats} />
+      {/* couch */}
+      <group position={[-2.4, 0, 0]} rotation={[0, -Math.PI / 2, 0]}>
+        <mesh position={[0, 0.3, 0]}><boxGeometry args={[2.6, 0.35, 1.0]} /><meshStandardMaterial color="#1e2a4a" roughness={0.8} /></mesh>
+        <mesh position={[0, 0.65, -0.48]}><boxGeometry args={[2.6, 0.7, 0.18]} /><meshStandardMaterial color="#16203a" roughness={0.8} /></mesh>
+        {[[-1.2], [1.2]].map(([x], i) => (
+          <mesh key={i} position={[x, 0.55, 0]}><boxGeometry args={[0.18, 0.5, 1.0]} /><meshStandardMaterial color="#16203a" roughness={0.8} /></mesh>
+        ))}
+        {[[-0.85, "#7c3aed"], [0, "#0ea5e9"], [0.85, "#f59e0b"]].map(([x, c], i) => (
+          <mesh key={i} position={[x as number, 0.62, -0.32]}><boxGeometry args={[0.5, 0.4, 0.12]} /><meshStandardMaterial color={c as string} roughness={0.9} /></mesh>
+        ))}
+      </group>
+      {/* coffee table with laptop showing X profile */}
+      <group position={[-3.6, 0, 0]}>
+        <mesh position={[0, 0.4, 0]}><boxGeometry args={[1.1, 0.06, 0.7]} /><meshStandardMaterial color="#182036" roughness={0.4} /></mesh>
+        {[[-0.5, -0.3], [0.5, -0.3], [-0.5, 0.3], [0.5, 0.3]].map(([x, z], i) => (
+          <mesh key={i} position={[x, 0.2, z]}><boxGeometry args={[0.06, 0.4, 0.06]} /><meshStandardMaterial color="#0d1326" /></mesh>
+        ))}
+      </group>
+      <XProfileLaptop position={[-3.6, 0.72, 0.1]} rotationY={Math.PI / 2} stats={stats} />
+      {/* agents watching */}
+      <WatchingAgent position={[-2.4, 0.48, -0.75]} color="#7c3aed" role="TRADER" delay={0} />
+      <WatchingAgent position={[-2.4, 0.48, 0]} color="#0ea5e9" role="SCOUT" delay={1.3} />
+      <WatchingAgent position={[-2.4, 0.48, 0.75]} color="#f59e0b" role="ORACLE" delay={2.1} />
+      {/* rug under lounge */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-3.4, 0.015, 0]}>
+        <circleGeometry args={[1.9, 40]} />
+        <meshStandardMaterial color="#0f1a2e" roughness={0.9} />
+      </mesh>
+    </group>
+  );
+}
+
 
 function Citizens({ stage }: { stage: number }) {
   const spots = useMemo(() => {
@@ -882,7 +1031,12 @@ function RocketPad() {
   );
 }
 
-function Office({ stage, mood, stats }: { stage: number; mood: AvatarMood; stats: AvatarStats }) {
+function Office({ stage, mood, stats, memories }: { stage: number; mood: AvatarMood; stats: AvatarStats; memories: AgentMemory[] }) {
+  const chatterLines = useMemo(() => {
+    const mem = memories.slice(0, 4).map((m) => m.text.replace(/^[^\s]+\s/, "").slice(0, 34));
+    const ambient = ["did you see that whale?!", "chart's looking spicy", "don't touch my ramen", "one more game?", "orbit to the moon"];
+    return [...mem, ...ambient].slice(0, 6);
+  }, [memories]);
   const crystal = useRef<THREE.Group>(null);
   useFrame((s) => {
     if (crystal.current) {
@@ -940,6 +1094,29 @@ function Office({ stage, mood, stats }: { stage: number; mood: AvatarMood; stats
         <mesh position={[0, 0.28, 0]}><cylinderGeometry args={[0.05, 0.05, 0.5, 8]} /><meshStandardMaterial color="#0d1326" metalness={0.6} /></mesh>
       </group>
 
+      {/* TV lounge — agents watching the charts (stage 1+) */}
+      {stage >= 1 && <TVLounge stats={stats} />}
+      {/* consoles + glare under the big TV */}
+      <GameConsoles />
+      <ScreenGlare />
+      {/* agent chatter above the couch */}
+      <AgentChatter lines={chatterLines} />
+      {/* music corner (stage 2+) */}
+      {stage >= 2 && <HeroGuitars />}
+      {stage >= 2 && <RockBandDrums />}
+      {stage >= 2 && <RockBandMic />}
+      {/* arcade zone (stage 2+) */}
+      {stage >= 2 && <ArcadeSection />}
+      {stage >= 2 && <ArcadeRug />}
+      {/* kitchen — they live here (stage 1+) */}
+      {stage >= 1 && <KitchenCorner />}
+      {stage >= 1 && <ViralMeals />}
+      {stage >= 1 && <FridgeGlow />}
+      {/* decor + memory */}
+      <OfficePlant />
+      <WallPosters />
+      <FloorLamp />
+      <MemoryBoard memories={memories} />
       {/* team workstation (stage 2+) */}
       {stage >= 2 && <SecondDesk stats={stats} />}
       {/* meeting plaza (stage 3+) */}
@@ -1053,7 +1230,7 @@ const THOUGHTS: Array<(s: AvatarStats) => string | null> = [
   (s) => (s.mcap ?? 0) >= 10_000_000 ? "From one desk to a whole metropolis. This community built it." : null,
 ];
 
-export function AgentOffice3D({ stats }: { stats: AvatarStats }) {
+export function AgentOffice3D({ stats, memories }: { stats: AvatarStats; memories?: AgentMemory[] }) {
   const stage = stageForMcap(stats.mcap);
   const mood = moodForChange(stats.change24h);
   const [thoughtIdx, setThoughtIdx] = useState(0);
@@ -1096,7 +1273,7 @@ export function AgentOffice3D({ stats }: { stats: AvatarStats }) {
             <pointLight position={[3, 2.5, -2]} intensity={8} color="#3b82f6" distance={12} />
             {mood === "dormant" && <pointLight position={[0, 2, 0]} intensity={4} color="#1e2a4a" distance={10} />}
             <Stars radius={60} depth={30} count={2200} factor={3.5} saturation={0} fade speed={0.6} />
-            <Office stage={stage} mood={mood} stats={stats} />
+            <Office stage={stage} mood={mood} stats={stats} memories={memories ?? []} />
             <BlockyAgent mood={mood} stage={stage} />
             <Citizens stage={stage} />
             {isCity && <CityBuildings stage={stage} />}

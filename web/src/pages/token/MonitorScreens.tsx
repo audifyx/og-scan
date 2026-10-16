@@ -3,7 +3,7 @@ import * as THREE from "three";
 import type { AvatarStats } from "./LivingAvatar";
 import { fmtPriceSmart } from "./TokenWidgets";
 
-export type ScreenKind = "orbitx" | "xscan" | "terminal" | "radar";
+export type ScreenKind = "orbitx" | "xscan" | "terminal" | "radar" | "dexchart" | "xprofile";
 
 function fmtUsd(n: number | null | undefined): string {
   if (n == null || !isFinite(n)) return "—";
@@ -20,6 +20,16 @@ function sparkPoints(price: number, change: number, n = 40): number[] {
   const drift = change / 100 / n;
   for (let i = 1; i < n; i++) pts.push(pts[i - 1] + drift + (rand() - 0.5) * 0.012);
   return pts;
+}
+
+function mulberry(seed: number) {
+  let s = seed >>> 0;
+  return () => {
+    s |= 0; s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 const X_LINES = [
@@ -155,6 +165,90 @@ function drawScreen(g: CanvasRenderingContext2D, kind: ScreenKind, stats: Avatar
     g.fillStyle = "#5eead4";
     g.font = "bold 11px monospace";
     g.fillText("TOKEN SCAN", 10, 18);
+  }
+
+  if (kind === "dexchart") {
+    const up = (stats.change24h ?? 0) >= 0;
+    g.fillStyle = "#0b0e17";
+    g.fillRect(0, 0, W, H);
+    g.fillStyle = "#fff";
+    g.font = "bold 12px monospace";
+    g.fillText("ORBITX / SOL", 10, 18);
+    g.fillStyle = up ? "#34d399" : "#fb7185";
+    g.font = "bold 12px monospace";
+    g.fillText(fmtPriceSmart(stats.price), 128, 18);
+    g.fillStyle = "rgba(255,255,255,0.4)";
+    g.font = "9px monospace";
+    g.fillText("DEXSCREENER - LIVE", 10, 32);
+    const rnd = mulberry(frame * 13 + 7);
+    const n = 22;
+    let base = 0.5;
+    const cw = (W - 20) / n;
+    for (let i = 0; i < n; i++) {
+      const drift = i === n - 1 ? (up ? 0.05 : -0.05) : (rnd() - 0.48) * 0.13;
+      const o = base;
+      const c = Math.min(0.92, Math.max(0.08, base + drift));
+      const h = Math.max(o, c) + rnd() * 0.05;
+      const l = Math.min(o, c) - rnd() * 0.05;
+      const x = 10 + i * cw + cw / 2;
+      const yO = 142 - o * 96, yC = 142 - c * 96, yH = 142 - h * 96, yL = 142 - l * 96;
+      const col = c >= o ? "#26a69a" : "#ef5350";
+      g.strokeStyle = col;
+      g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(x, yH); g.lineTo(x, yL); g.stroke();
+      g.fillStyle = col;
+      const top = Math.min(yO, yC);
+      g.fillRect(x - cw * 0.28, top, cw * 0.56, Math.max(2, Math.abs(yC - yO)));
+      base = c;
+    }
+    g.strokeStyle = up ? "#34d399" : "#fb7185";
+    g.setLineDash([4, 3]);
+    g.beginPath(); g.moveTo(10, 142 - base * 96); g.lineTo(W - 10, 142 - base * 96); g.stroke();
+    g.setLineDash([]);
+    if (frame % 2 === 0) { g.fillStyle = "#ef5350"; g.beginPath(); g.arc(W - 12, 14, 4, 0, 7); g.fill(); }
+  }
+
+  if (kind === "xprofile") {
+    g.fillStyle = "#000";
+    g.fillRect(0, 0, W, H);
+    g.fillStyle = "#1d9bf0";
+    g.fillRect(0, 0, W, 44);
+    g.fillStyle = "#0a0f1a";
+    g.beginPath(); g.arc(30, 48, 16, 0, 7); g.fill();
+    g.strokeStyle = "#1d9bf0"; g.lineWidth = 2;
+    g.beginPath(); g.arc(30, 48, 16, 0, 7); g.stroke();
+    g.fillStyle = "#2dd4bf";
+    g.font = "bold 13px monospace";
+    g.fillText("\u25C8", 24, 53);
+    g.fillStyle = "#fff";
+    g.font = "bold 12px monospace";
+    g.fillText("orbitx", 52, 46);
+    g.fillStyle = "rgba(255,255,255,0.5)";
+    g.font = "10px monospace";
+    g.fillText("@orbitx_wrld", 52, 60);
+    g.fillStyle = "#fff";
+    g.font = "bold 10px monospace";
+    g.fillText("660", 158, 46);
+    g.fillStyle = "rgba(255,255,255,0.5)";
+    g.fillText("followers", 184, 46);
+    g.fillStyle = "rgba(255,255,255,0.08)";
+    g.fillRect(10, 72, W - 20, 76);
+    g.fillStyle = "#e7e9ea";
+    g.font = "10px monospace";
+    const posts = [
+      "ORBITX just burned more",
+      "supply. Fewer tokens.",
+      "Same dream. LFG \u25C8",
+      "New ATH loading...",
+      "Agents are watching.",
+    ];
+    const off = frame % posts.length;
+    for (let i = 0; i < 4; i++) {
+      g.fillText(posts[(off + i) % posts.length].slice(0, 30), 18, 90 + i * 16);
+    }
+    g.fillStyle = "#1d9bf0";
+    g.font = "9px monospace";
+    g.fillText("X LIVE FEED", 10, 20);
   }
 }
 
