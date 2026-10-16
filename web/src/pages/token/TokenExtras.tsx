@@ -74,6 +74,7 @@ export function PriceAlerts({ price }: { price: number | null | undefined }) {
     setAlert(next);
     setInput("");
     try { localStorage.setItem(ALERT_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+    window.dispatchEvent(new CustomEvent("orbitx-alert-set"));
   };
 
   const clear = () => {

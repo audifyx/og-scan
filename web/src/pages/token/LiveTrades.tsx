@@ -38,8 +38,9 @@ function TradeRow({ t }: { t: RpcTrade }) {
   );
 }
 
-export function LiveTrades({ mint }: { mint: string }) {
-  const { trades, loading, error, refresh } = useRpcTrades(mint, 15, 20000);
+export function LiveTrades({ mint, feed }: { mint: string; feed?: { trades: RpcTrade[]; loading: boolean; error: string | null; refresh: () => void } }) {
+  const internal = useRpcTrades(mint, 15, 20000);
+  const { trades, loading, error, refresh } = feed ?? internal;
 
   return (
     <div className="space-y-3">

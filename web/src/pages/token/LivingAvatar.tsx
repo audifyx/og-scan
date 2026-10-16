@@ -73,7 +73,7 @@ function fmtUsd(n: number | null): string {
   return `$${n.toFixed(0)}`;
 }
 
-function thoughtFor(stats: AvatarStats, stage: number, mood: AvatarMood): string {
+export function thoughtFor(stats: AvatarStats, stage: number, mood: AvatarMood): string {
   const { mcap, liquidity, change24h, burned } = stats;
   const pool = [
     mcap != null ? `Market cap ${fmtUsd(mcap)} — I can feel myself growing.` : null,
@@ -96,12 +96,19 @@ export function LivingAvatar({ stats, size = 220, compact = false }: { stats: Av
   const stage = stageForMcap(stats.mcap);
   const mood = moodForChange(stats.change24h);
   const [thought, setThought] = useState(() => thoughtFor(stats, stage, mood));
+  const [thoughtVisible, setThoughtVisible] = useState(true);
   const [justEvolved, setJustEvolved] = useState(false);
   const [memory, setMemory] = useState<Memory>(loadMemory);
 
-  // Rotate thoughts
+  // Rotate thoughts with crossfade: fade out, swap, fade in
   useEffect(() => {
-    const id = setInterval(() => setThought(thoughtFor(stats, stage, mood)), 9000);
+    const id = setInterval(() => {
+      setThoughtVisible(false);
+      setTimeout(() => {
+        setThought(thoughtFor(stats, stage, mood));
+        setThoughtVisible(true);
+      }, 350);
+    }, 9000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stats.mcap, stats.liquidity, stats.change24h, stage, mood]);
@@ -161,7 +168,7 @@ export function LivingAvatar({ stats, size = 220, compact = false }: { stats: Av
       {/* Thought bubble */}
       {!compact && (
       <div className="relative mb-2 max-w-[260px] rounded-2xl rounded-bl-sm border border-white/10 bg-white/[0.06] px-4 py-2.5 text-center backdrop-blur-md">
-        <p key={thought} className="animate-[thoughtIn_0.5s_ease-out text-[13px] leading-snug text-white/85">{thought}</p>
+        <p className={`text-[13px] leading-snug text-white/85 transition-opacity duration-300 ${thoughtVisible ? "opacity-100" : "opacity-0"}`}>{thought}</p>
         <div className="absolute -bottom-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b border-r border-white/10 bg-[#0b0f1a]" />
       </div>
       )}
