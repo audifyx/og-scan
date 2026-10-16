@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Rocket } from "lucide-react";
+import { Rocket, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Smoothly animates toward a numeric target. */
@@ -46,6 +46,68 @@ export function fmtTokens(n: number | null | undefined): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return n.toFixed(0);
+}
+
+/** Collapsible section — compacts the page without removing anything. */
+export function Collapsible({
+  id,
+  icon: Icon,
+  title,
+  sub,
+  defaultOpen = false,
+  children,
+}: {
+  id: string;
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  sub?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(() => {
+    try {
+      const raw = localStorage.getItem("orbitx-collapsed");
+      if (raw) {
+        const map = JSON.parse(raw);
+        if (id in map) return map[id];
+      }
+    } catch { /* ignore */ }
+    return defaultOpen;
+  });
+  const toggle = () => {
+    setOpen((o: boolean) => {
+      const next = !o;
+      try {
+        const raw = localStorage.getItem("orbitx-collapsed");
+        const map = raw ? JSON.parse(raw) : {};
+        map[id] = next;
+        localStorage.setItem("orbitx-collapsed", JSON.stringify(map));
+      } catch { /* ignore */ }
+      return next;
+    });
+  };
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] lg:rounded-lg">
+      <button
+        onClick={toggle}
+        className="flex w-full items-center gap-2.5 px-4 py-3 text-left transition hover:bg-white/[0.04]"
+      >
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-teal-400/12 text-teal-300">
+          <Icon className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-extrabold">{title}</span>
+          {sub && <span className="block truncate text-[11px] text-white/40">{sub}</span>}
+        </span>
+        <ChevronDown className={cn("h-4 w-4 shrink-0 text-white/40 transition-transform duration-300", open && "rotate-180")} />
+      </button>
+      <div className={cn("grid transition-all duration-300 ease-out", open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
+        <div className="overflow-hidden">
+          <div className="border-t border-white/8 p-3">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /** Full-screen confetti celebration when Orbit evolves to a new stage. */

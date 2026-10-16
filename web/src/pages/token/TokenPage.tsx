@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, BadgeCheck, Bell, Copy, ExternalLink, Flame, Share2, CandlestickChart, Wallet, Info, Activity } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Bell, Copy, ExternalLink, Flame, Share2, CandlestickChart, Wallet, Info, Activity, Brain, Heart, Gem, Award, PieChart, Calculator, TrendingUp, Milestone, Clock, Lightbulb, MessageSquarePlus, Gift } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LivingAvatar, type AvatarStats } from "./LivingAvatar";
@@ -14,7 +14,7 @@ import { ShareButton, PriceAlerts, TokenomicsBars, DiamondHands } from "./TokenE
 import { WhatIf } from "./WhatIf";
 import { EvolutionTimeline } from "./EvolutionTimeline";
 import { AmbientToggle } from "./AmbientToggle";
-import { TickerTape, StageProgress, StatCard, EvolutionCelebration, useCountUp, fmtUsdShort, fmtPriceSmart, fmtTokens } from "./TokenWidgets";
+import { TickerTape, StageProgress, StatCard, EvolutionCelebration, Collapsible, useCountUp, fmtUsdShort, fmtPriceSmart, fmtTokens } from "./TokenWidgets";
 import { TopScreen, Hinge, BottomScreen, TouchButton, DialogueBox } from "./DS3Shell";
 import { thoughtFor, moodForChange } from "./LivingAvatar";
 import { THEMES, ThemeSwitcher, ThemeStyles } from "./TokenThemes";
@@ -166,6 +166,132 @@ export default function TokenPage() {
     { id: "burns", label: "Burns", icon: Flame },
   ];
 
+  const bottomContent = (
+    <div className="space-y-3 p-3 lg:p-0">
+  {/* profile row */}
+  <div className="flex items-center gap-3">
+    <div className="rounded-2xl border-2 border-white/15 bg-[#0a0f1a] p-0.5">
+      <LivingAvatar stats={avatarStats} size={56} compact />
+    </div>
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-1.5">
+        <h1 className="text-base font-extrabold tracking-tight">ORBITX</h1>
+        <BadgeCheck className="h-4 w-4 text-sky-400" />
+      </div>
+      <button onClick={copyMint} className="mt-0.5 flex w-full items-center gap-1.5 text-left">
+        <code className="flex-1 truncate font-mono text-[10px] text-teal-200/80">{ORBITX_MINT}</code>
+        {copied ? <span className="text-[10px] font-bold text-emerald-300">Copied!</span> : <Copy className="h-3 w-3 text-white/40" />}
+      </button>
+    </div>
+    <ShareButton price={stats?.price} change={stats?.change24h} mcap={stats?.mcap} />
+  </div>
+
+  {/* stat grid */}
+  <div className="grid grid-cols-4 gap-1.5">
+    <StatCard label="Price" value={fmtPriceSmart(stats?.price)} />
+    <StatCard label="MCap" value={fmtUsdShort(useCountUp(stats?.mcap))} sub={change != null ? `${changeUp ? "+" : ""}${change.toFixed(1)}%` : null} subUp={changeUp} />
+    <StatCard label="Liq" value={fmtUsdShort(useCountUp(stats?.liquidity))} />
+    <StatCard label="Vol" value={fmtUsdShort(useCountUp(stats?.volume24h))} />
+  </div>
+
+  <StageProgress mcap={stats?.mcap} stage={stage} />
+
+  <div className="overflow-hidden rounded-xl">
+    <TickerTape items={[
+      `ORBITX ${fmtPriceSmart(stats?.price)}`,
+      `MCAP ${fmtUsdShort(stats?.mcap)}`,
+      `24H ${change != null ? `${changeUp ? "+" : ""}${change.toFixed(1)}%` : "—"}`,
+      `LIQ ${fmtUsdShort(stats?.liquidity)}`,
+      `BURNED ${fmtTokens(burned)} ORBITX`,
+      `STAGE ${stage + 1}/6`,
+    ]} />
+  </div>
+
+  {/* tab content */}
+  <div className="min-h-[300px]">
+    {tab === "about" && (
+      <div className="space-y-2.5">
+        <Collapsible id="ai-brief" icon={Brain} title="Orbit AI brief" sub="Live market analysis" defaultOpen>
+          <AIBrief stats={avatarStats} burned={burned} />
+        </Collapsible>
+        <div className="grid gap-2.5 lg:grid-cols-2">
+          <Collapsible id="tamagotchi" icon={Heart} title="Orbit's mood" sub="Tamagotchi" defaultOpen>
+            <Tamagotchi buyCount={buyCount} />
+          </Collapsible>
+          <Collapsible id="diamond" icon={Gem} title="Diamond hands" sub="Your loyalty tier">
+            <DiamondHands />
+          </Collapsible>
+        </div>
+        <Collapsible id="badges" icon={Award} title="Achievements" sub="Unlock them all">
+          <Badges />
+        </Collapsible>
+        <div className="grid gap-2.5 lg:grid-cols-2">
+          <Collapsible id="alerts" icon={Bell} title="Price alerts" sub="Never miss a move">
+            <PriceAlerts price={stats?.price} />
+          </Collapsible>
+          <Collapsible id="tokenomics" icon={PieChart} title="Tokenomics" sub="Supply breakdown" defaultOpen>
+            <TokenomicsBars burned={burned} supply={supply} />
+          </Collapsible>
+        </div>
+        <Collapsible id="supply" icon={Flame} title="Supply countdown" sub="Burning down">
+          <SupplyCountdown burned={burned} />
+        </Collapsible>
+        <div className="grid gap-2.5 lg:grid-cols-2">
+          <Collapsible id="whatif" icon={Calculator} title="What-if calculator" sub="Dream bigger">
+            <WhatIf price={stats?.price} mcap={stats?.mcap} burned={burned} />
+          </Collapsible>
+          <Collapsible id="regret" icon={TrendingUp} title="Regret calculator" sub="Emotional damage">
+            <RegretCalculator price={stats?.price} />
+          </Collapsible>
+        </div>
+        <Collapsible id="timeline" icon={Milestone} title="Evolution journey" sub="6 stages">
+          <EvolutionTimeline stage={stage} />
+        </Collapsible>
+        <div className="grid gap-2.5 lg:grid-cols-2">
+          <Collapsible id="age" icon={Clock} title="Token age" sub="Ticking">
+            <TokenAge />
+          </Collapsible>
+          <Collapsible id="tips" icon={Lightbulb} title="Loading tips" sub="Wisdom">
+            <LoadingTips />
+          </Collapsible>
+        </div>
+        <Collapsible id="suggest" icon={MessageSquarePlus} title="Suggestion box" sub="Vote the next feature">
+          <SuggestionBox />
+        </Collapsible>
+        <Collapsible id="mystery" icon={Gift} title="Mystery button" sub="Definitely nothing happens">
+          <DoNotPress />
+        </Collapsible>
+        <TokenArticle />
+      </div>
+    )}
+    {tab === "chart" && <TokenChart pool={stats?.pairAddress ?? null} fallbackMint={ORBITX_MINT} />}
+    {tab === "buys" && <LiveTrades mint={ORBITX_MINT} feed={feed} />}
+    {tab === "burns" && <BurnTracker mint={ORBITX_MINT} />}
+  </div>
+
+  {/* theme switcher */}
+  <div className="pt-1">
+    <ThemeSwitcher theme={theme} setTheme={changeTheme} />
+  </div>
+
+  {/* 3DS touch navigation */}
+  <div className="sticky bottom-3 z-30">
+    <div className="flex gap-1.5 rounded-2xl border border-white/10 bg-black/70 p-1.5 backdrop-blur-xl">
+      {tabs.map((t) => (
+        <TouchButton
+          key={t.id}
+          icon={t.icon}
+          label={t.label}
+          active={tab === t.id}
+          onClick={() => setTab(t.id)}
+          badge={t.badge}
+        />
+      ))}
+    </div>
+  </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-[#04070d] text-white" data-theme={theme}>
       <ThemeStyles theme={theme} />
@@ -175,7 +301,7 @@ export default function TokenPage() {
 
       {/* slim device top bar */}
       <div className="sticky top-0 z-40 border-b border-white/10 bg-[#04070d]/85 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-2.5">
+        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-2.5 lg:max-w-6xl">
           <button onClick={() => navigate(-1)} className="rounded-full p-2 text-white/70 transition hover:bg-white/10 hover:text-white" aria-label="Back">
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -193,117 +319,35 @@ export default function TokenPage() {
         </div>
       </div>
 
-      {/* 3DS device */}
-      <div className="mx-auto max-w-2xl px-2 pb-8 pt-3">
-        {/* TOP SCREEN: the game */}
-        <TopScreen>
-          <AgentOffice3D stats={avatarStats} />
-          {/* HUD */}
-          <div className="pointer-events-none absolute left-2 top-2 flex gap-1.5">
-            <span className="rounded-full border border-teal-300/30 bg-black/60 px-2.5 py-1 text-[10px] font-bold text-teal-200 backdrop-blur">
-              {["EGG","SPROUT","WHELP","GUARDIAN","TITAN","COSMIC"][stage]}
-            </span>
-            <span className="rounded-full border border-white/15 bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white/70 backdrop-blur">
-              {fmtPriceSmart(stats?.price)}
-            </span>
+      {/* 3DS device — stacked on mobile, side-by-side web app on desktop */}
+      <div className="mx-auto max-w-2xl px-2 pb-8 pt-3 lg:max-w-6xl lg:px-4">
+        <div className="lg:grid lg:grid-cols-[1.05fr_1fr] lg:gap-5 lg:items-start">
+          <div className="lg:sticky lg:top-[68px]">
+            <TopScreen>
+              <AgentOffice3D stats={avatarStats} />
+              <div className="pointer-events-none absolute left-2 top-2 flex gap-1.5">
+                <span className="rounded-full border border-teal-300/30 bg-black/60 px-2.5 py-1 text-[10px] font-bold text-teal-200 backdrop-blur">
+                  {["EGG","SPROUT","WHELP","GUARDIAN","TITAN","COSMIC"][stage]}
+                </span>
+                <span className="rounded-full border border-white/15 bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white/70 backdrop-blur">
+                  {fmtPriceSmart(stats?.price)}
+                </span>
+              </div>
+              <div className={`pointer-events-none absolute inset-x-2 bottom-2 transition-opacity duration-300 ${thoughtVisible ? "opacity-100" : "opacity-0"}`}>
+                <DialogueBox text={thought} speaker="Orbit" />
+              </div>
+            </TopScreen>
+            <div className="lg:hidden"><Hinge /></div>
           </div>
-          <div className={`pointer-events-none absolute inset-x-2 bottom-2 transition-opacity duration-300 ${thoughtVisible ? "opacity-100" : "opacity-0"}`}>
-            <DialogueBox text={thought} speaker="Orbit" />
-          </div>
-        </TopScreen>
-
-        <Hinge />
-
-        {/* BOTTOM SCREEN: touch data */}
-        <BottomScreen>
-          <div className="space-y-3 p-3">
-            {/* profile row */}
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl border-2 border-white/15 bg-[#0a0f1a] p-0.5">
-                <LivingAvatar stats={avatarStats} size={56} compact />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <h1 className="text-base font-extrabold tracking-tight">ORBITX</h1>
-                  <BadgeCheck className="h-4 w-4 text-sky-400" />
-                </div>
-                <button onClick={copyMint} className="mt-0.5 flex w-full items-center gap-1.5 text-left">
-                  <code className="flex-1 truncate font-mono text-[10px] text-teal-200/80">{ORBITX_MINT}</code>
-                  {copied ? <span className="text-[10px] font-bold text-emerald-300">Copied!</span> : <Copy className="h-3 w-3 text-white/40" />}
-                </button>
-              </div>
-              <ShareButton price={stats?.price} change={stats?.change24h} mcap={stats?.mcap} />
+          <div>
+            <div className="lg:hidden">
+              <BottomScreen>{bottomContent}</BottomScreen>
             </div>
-
-            {/* stat grid */}
-            <div className="grid grid-cols-4 gap-1.5">
-              <StatCard label="Price" value={fmtPriceSmart(stats?.price)} />
-              <StatCard label="MCap" value={fmtUsdShort(useCountUp(stats?.mcap))} sub={change != null ? `${changeUp ? "+" : ""}${change.toFixed(1)}%` : null} subUp={changeUp} />
-              <StatCard label="Liq" value={fmtUsdShort(useCountUp(stats?.liquidity))} />
-              <StatCard label="Vol" value={fmtUsdShort(useCountUp(stats?.volume24h))} />
-            </div>
-
-            <StageProgress mcap={stats?.mcap} stage={stage} />
-
-            <div className="overflow-hidden rounded-xl">
-              <TickerTape items={[
-                `ORBITX ${fmtPriceSmart(stats?.price)}`,
-                `MCAP ${fmtUsdShort(stats?.mcap)}`,
-                `24H ${change != null ? `${changeUp ? "+" : ""}${change.toFixed(1)}%` : "—"}`,
-                `LIQ ${fmtUsdShort(stats?.liquidity)}`,
-                `BURNED ${fmtTokens(burned)} ORBITX`,
-                `STAGE ${stage + 1}/6`,
-              ]} />
-            </div>
-
-            {/* tab content */}
-            <div className="min-h-[300px]">
-              {tab === "about" && (
-                <div className="space-y-3">
-                  <AIBrief stats={avatarStats} burned={burned} />
-                  <Tamagotchi buyCount={buyCount} />
-                  <DiamondHands />
-                  <Badges />
-                  <PriceAlerts price={stats?.price} />
-                  <TokenomicsBars burned={burned} supply={supply} />
-                  <SupplyCountdown burned={burned} />
-                  <WhatIf price={stats?.price} mcap={stats?.mcap} burned={burned} />
-                  <RegretCalculator price={stats?.price} />
-                  <EvolutionTimeline stage={stage} />
-                  <TokenAge />
-                  <SuggestionBox />
-                  <DoNotPress />
-                  <LoadingTips />
-                  <TokenArticle />
-                </div>
-              )}
-              {tab === "chart" && <TokenChart pool={stats?.pairAddress ?? null} fallbackMint={ORBITX_MINT} />}
-              {tab === "buys" && <LiveTrades mint={ORBITX_MINT} feed={feed} />}
-              {tab === "burns" && <BurnTracker mint={ORBITX_MINT} />}
-            </div>
-
-            {/* theme switcher */}
-            <div className="pt-1">
-              <ThemeSwitcher theme={theme} setTheme={changeTheme} />
-            </div>
-
-            {/* 3DS touch navigation */}
-            <div className="sticky bottom-3 z-30">
-              <div className="flex gap-1.5 rounded-2xl border border-white/10 bg-black/70 p-1.5 backdrop-blur-xl">
-                {tabs.map((t) => (
-                  <TouchButton
-                    key={t.id}
-                    icon={t.icon}
-                    label={t.label}
-                    active={tab === t.id}
-                    onClick={() => setTab(t.id)}
-                    badge={t.badge}
-                  />
-                ))}
-              </div>
+            <div className="hidden lg:block rounded-xl border border-white/10 bg-[#0a0e18]/80 p-5">
+              {bottomContent}
             </div>
           </div>
-        </BottomScreen>
+        </div>
       </div>
     </div>
   );
