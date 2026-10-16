@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, BadgeCheck, Bell, Copy, ExternalLink, Flame, Share2, CandlestickChart, Wallet, Info, Activity, Brain, Heart, Gem, Award, PieChart, Calculator, TrendingUp, Milestone, Clock, Lightbulb, MessageSquarePlus, Gift } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Bell, Copy, ExternalLink, Flame, Share2, CandlestickChart, Wallet, Info, Activity, Brain, Heart, Gem, Award, PieChart, Calculator, TrendingUp, Milestone, Clock, Lightbulb, MessageSquarePlus, Gift, BookOpen, Users, Bot, Link2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LivingAvatar, type AvatarStats } from "./LivingAvatar";
@@ -19,6 +19,21 @@ import { TopScreen, Hinge, BottomScreen, TouchButton, DialogueBox } from "./DS3S
 import { thoughtFor, moodForChange } from "./LivingAvatar";
 import { THEMES, ThemeSwitcher, ThemeStyles } from "./TokenThemes";
 import { RegretCalculator, TokenAge, KonamiCode, DoNotPress, SuggestionBox, Badges, Tamagotchi, WhaleSiren, SupplyCountdown, LoadingTips, unlockBadge } from "./TokenFun";
+import * as Social1 from "./TokenSocial1";
+import * as Social2 from "./TokenSocial2";
+import * as Social3 from "./TokenSocial3";
+import * as Social4 from "./TokenSocial4";
+import * as Agents1 from "./TokenAgents1";
+import * as Agents2 from "./TokenAgents2";
+import * as Agents3 from "./TokenAgents3";
+import * as Agents4 from "./TokenAgents4";
+import * as Chain1 from "./TokenChain1";
+import * as Chain2 from "./TokenChain2";
+import * as Chain3 from "./TokenChain3";
+import * as Chain4 from "./TokenChain4";
+/* WILD_IMPORTS_PLACEHOLDER */
+import { AgentDiary } from "./AgentDiary";
+import { useAgentMemory } from "./AgentMemory";
 import { stageForMcap } from "./LivingAvatar";
 import { cn } from "@/lib/utils";
 
@@ -62,7 +77,7 @@ function fmtUsd(n: number | null | undefined): string {
 }
 
 
-type Tab = "about" | "chart" | "buys" | "burns";
+type Tab = "about" | "chart" | "buys" | "burns" | "social" | "agents" | "chain";
 
 export default function TokenPage() {
   const navigate = useNavigate();
@@ -97,6 +112,7 @@ export default function TokenPage() {
 
   // Shared live trade feed (powers Live tab + Tamagotchi + Whale siren)
   const feed = useRpcTrades(ORBITX_MINT, 15, 20000);
+  const memories = useAgentMemory(feed.trades, burned, stats?.price, stats?.mcap);
   const buyCount = useMemo(() => feed.trades.filter((t) => t.side === "BUY").length, [feed.trades]);
   const lastBigBuy = useMemo(() => {
     const big = feed.trades
@@ -162,9 +178,30 @@ export default function TokenPage() {
   const tabs: { id: Tab; label: string; icon: typeof Info; badge?: number }[] = [
     { id: "about", label: "About", icon: Info },
     { id: "chart", label: "Chart", icon: CandlestickChart },
-    { id: "buys", label: "Live buys", icon: Activity },
+    { id: "buys", label: "Live", icon: Activity },
     { id: "burns", label: "Burns", icon: Flame },
+    { id: "social", label: "Social", icon: Users },
+    { id: "agents", label: "Agents", icon: Bot },
+    { id: "chain", label: "Chain", icon: Link2 },
+    /* WILD_TAB_PLACEHOLDER */
   ];
+
+
+  const renderWidgets = (mods: Record<string, unknown>[], extraProps?: Record<string, unknown>) => {
+    const comps: { name: string; Comp: React.ComponentType<any> }[] = [];
+    for (const m of mods) {
+      for (const [name, v] of Object.entries(m)) {
+        if (typeof v === "function" && /^[A-Z]/.test(name)) comps.push({ name, Comp: v as React.ComponentType<any> });
+      }
+    }
+    return (
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        {comps.map(({ name, Comp }) => (
+          <div key={name} className="min-w-0"><Comp {...(extraProps ?? {})} /></div>
+        ))}
+      </div>
+    );
+  };
 
   const bottomContent = (
     <div className="space-y-3 p-3 lg:p-0">
@@ -255,6 +292,9 @@ export default function TokenPage() {
             <LoadingTips />
           </Collapsible>
         </div>
+        <Collapsible id="diary" icon={BookOpen} title="Agent diary" sub="what the agents remember">
+          <AgentDiary memories={memories} />
+        </Collapsible>
         <Collapsible id="suggest" icon={MessageSquarePlus} title="Suggestion box" sub="Vote the next feature">
           <SuggestionBox />
         </Collapsible>
@@ -267,6 +307,25 @@ export default function TokenPage() {
     {tab === "chart" && <TokenChart pool={stats?.pairAddress ?? null} fallbackMint={ORBITX_MINT} />}
     {tab === "buys" && <LiveTrades mint={ORBITX_MINT} feed={feed} />}
     {tab === "burns" && <BurnTracker mint={ORBITX_MINT} />}
+              {tab === "social" && (
+                <div className="space-y-2.5">
+                  <p className="px-1 text-xs text-white/40">100 community widgets — shill, compete, connect.</p>
+                  {renderWidgets([Social1, Social2, Social3, Social4], { price: stats?.price ?? null })}
+                </div>
+              )}
+              {tab === "agents" && (
+                <div className="space-y-2.5">
+                  <p className="px-1 text-xs text-white/40">100 AI agent widgets — they live here now.</p>
+                  {renderWidgets([Agents1, Agents2, Agents3, Agents4], { stats: avatarStats })}
+                </div>
+              )}
+              {tab === "chain" && (
+                <div className="space-y-2.5">
+                  <p className="px-1 text-xs text-white/40">100 on-chain widgets — real data, no fairy tales.</p>
+                  {renderWidgets([Chain1, Chain2, Chain3, Chain4], { trades: feed.trades, solPrice: null, loading: feed.loading })}
+                </div>
+              )}
+              {/* WILD_PANEL_PLACEHOLDER */}
   </div>
 
   {/* theme switcher */}
@@ -276,7 +335,7 @@ export default function TokenPage() {
 
   {/* 3DS touch navigation */}
   <div className="sticky bottom-3 z-30">
-    <div className="flex gap-1.5 rounded-2xl border border-white/10 bg-black/70 p-1.5 backdrop-blur-xl">
+    <div className="flex gap-1.5 overflow-x-auto rounded-2xl border border-white/10 bg-black/70 p-1.5 backdrop-blur-xl">
       {tabs.map((t) => (
         <TouchButton
           key={t.id}
@@ -324,7 +383,7 @@ export default function TokenPage() {
         <div className="lg:grid lg:grid-cols-[1.05fr_1fr] lg:gap-5 lg:items-start">
           <div className="lg:sticky lg:top-[68px]">
             <TopScreen>
-              <AgentOffice3D stats={avatarStats} />
+              <AgentOffice3D stats={avatarStats} memories={memories} />
               <div className="pointer-events-none absolute left-2 top-2 flex gap-1.5">
                 <span className="rounded-full border border-teal-300/30 bg-black/60 px-2.5 py-1 text-[10px] font-bold text-teal-200 backdrop-blur">
                   {["EGG","SPROUT","WHELP","GUARDIAN","TITAN","COSMIC"][stage]}
