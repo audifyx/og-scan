@@ -87,7 +87,7 @@ export function TouchButton({
     <button
       onClick={onClick}
       className={cn(
-        "relative flex flex-1 flex-col items-center gap-1 rounded-2xl border px-2 py-3 transition-all duration-150 active:translate-y-0.5",
+        "relative flex min-w-[64px] flex-1 flex-col items-center gap-1 rounded-2xl border px-2 py-3 transition-all duration-150 active:translate-y-0.5",
         active
           ? "border-teal-300/50 bg-gradient-to-b from-teal-400/30 to-teal-500/15 shadow-[0_0_16px_rgba(45,212,191,0.35),inset_0_1px_0_rgba(255,255,255,0.25)]"
           : "border-white/10 bg-gradient-to-b from-white/[0.09] to-white/[0.03] shadow-[0_2px_8px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.12)] active:shadow-[inset_0_2px_6px_rgba(0,0,0,0.4)]"
