@@ -575,6 +575,59 @@ function AICore({ mood, change }: { mood: AvatarMood; change: number | null }) {
   );
 }
 
+/** Airship with glowing ORBITX banner circling the city (stage 3+). */
+function Airship() {
+  const g = useRef<THREE.Group>(null);
+  const banner = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 512; c.height = 96;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "rgba(2,10,20,0.85)";
+    ctx.fillRect(0, 0, 512, 96);
+    ctx.strokeStyle = "#5eead4";
+    ctx.lineWidth = 4;
+    ctx.strokeRect(4, 4, 504, 88);
+    ctx.fillStyle = "#5eead4";
+    ctx.font = "bold 52px monospace";
+    ctx.textAlign = "center";
+    ctx.shadowColor = "#5eead4";
+    ctx.shadowBlur = 16;
+    ctx.fillText("◈ ORBITX ◈", 256, 66);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, []);
+  useFrame(({ clock }) => {
+    if (!g.current) return;
+    const t = clock.getElapsedTime() * 0.12;
+    const r = 16;
+    g.current.position.set(Math.cos(t) * r, 9.5 + Math.sin(t * 2.3) * 0.5, Math.sin(t) * r - 6);
+    g.current.rotation.y = -t - Math.PI / 2;
+  });
+  return (
+    <group ref={g}>
+      {/* envelope */}
+      <mesh>
+        <capsuleGeometry args={[1.1, 3.2, 8, 16]} />
+        <meshStandardMaterial color="#1e2a4a" metalness={0.7} roughness={0.35} emissive="#0e3a4a" emissiveIntensity={0.4} />
+      </mesh>
+      {/* fins */}
+      <mesh position={[-2.2, 0.4, 0]} rotation={[0, 0, 0.5]}><boxGeometry args={[1.2, 0.12, 0.9]} /><meshStandardMaterial color="#141c36" metalness={0.6} roughness={0.4} /></mesh>
+      {/* gondola */}
+      <mesh position={[0, -1.35, 0]}><boxGeometry args={[1.6, 0.5, 0.8]} /><meshStandardMaterial color="#0f1528" metalness={0.5} roughness={0.5} /></mesh>
+      <mesh position={[0, -1.35, 0.42]}><boxGeometry args={[1.2, 0.2, 0.04]} /><meshStandardMaterial color="#000" emissive="#fbbf24" emissiveIntensity={1.6} /></mesh>
+      {/* banner */}
+      <mesh position={[0, -2.3, 0]}>
+        <planeGeometry args={[4.4, 0.82]} />
+        <meshBasicMaterial map={banner} transparent side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+      {/* nav lights */}
+      <mesh position={[2.3, 0, 0]}><sphereGeometry args={[0.09, 8, 8]} /><meshBasicMaterial color="#ff5555" /></mesh>
+      <mesh position={[-2.3, 0, 0]}><sphereGeometry args={[0.09, 8, 8]} /><meshBasicMaterial color="#55ff88" /></mesh>
+    </group>
+  );
+}
+
 /** Firework bursts in the city sky (stage 4+). */
 function Fireworks({ count = 5 }: { count?: number }) {
   const ref = useRef<THREE.Points>(null);
@@ -903,6 +956,8 @@ function Office({ stage, mood, stats }: { stage: number; mood: AvatarMood; stats
       {/* city dressing (stage 4+) */}
       {stage >= 4 && <StreetLamps />}
       {stage >= 4 && <Fireworks />}
+      {/* airship (stage 3+) */}
+      {stage >= 3 && <Airship />}
 
       {/* trophy shelf */}
       <group position={[2.9, 0, -2.6]} rotation={[0, -0.5, 0]}>

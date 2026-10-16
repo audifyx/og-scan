@@ -11,6 +11,9 @@ import { TokenChart } from "./TokenChart";
 import { BurnTracker } from "./BurnTracker";
 import { AIBrief } from "./AIBrief";
 import { ShareButton, PriceAlerts, TokenomicsBars, DiamondHands } from "./TokenExtras";
+import { WhatIf } from "./WhatIf";
+import { EvolutionTimeline } from "./EvolutionTimeline";
+import { AmbientToggle } from "./AmbientToggle";
 import { TickerTape, StageProgress, StatCard, EvolutionCelebration, useCountUp, fmtUsdShort } from "./TokenWidgets";
 import { stageForMcap } from "./LivingAvatar";
 import { cn } from "@/lib/utils";
@@ -150,6 +153,7 @@ export default function TokenPage() {
             <button onClick={() => {}} className="rounded-full p-2 text-white/70 transition hover:bg-white/10 hover:text-white" aria-label="Alerts">
               <Bell className="h-5 w-5" />
             </button>
+            <AmbientToggle />
             <button onClick={share} className="rounded-full p-2 text-white/70 transition hover:bg-white/10 hover:text-white" aria-label="Share">
               <Share2 className="h-5 w-5" />
             </button>
@@ -295,6 +299,10 @@ export default function TokenPage() {
                 <DiamondHands />
                 <PriceAlerts price={stats?.price} />
                 <TokenomicsBars burned={burned} supply={supply} />
+              </div>
+              <div className="mt-4 grid gap-3">
+                <WhatIf price={stats?.price} mcap={stats?.mcap} burned={burned} />
+                <EvolutionTimeline stage={stage} />
               </div>
               <TokenArticle />
             </div>
