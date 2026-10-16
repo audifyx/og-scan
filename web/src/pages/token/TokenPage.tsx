@@ -14,7 +14,7 @@ import { ShareButton, PriceAlerts, TokenomicsBars, DiamondHands } from "./TokenE
 import { WhatIf } from "./WhatIf";
 import { EvolutionTimeline } from "./EvolutionTimeline";
 import { AmbientToggle } from "./AmbientToggle";
-import { TickerTape, StageProgress, StatCard, EvolutionCelebration, useCountUp, fmtUsdShort } from "./TokenWidgets";
+import { TickerTape, StageProgress, StatCard, EvolutionCelebration, useCountUp, fmtUsdShort, fmtPriceSmart, fmtTokens } from "./TokenWidgets";
 import { stageForMcap } from "./LivingAvatar";
 import { cn } from "@/lib/utils";
 
@@ -57,12 +57,6 @@ function fmtUsd(n: number | null | undefined): string {
   return `$${n.toFixed(0)}`;
 }
 
-function fmtPrice(p: number | null | undefined): string {
-  if (p == null || !isFinite(p) || p === 0) return "—";
-  if (p < 0.0001) return `$${p.toExponential(2)}`;
-  if (p < 1) return `$${p.toFixed(6)}`;
-  return `$${p.toFixed(2)}`;
-}
 
 type Tab = "about" | "chart" | "buys" | "burns";
 
@@ -219,7 +213,7 @@ export default function TokenPage() {
 
           {/* stat grid */}
           <div className="mt-4 grid grid-cols-4 gap-2">
-            <StatCard label="Price" value={fmtPrice(stats?.price)} />
+            <StatCard label="Price" value={fmtPriceSmart(stats?.price)} />
             <StatCard label="MCap" value={fmtUsdShort(useCountUp(stats?.mcap))} sub={change != null ? `${changeUp ? "+" : ""}${change.toFixed(1)}%` : null} subUp={changeUp} />
             <StatCard label="Liquidity" value={fmtUsdShort(useCountUp(stats?.liquidity))} />
             <StatCard label="24h Vol" value={fmtUsdShort(useCountUp(stats?.volume24h))} />
@@ -249,11 +243,11 @@ export default function TokenPage() {
         {/* live ticker tape */}
         <div className="mt-5 overflow-hidden rounded-2xl">
           <TickerTape items={[
-            `ORBITX ${fmtPrice(stats?.price)}`,
+            `ORBITX ${fmtPriceSmart(stats?.price)}`,
             `MCAP ${fmtUsdShort(stats?.mcap)}`,
             `24H ${change != null ? `${changeUp ? "+" : ""}${change.toFixed(1)}%` : "—"}`,
             `LIQ ${fmtUsdShort(stats?.liquidity)}`,
-            `BURNED ${fmtUsdShort(burned)}`,
+            `BURNED ${fmtTokens(burned)} ORBITX`,
             `STAGE ${stage + 1}/6 · ${["EGG","SPROUT","WHELP","GUARDIAN","TITAN","COSMIC"][stage]}`,
           ]} />
         </div>

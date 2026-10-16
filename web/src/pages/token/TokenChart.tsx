@@ -25,9 +25,9 @@ async function fetchOhlc(pool: string, tf: (typeof TFS)[number]): Promise<Candle
 
 function fmtP(p: number): string {
   if (!isFinite(p) || p <= 0) return "—";
-  if (p < 0.0001) return p.toExponential(2);
-  if (p < 1) return p.toFixed(6);
-  return p.toFixed(4);
+  if (p >= 1) return p.toFixed(4);
+  if (p >= 0.01) return p.toFixed(6);
+  return p.toFixed(10).replace(/0+$/, "");
 }
 
 export function TokenChart({ pool, fallbackMint }: { pool: string | null; fallbackMint: string }) {

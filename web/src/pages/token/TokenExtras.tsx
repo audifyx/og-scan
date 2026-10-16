@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Share2, Bell, BellRing, Flame, Gem, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fmtUsdShort } from "./TokenWidgets";
+import { fmtUsdShort, fmtPriceSmart } from "./TokenWidgets";
 
 const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 const ALERT_KEY = "orbitx-price-alert-v1";
@@ -10,7 +10,7 @@ const ALERT_KEY = "orbitx-price-alert-v1";
 export function ShareButton({ price, change, mcap }: { price: number | null | undefined; change: number | null | undefined; mcap: number | null | undefined }) {
   const [done, setDone] = useState(false);
   const text = useMemo(() => {
-    const p = price != null && price > 0 ? (price < 0.0001 ? price.toExponential(2) : price.toFixed(6)) : "?";
+    const p = price != null && price > 0 ? fmtPriceSmart(price).replace("$", "") : "?";
     const c = change != null ? `${change >= 0 ? "+" : ""}${change.toFixed(1)}%` : "?";
     return `ORBITX $${p} (${c} 24h) · MCAP ${fmtUsdShort(mcap)} · the token with a living 3D city 🚀 orbitx.world/token`;
   }, [price, change, mcap]);
@@ -65,7 +65,7 @@ export function PriceAlerts({ price }: { price: number | null | undefined }) {
     }
   }, [price, alert]);
 
-  const fmtT = (p: number) => (p < 0.0001 ? p.toExponential(2) : p.toFixed(6));
+  const fmtT = (p: number) => fmtPriceSmart(p).replace("$", "");
 
   const save = (dir: "above" | "below") => {
     const t = parseFloat(input);

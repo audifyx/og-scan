@@ -26,11 +26,26 @@ export function useCountUp(target: number | null | undefined, duration = 900): n
   return val;
 }
 
-export function fmtUsdShort(n: number | null | undefined): string {
-  if (n == null || !isFinite(n)) return "—";
+export function fmtUsdShort(n: number | null | undefined): string {  if (n == null || !isFinite(n)) return "—";
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}k`;
   return `$${n.toFixed(0)}`;
+}
+
+/** Smart price formatter — never scientific notation. */
+export function fmtPriceSmart(p: number | null | undefined): string {
+  if (p == null || !isFinite(p) || p <= 0) return "—";
+  if (p >= 1) return `$${p.toFixed(2)}`;
+  if (p >= 0.01) return `$${p.toFixed(4)}`;
+  return `$${p.toFixed(10).replace(/0+$/, "")}`;
+}
+
+/** Token amount formatter (no dollar sign). */
+export function fmtTokens(n: number | null | undefined): string {
+  if (n == null || !isFinite(n)) return "—";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return n.toFixed(0);
 }
 
 /** Full-screen confetti celebration when Orbit evolves to a new stage. */

@@ -4,6 +4,7 @@ import { Stars, OrbitControls, Grid } from "@react-three/drei";
 import * as THREE from "three";
 import { Sparkles } from "lucide-react";
 import { stageForMcap, moodForChange, type AvatarStats, type AvatarMood } from "./LivingAvatar";
+import { fmtPriceSmart } from "./TokenWidgets";
 
 /**
  * AgentOffice3D — "Orbit" the ORBITX agent as a Roblox-style blocky character
@@ -747,7 +748,7 @@ function PriceHologram({ stats, stage }: { stats: AvatarStats; stage: number }) 
       g.font = "bold 56px monospace";
       g.shadowColor = g.fillStyle as string;
       g.shadowBlur = 18;
-      g.fillText(p != null && p > 0 ? (p < 0.0001 ? p.toExponential(2) : `$${p.toFixed(6)}`) : "—", 256, 112);
+      g.fillText(p != null && p > 0 ? fmtPriceSmart(p) : "—", 256, 112);
       g.shadowBlur = 0;
       g.fillStyle = "rgba(255,255,255,0.55)";
       g.font = "bold 24px monospace";

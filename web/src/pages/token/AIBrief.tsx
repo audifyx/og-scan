@@ -1,13 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, Brain } from "lucide-react";
 import type { AvatarStats } from "./LivingAvatar";
-import { fmtUsdShort } from "./TokenWidgets";
-
-function fmtPrice(p: number | null | undefined): string {
-  if (p == null || !isFinite(p) || p <= 0) return "—";
-  if (p < 0.0001) return `$${p.toExponential(2)}`;
-  return `$${p.toFixed(6)}`;
-}
+import { fmtUsdShort, fmtPriceSmart } from "./TokenWidgets";
 
 /** Generates an analyst-style briefing from live stats. */
 function buildBrief(s: AvatarStats, burned: number | null): string[] {
@@ -20,7 +14,7 @@ function buildBrief(s: AvatarStats, burned: number | null): string[] {
   // trend
   if (chg >= 15) lines.push(`Momentum is violent to the upside — ORBITX is up ${chg.toFixed(1)}% in 24h. This is breakout behavior, not drift.`);
   else if (chg >= 5) lines.push(`Strong session — up ${chg.toFixed(1)}% in 24h with buyers clearly in control.`);
-  else if (chg >= 0) lines.push(`Holding steady at ${fmtPrice(s.price)}, up ${chg.toFixed(1)}% on the day. Coiled, not weak.`);
+  else if (chg >= 0) lines.push(`Holding steady at ${fmtPriceSmart(s.price)}, up ${chg.toFixed(1)}% on the day. Coiled, not weak.`);
   else if (chg > -10) lines.push(`Cooling off — down ${Math.abs(chg).toFixed(1)}% in 24h. Dips at this market cap are where positions get built.`);
   else lines.push(`Deep red day — down ${Math.abs(chg).toFixed(1)}%. Volatility is the price of admission this early.`);
 

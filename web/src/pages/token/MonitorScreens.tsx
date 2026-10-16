@@ -1,14 +1,10 @@
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import type { AvatarStats } from "./LivingAvatar";
+import { fmtPriceSmart } from "./TokenWidgets";
 
 export type ScreenKind = "orbitx" | "xscan" | "terminal" | "radar";
 
-function fmtPrice(p: number | null | undefined): string {
-  if (p == null || !isFinite(p) || p <= 0) return "—";
-  if (p < 0.0001) return `$${p.toExponential(2)}`;
-  return `$${p.toFixed(6)}`;
-}
 function fmtUsd(n: number | null | undefined): string {
   if (n == null || !isFinite(n)) return "—";
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
@@ -64,7 +60,7 @@ function drawScreen(g: CanvasRenderingContext2D, kind: ScreenKind, stats: Avatar
     g.fillText("◈ ORBITX COMMAND", 10, 20);
     g.fillStyle = "#fff";
     g.font = "bold 26px monospace";
-    g.fillText(fmtPrice(stats.price), 10, 50);
+    g.fillText(fmtPriceSmart(stats.price), 10, 50);
     g.fillStyle = col;
     g.font = "bold 14px monospace";
     const chg = stats.change24h;
