@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import type * as THREE from "three";
+import * as THREE from "three";
 
 export function FloorLamp() {
   const lightRef = useRef<THREE.PointLight>(null);
