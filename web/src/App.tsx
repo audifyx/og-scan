@@ -531,12 +531,12 @@ const App = () => (
                 </Suspense>
               }
             />
-            {/* ── Public: OrbitX Launchpad (MCP-powered) ── */}
+            {/* ── Public: OrbitX Launchpad — redirects to the new live feed ── */}
             <Route
               path="/launchpad"
               element={
                 <Suspense fallback={SOCIAL_FALLBACK}>
-                  <LaunchpadPage />
+                  <LaunchpadLive />
                 </Suspense>
               }
             />

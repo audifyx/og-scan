@@ -97,11 +97,28 @@ export default function LaunchpadLive() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 text-xl font-black">
               🚀
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-2xl font-black tracking-tight">Launchpad</h1>
               <p className="text-sm text-white/40">Tokens launched via the OrbitX MCP — trade through your AI, not here</p>
             </div>
           </div>
+
+          {/* Section nav */}
+          <nav className="mt-6 flex gap-2 overflow-x-auto pb-1">
+            {[
+              { to: "/launchpad/live", label: "🔴 Live" },
+              { to: "/launchpad/swipe", label: "👆 Swipe" },
+              { to: "/launchpad/stats", label: "📊 Stats" },
+            ].map((l) => (
+              <Link
+                key={l.to}
+                to={l.to}
+                className="shrink-0 rounded-full bg-white/5 px-4 py-2 text-sm font-bold text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                {l.label}
+              </Link>
+            ))}
+          </nav>
 
           {/* Search + filters */}
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
