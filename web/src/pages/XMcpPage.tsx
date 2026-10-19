@@ -4,7 +4,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { PLATFORM_WALLET } from "@/lib/platformFee";
-import { xGetStoredUser, xSetStoredUser, xStartLogin, type XUser } from "@/lib/xAuth";
+import { xGetStoredUser, xSetStoredUser, xStartLogin, startSignInWithX, type XUser } from "@/lib/xAuth";
 import {
   approveXAgentQueueItem,
   bootstrapXMcp,
@@ -308,40 +308,6 @@ export default function XMcpPage({ embedded = false, initialTab = "home", initia
       /* ignore */
     }
     void refresh();
-    // Auto-sync X identity from Supabase login to profile (so X shows as connected).
-    void (async () => {
-      try {
-        const { supabase } = await import("@/lib/supabase");
-        const { data } = await supabase.auth.getUser();
-        const identities = (data.user as any)?.identities as Array<{ provider: string; identity_data?: any }> | undefined;
-        const xIdent = identities?.find((i) => i.provider === "x");
-        const xData = xIdent?.identity_data;
-        const xUsername = xData?.user_name || xData?.preferred_username;
-        if (xUsername && data.user?.id) {
-          const { data: session } = await supabase.auth.getSession();
-          const token = session.session?.access_token;
-          if (!token) return;
-          // Only update if profile doesn't already have it
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("twitter_username")
-            .eq("user_id", data.user.id)
-            .maybeSingle();
-          if (!profile?.twitter_username) {
-            await supabase.from("profiles").update({
-              twitter_username: xUsername,
-              twitter_name: xData?.name || xData?.full_name || null,
-              twitter_avatar: xData?.avatar_url || xData?.picture || null,
-              twitter_id: String(xData?.provider_id || xData?.sub || ""),
-            }).eq("user_id", data.user.id);
-            // Refresh to show connected state
-            void refresh();
-          }
-        }
-      } catch {
-        /* X identity sync optional */
-      }
-    })();
   }, [refresh]);
 
   // Hard cap: never leave mobile users on the spinner forever
@@ -400,7 +366,9 @@ export default function XMcpPage({ embedded = false, initialTab = "home", initia
     setConnectingX(true);
     setError(null);
     try {
-      await xStartLogin();
+      // Use Supabase X auth (seamless if already logged in with X).
+      // AuthWallet auto-links the provider tokens to MCP on callback.
+      await startSignInWithX(window.location.pathname + window.location.search);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to start X login");
       setConnectingX(false);
