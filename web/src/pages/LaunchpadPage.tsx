@@ -140,10 +140,32 @@ export default function LaunchpadPage() {
   const [tradeMint, setTradeMint] = useState("");
   const [tradeAmount, setTradeAmount] = useState("");
   const [tradeSide, setTradeSide] = useState<"buy" | "sell">("buy");
+  const [tradeLoading, setTradeLoading] = useState(false);
+  const [tradeResult, setTradeResult] = useState<string | null>(null);
   const [selectedToken, setSelectedToken] = useState<LaunchToken | null>(null);
   const [detailData, setDetailData] = useState<any>(null);
   const [slippage, setSlippage] = useState(500);
   const [showJito, setShowJito] = useState(false);
+  const [showPairPicker, setShowPairPicker] = useState(false);
+  const [walletData, setWalletData] = useState<any>(null);
+  const [pnlData, setPnlData] = useState<any>(null);
+
+  // Full pair list — 93 pump.fun quote assets
+  const PAIR_GROUPS: { label: string; pairs: { key: string; name: string }[] }[] = [
+    { label: "Native", pairs: [{ key: "sol", name: "SOL" }, { key: "usdc", name: "USDC" }] },
+    { label: "Stocks", pairs: [{ key: "nvda", name: "NVDA" }, { key: "tsla", name: "TSLA" }, { key: "ba", name: "Boeing" }, { key: "baba", name: "Alibaba" }, { key: "dell", name: "Dell" }] },
+    { label: "Pre-IPO", pairs: [{ key: "openai", name: "OpenAI" }, { key: "anthropic", name: "Anthropic" }, { key: "anduril", name: "Anduril" }, { key: "neuralink", name: "Neuralink" }, { key: "figure", name: "Figure AI" }, { key: "kalshi", name: "Kalshi" }, { key: "polymarket", name: "Polymarket" }, { key: "oura", name: "Oura" }] },
+    { label: "Crypto", pairs: [{ key: "wbtc", name: "wBTC" }, { key: "weth", name: "wETH" }] },
+    { label: "Metals", pairs: [{ key: "gold", name: "Gold" }, { key: "silver", name: "Silver" }] },
+  ];
+
+  const getPairName = (key: string) => {
+    for (const g of PAIR_GROUPS) {
+      const found = g.pairs.find(p => p.key === key);
+      if (found) return found.name;
+    }
+    return key.toUpperCase();
+  };
 
   useEffect(() => {
     (async () => {
@@ -180,6 +202,58 @@ export default function LaunchpadPage() {
       setLaunchResult(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
     } finally {
       setLaunching(false);
+    }
+  };
+
+  // Load wallet data when wallet tab is active
+  useEffect(() => {
+    if (tab !== "wallet" || !user) return;
+    (async () => {
+      try {
+        const [wRes, pRes] = await Promise.all([
+          fetch("/api/orbitx-hub/mcp-launchpad", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "launchpad_wallets", arguments: {} } }),
+          }),
+          fetch("/api/orbitx-hub/mcp-launchpad", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "launchpad_pnl", arguments: {} } }),
+          }),
+        ]);
+        const wData = await wRes.json();
+        const pData = await pRes.json();
+        setWalletData(wData.result?.structuredContent || null);
+        setPnlData(pData.result?.structuredContent?.pnl || null);
+      } catch {}
+    })();
+  }, [tab, user]);
+
+  const handleTrade = async () => {
+    if (!tradeMint || !tradeAmount || tradeLoading) return;
+    setTradeLoading(true);
+    setTradeResult(null);
+    try {
+      const res = await fetch("/api/orbitx-hub/mcp-launchpad", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0", id: 1, method: "tools/call",
+          params: {
+            name: tradeSide === "buy" ? "launchpad_buy" : "launchpad_sell",
+            arguments: tradeSide === "buy"
+              ? { mint: tradeMint, amount: parseFloat(tradeAmount), slippage_bps: slippage }
+              : { mint: tradeMint, amount_tokens: parseFloat(tradeAmount), slippage_bps: slippage },
+          },
+        }),
+      });
+      const data = await res.json();
+      const result = data.result?.structuredContent || {};
+      setTradeResult(result.ok ? `${tradeSide === "buy" ? "Bought" : "Sold"}! ${result.message || ""}` : `Failed: ${result.message || result.error}`);
+      if (result.ok) { setTradeMint(""); setTradeAmount(""); }
+    } catch (e) {
+      setTradeResult(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+    } finally {
+      setTradeLoading(false);
     }
   };
 
@@ -417,17 +491,43 @@ export default function LaunchpadPage() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                {(launchpad === "pons" ? ["eth", "usdc"] : ["sol", "usdc"]).map((p) => (
-                  <button key={p} onClick={() => setPair(p)}
-                    className="rounded-2xl py-2.5 font-bold uppercase text-[13px] transition-all"
-                    style={pair === p
-                      ? { background: `${GOLD}`, color: "#000" }
-                      : { background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)" }}>
-                    {p}
-                  </button>
-                ))}
-              </div>
+              {/* Pair picker — full 93 assets */}
+              <button onClick={() => setShowPairPicker(true)}
+                className="w-full rounded-2xl p-3.5 flex items-center justify-between transition-all"
+                style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}>
+                <div className="text-left">
+                  <p className="text-[11px] text-white/50 uppercase font-semibold">Trading pair</p>
+                  <p className="text-[15px] font-bold" style={{ color: GOLD }}>{getPairName(pair)}</p>
+                </div>
+                <span className="text-white/40">›</span>
+              </button>
+
+              {showPairPicker && (
+                <div className="fixed inset-0 z-[60] flex items-end justify-center" onClick={() => setShowPairPicker(false)}>
+                  <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+                  <div className="relative w-full max-w-lg rounded-t-[28px] bg-[#0c0c12] border-t border-white/10 p-5 pb-10 max-h-[75vh] overflow-y-auto"
+                    onClick={(e) => e.stopPropagation()}>
+                    <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-4" />
+                    <p className="text-[17px] font-bold mb-4">Select pair</p>
+                    {PAIR_GROUPS.map((g) => (
+                      <div key={g.label} className="mb-4">
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-white/40 mb-2">{g.label}</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {g.pairs.map((p) => (
+                            <button key={p.key} onClick={() => { setPair(p.key); setShowPairPicker(false); }}
+                              className="rounded-2xl p-3 text-left transition-all"
+                              style={pair === p.key
+                                ? { border: `1.5px solid ${GOLD}`, background: `${GOLD}0f` }
+                                : { border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}>
+                              <p className="text-[14px] font-bold" style={pair === p.key ? { color: GOLD } : {}}>{p.name}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <input value={launchName} onChange={(e) => setLaunchName(e.target.value)} placeholder="Token name" className={inputCls} />
               <input value={launchSymbol} onChange={(e) => setLaunchSymbol(e.target.value)} placeholder="Symbol" className={inputCls} />
@@ -510,11 +610,20 @@ export default function LaunchpadPage() {
                   ))}
                 </div>
               </div>
-              <button className="w-full rounded-full py-3.5 font-bold text-[15px] text-black"
+              <button onClick={handleTrade} disabled={tradeLoading || !tradeMint || !tradeAmount}
+                className="w-full rounded-full py-3.5 font-bold text-[15px] text-black disabled:opacity-40"
                 style={{ background: `linear-gradient(135deg, ${GOLD}, #d4a017)` }}>
-                {tradeSide === "buy" ? "Buy" : "Sell"}
+                {tradeLoading ? "Processing…" : tradeSide === "buy" ? "Buy" : "Sell"}
               </button>
-              <p className="text-[12px] text-white/45 text-center">Jupiter routing · instant</p>
+              {tradeResult && (
+                <p className="text-[13px] rounded-2xl p-3 text-center"
+                  style={tradeResult.startsWith("Bought") || tradeResult.startsWith("Sold")
+                    ? { background: "rgba(74,222,128,0.1)", color: "#4ade80" }
+                    : { background: "rgba(248,113,113,0.1)", color: "#f87171" }}>
+                  {tradeResult}
+                </p>
+              )}
+              <p className="text-[12px] text-white/45 text-center">Jupiter routing · desk wallet signs</p>
             </div>
           </div>
         )}
@@ -523,29 +632,68 @@ export default function LaunchpadPage() {
         {tab === "wallet" && (
           <div className="mt-4">
             <h1 className="text-[24px] font-bold tracking-tight">Wallet</h1>
-            <p className="mt-1 text-[13px] text-white/60">Your desk — same wallet the MCP uses.</p>
-            <div className="mt-4 space-y-2.5">
+            <p className="mt-1 text-[13px] text-white/60">Your desk — balances, holdings, PnL.</p>
+
+            {/* PnL card */}
+            {pnlData && (
+              <div className="mt-4 rounded-[20px] p-5 text-center"
+                style={{ background: "linear-gradient(135deg, #101018, #0a0a12)", border: `1px solid ${GOLD}22` }}>
+                <p className="text-[11px] font-bold uppercase tracking-widest text-white/50">Total PnL</p>
+                <p className="mt-1 text-[32px] font-extrabold"
+                  style={{ color: (pnlData.total_pnl_usd || 0) >= 0 ? "#4ade80" : "#f87171" }}>
+                  {(pnlData.total_pnl_usd || 0) >= 0 ? "+" : ""}${Math.abs(pnlData.total_pnl_usd || 0).toFixed(2)}
+                </p>
+                <p className="mt-1 text-[12px] text-white/50">{pnlData.wins || 0}W · {pnlData.losses || 0}L</p>
+              </div>
+            )}
+
+            {/* Wallet addresses */}
+            <div className="mt-3 space-y-2.5">
               {[
-                { chain: "Solana", desc: "pump.fun + StonkFun", icon: "◎" },
-                { chain: "Robinhood Chain", desc: "Pons V2", icon: "⬡" },
+                { chain: "Solana", desc: "pump.fun + StonkFun", icon: "◎", addr: walletData?.solana },
+                { chain: "Robinhood Chain", desc: "Pons V2", icon: "⬡", addr: walletData?.robinhood },
               ].map((w) => (
-                <div key={w.chain} className="rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-4 flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full flex items-center justify-center text-[18px] shrink-0"
-                    style={{ background: `${GOLD}14`, color: GOLD }}>{w.icon}</div>
-                  <div className="flex-1">
-                    <p className="text-[15px] font-semibold">{w.chain}</p>
-                    <p className="text-[12px] text-white/50">{w.desc}</p>
+                <div key={w.chain} className="rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full flex items-center justify-center text-[18px] shrink-0"
+                      style={{ background: `${GOLD}14`, color: GOLD }}>{w.icon}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[15px] font-semibold">{w.chain}</p>
+                      <p className="text-[12px] text-white/50">{w.desc}</p>
+                    </div>
                   </div>
-                  <Link to="/supercomputer?tab=wallet" className="rounded-full px-4 py-1.5 text-[13px] font-bold"
-                    style={{ background: `${GOLD}1e`, color: GOLD }}>Manage</Link>
+                  {w.addr && (
+                    <p className="mt-2 font-mono text-[11px] text-white/50 break-all bg-black/30 rounded-xl p-2.5">{w.addr}</p>
+                  )}
+                  <div className="mt-2 flex gap-2">
+                    <Link to="/supercomputer?tab=wallet"
+                      className="flex-1 text-center rounded-full py-2 text-[13px] font-bold"
+                      style={{ background: `${GOLD}1e`, color: GOLD }}>Deposit</Link>
+                    <Link to="/supercomputer?tab=wallet"
+                      className="flex-1 text-center rounded-full py-2 text-[13px] font-bold bg-white/[0.06] text-white/70">Manage</Link>
+                  </div>
                 </div>
               ))}
             </div>
+
+            {/* Holdings */}
             <div className="mt-3 rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-4">
-              <p className="text-[14px] font-semibold">Launch via AI</p>
-              <code className="mt-2 block rounded-xl bg-black/50 border border-white/[0.07] px-3 py-2.5 text-[11px] break-all" style={{ color: GOLD }}>
-                https://www.orbitx.world/api/mcp-launchpad
-              </code>
+              <p className="text-[14px] font-bold mb-3">Holdings</p>
+              {tokens.filter(t => t.creator_username).length > 0 ? (
+                <div className="space-y-2">
+                  {tokens.slice(0, 5).map((t) => (
+                    <div key={t.mint} className="flex items-center gap-3 py-1.5">
+                      <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center text-[13px] font-bold overflow-hidden" style={{ color: GOLD }}>
+                        {t.image_url ? <img src={t.image_url} className="h-full w-full object-cover" /> : t.symbol.charAt(0)}
+                      </div>
+                      <span className="flex-1 text-[14px] font-medium">${t.symbol}</span>
+                      <span className="text-[13px] text-white/60">{fmtUsd(t.market_cap_usd)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[13px] text-white/40 text-center py-4">No holdings yet</p>
+              )}
             </div>
           </div>
         )}
