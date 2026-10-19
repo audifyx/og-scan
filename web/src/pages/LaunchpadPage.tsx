@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocalWallets } from "@/lib/localWallets";
+import { usePadNotifications, requestNotifPermission, addNotification } from "@/lib/padNotifications";
 
 type PadTab = "board" | "launch" | "trade" | "wallet";
 
@@ -28,6 +29,55 @@ interface LaunchToken {
 }
 
 const GOLD = "#e8b84a";
+
+function ClaimFeeButton({ label, launchpad }: { label: string; launchpad: string }) {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  const claim = async () => {
+    setLoading(true);
+    setResult(null);
+    try {
+      // Get user's tokens for this launchpad
+      const { data: tokens } = await supabase.from("launchpad_tokens").select("mint").eq("launchpad", launchpad).limit(10);
+      if (!tokens?.length) {
+        setResult("No tokens to claim from");
+        setLoading(false);
+        return;
+      }
+      let claimed = 0;
+      for (const t of tokens) {
+        try {
+          const res = await fetch("/api/orbitx-hub/mcp-launchpad", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0", id: 1, method: "tools/call",
+              params: { name: "launchpad_claim_fees", arguments: { mint: t.mint, launchpad } },
+            }),
+          });
+          const data = await res.json();
+          if (data.result?.structuredContent?.ok) claimed++;
+        } catch {}
+      }
+      setResult(claimed ? `Claimed from ${claimed} token${claimed > 1 ? "s" : ""}!` : "Nothing to claim");
+    } catch (e) {
+      setResult("Failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <button onClick={claim} disabled={loading}
+        className="w-full rounded-full py-2.5 text-[13px] font-bold disabled:opacity-40"
+        style={{ background: `${GOLD}1e`, color: GOLD, border: `1px solid ${GOLD}33` }}>
+        {loading ? "Claiming…" : label}
+      </button>
+      {result && <p className="mt-1.5 text-[11px] text-center" style={{ color: result.includes("Claimed") ? "#4ade80" : "rgba(255,255,255,0.5)" }}>{result}</p>}
+    </div>
+  );
+}
 
 function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
   wallets: { solana: { publicKey: string; secretKey: string } | null; evm: { address: string; privateKey: string } | null } | null;
@@ -241,6 +291,16 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
         <p className="mt-2 text-[11px] text-white/40 text-center">Signing happens on-device. Keys never leave.</p>
       </div>
 
+      {/* Claim fees */}
+      <div className="mt-2.5 rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-4">
+        <p className="text-[14px] font-bold mb-1">Claim creator fees</p>
+        <p className="text-[12px] text-white/50 mb-3">Collect fees from your launched tokens.</p>
+        <div className="grid grid-cols-2 gap-2">
+          <ClaimFeeButton label="◎ Pump.fun" launchpad="pump" />
+          <ClaimFeeButton label="⬡ Pons" launchpad="pons" />
+        </div>
+      </div>
+
       {/* Holdings */}
       <div className="mt-2.5 rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-4">
         <p className="text-[14px] font-bold mb-3">Holdings</p>
@@ -364,7 +424,9 @@ const TABS: { id: PadTab; label: string; icon: JSX.Element }[] = [
 export default function LaunchpadPage() {
   const { user } = useAuth();
   const { wallets, ready: walletsReady } = useLocalWallets();
+  const { notifs, unread, markRead } = usePadNotifications();
   const [tab, setTab] = useState<PadTab>("board");
+  const [showNotifs, setShowNotifs] = useState(false);
   const [tokens, setTokens] = useState<LaunchToken[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -540,9 +602,42 @@ export default function LaunchpadPage() {
             <button className="p-2 rounded-full text-white/70 hover:bg-white/10" aria-label="Search">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
             </button>
-            <button className="p-2 rounded-full text-white/70 hover:bg-white/10" aria-label="Notifications">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
-            </button>
+            <div className="relative">
+              <button onClick={async () => { if (!showNotifs) await requestNotifPermission(); setShowNotifs(!showNotifs); }}
+                className="p-2 rounded-full text-white/70 hover:bg-white/10 relative" aria-label="Notifications">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
+                {unread > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 rounded-full text-[10px] font-bold text-black flex items-center justify-center"
+                    style={{ background: GOLD }}>{unread > 9 ? "9+" : unread}</span>
+                )}
+              </button>
+              {showNotifs && (
+                <div className="absolute right-0 top-11 w-80 max-h-96 overflow-y-auto rounded-[20px] bg-[#0c0c12] border border-white/10 shadow-2xl z-50">
+                  <div className="flex items-center justify-between p-4 border-b border-white/[0.07]">
+                    <p className="text-[14px] font-bold">Notifications</p>
+                    {unread > 0 && (
+                      <button onClick={markRead} className="text-[12px] font-semibold" style={{ color: GOLD }}>Mark all read</button>
+                    )}
+                  </div>
+                  {notifs.length === 0 ? (
+                    <p className="p-6 text-center text-[13px] text-white/40">No notifications yet.<br />You'll get alerts for graduations, snipers, and launches.</p>
+                  ) : notifs.map((n) => (
+                    <div key={n.id} className="p-3.5 border-b border-white/[0.05] flex gap-3" style={{ opacity: n.read ? 0.55 : 1 }}>
+                      <div className="h-8 w-8 rounded-full flex items-center justify-center text-[14px] shrink-0"
+                        style={{ background: `${GOLD}14` }}>
+                        {n.type === "graduation" ? "🎓" : n.type === "sniper" ? "🎯" : n.type === "launch" ? "🚀" : n.type === "claim" ? "💰" : "📢"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold">{n.title}</p>
+                        <p className="text-[12px] text-white/55 mt-0.5">{n.body}</p>
+                        <p className="text-[10px] text-white/35 mt-1">{new Date(n.timestamp).toLocaleString()}</p>
+                      </div>
+                      {!n.read && <span className="h-2 w-2 rounded-full mt-1.5 shrink-0" style={{ background: GOLD }} />}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             {!user ? (
               <Link to="/auth" className="ml-1 rounded-full px-4 py-1.5 text-[13px] font-bold text-black"
                 style={{ background: `linear-gradient(135deg, ${GOLD}, #d4a017)` }}>Sign in</Link>
@@ -707,6 +802,49 @@ export default function LaunchpadPage() {
               <p className="text-[12px] text-white/50">Snipers getting cooked by the tax in real-time.</p>
               <div id="sniper-feed" className="mt-3 space-y-2">
                 <p className="text-[12px] text-white/40 text-center py-4">No sniper activity yet — launch a token to activate the radar.</p>
+              </div>
+            </div>
+
+            {/* MCP Guide */}
+            <div className="mt-3 rounded-[20px] bg-[#0c0c12] border border-white/[0.07] p-4">
+              <p className="text-[14px] font-bold mb-1">🤖 Launch via AI</p>
+              <p className="text-[12px] text-white/50 mb-3">Connect Grok, Claude, ChatGPT, or Muse to launch tokens with your voice.</p>
+
+              <div className="space-y-2.5 text-[13px]">
+                <div className="rounded-2xl bg-white/[0.03] p-3">
+                  <p className="font-bold text-white/85">1. Get your auth code</p>
+                  <p className="text-white/55 mt-0.5">Go to <Link to="/supercomputer?tab=launchpad" className="font-semibold" style={{ color: GOLD }}>Connection Settings</Link> and copy your code.</p>
+                </div>
+                <div className="rounded-2xl bg-white/[0.03] p-3">
+                  <p className="font-bold text-white/85">2. Add the MCP server</p>
+                  <p className="text-white/55 mt-0.5">Paste this URL into your AI's MCP settings:</p>
+                  <code className="mt-1.5 block rounded-xl bg-black/50 px-3 py-2 text-[11px] break-all font-mono" style={{ color: GOLD }}>
+                    https://www.orbitx.world/api/mcp-launchpad
+                  </code>
+                </div>
+                <div className="rounded-2xl bg-white/[0.03] p-3">
+                  <p className="font-bold text-white/85">3. Say it</p>
+                  <p className="text-white/55 mt-0.5 italic">"Launch a meme coin called MoonDog on pump.fun"</p>
+                </div>
+              </div>
+
+              <div className="mt-3 flex gap-2">
+                <Link to="/supercomputer?tab=launchpad"
+                  className="flex-1 text-center rounded-full py-2.5 text-[13px] font-bold text-black"
+                  style={{ background: `linear-gradient(135deg, ${GOLD}, #d4a017)` }}>
+                  Setup Guide
+                </Link>
+                <a href="https://www.orbitx.world/api/mcp-launchpad"
+                  className="flex-1 text-center rounded-full py-2.5 text-[13px] font-bold bg-white/[0.06] text-white/70">
+                  API Docs
+                </a>
+              </div>
+
+              <div className="mt-3 pt-3 border-t border-white/[0.06] flex justify-center gap-4 text-[12px]">
+                <a href="#" className="text-white/45 hover:text-white/70">Terms</a>
+                <a href="#" className="text-white/45 hover:text-white/70">Whitepaper</a>
+                <a href="https://x.com/orbitx_wrld" target="_blank" rel="noreferrer" className="text-white/45 hover:text-white/70">X</a>
+                <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="text-white/45 hover:text-white/70">Telegram</a>
               </div>
             </div>
           </>
