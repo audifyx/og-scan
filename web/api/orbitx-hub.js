@@ -1767,6 +1767,7 @@ const PUBLIC_TOOL_EXACT = new Set([
   "orbitx_social_members",
   "orbitx_spaces_list",
   "orbitx_spaces_join",
+  "orbitx_charts",
   "orbitx_paper_desk",
   "orbitx_paper_agent",
   "orbitx_paper_buying",
@@ -3291,6 +3292,24 @@ const CORE_TOOLS = [
         isPrivate: { type: "boolean", default: false },
       },
       required: ["title"],
+    },
+  },
+  {
+    name: "orbitx_charts",
+    description:
+      "Show embedded DexScreener charts for 1-4 Solana tokens side by side. Pass token contract addresses (CAs). Returns a sharable URL with all charts embedded in a grid — no more switching between tabs.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tokens: {
+          type: "array",
+          items: { type: "string" },
+          description: "Solana token contract addresses (1-4)",
+          minItems: 1,
+          maxItems: 4,
+        },
+      },
+      required: ["tokens"],
     },
   },
   {
@@ -5545,6 +5564,24 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
         listenUrl: `${base}/listen/${space.id}`,
       },
       message: `Space "${title}" is live! Join: ${base}/spaces/${space.id}`,
+    };
+  }
+
+  if (name === "orbitx_charts") {
+    const tokens = (Array.isArray(args.tokens) ? args.tokens : [])
+      .map((t) => String(t).trim())
+      .filter(Boolean)
+      .slice(0, 4);
+    if (tokens.length === 0) throw new Error("tokens required (1-4 Solana contract addresses)");
+    const url = `${base}/charts?tokens=${tokens.map(encodeURIComponent).join(",")}`;
+    return {
+      ok: true,
+      count: tokens.length,
+      tokens,
+      url,
+      embedUrls: tokens.map((t) => `https://dexscreener.com/solana/${t}?embed=1&theme=dark`),
+      message: `Charts ready: ${url}`,
+      hint: "Open the URL to see all charts side by side. Each chart links out to DexScreener.",
     };
   }
 
