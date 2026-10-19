@@ -12,6 +12,7 @@ import LaunchpadUpvote from "@/components/LaunchpadUpvote";
 import LaunchpadKingOfHill from "@/components/LaunchpadKingOfHill";
 import LaunchpadSparkline from "@/components/LaunchpadSparkline";
 import LaunchpadCommandPalette from "@/components/LaunchpadCommandPalette";
+import LaunchpadTokenOfDay from "@/components/LaunchpadTokenOfDay";
 
 interface LaunchToken {
   mint: string;
@@ -125,6 +126,9 @@ export default function LaunchpadLive() {
           </div>
         </div>
       </div>
+
+      {/* Token of the Day */}
+      <LaunchpadTokenOfDay />
 
       {/* Token grid */}
       <div className="mx-auto max-w-6xl px-4 py-8">
