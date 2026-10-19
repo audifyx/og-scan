@@ -6137,92 +6137,6 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
   throw new Error(`Unknown tool: ${name}`);
 }
 
-/**
- * OrbitX Launchpad MCP — separate MCP server for token launching.
- * Path: /api/mcp-launchpad → orbitx-hub?path=mcp-launchpad
- */
-async function handleLaunchpadMcp(req, res) {
-  const { LAUNCHPAD_TOOLS, handleLaunchpadTool } = await import("./orbitx/_handlers/_launchpad-mcp.js");
-
-  if (req.method === "GET") {
-    return json(res, {
-      name: "OrbitX Launchpad MCP",
-      version: "1.0.0",
-      description: "Launch Solana tokens via MCP using your OrbitX desk wallet. No manual signing.",
-      mcp_url: "https://www.orbitx.world/api/mcp-launchpad",
-      tools: LAUNCHPAD_TOOLS.map((t) => t.name),
-    });
-  }
-
-  if (req.method !== "POST") {
-    res.statusCode = 405;
-    return res.end("Method not allowed");
-  }
-
-  const body = await readBody(req);
-  const { jsonrpc, id, method, params } = body || {};
-
-  // Extract auth from bearer token or authCode
-  let auth = null;
-  try {
-    const authHeader = req.headers?.authorization || "";
-    const token = authHeader.replace(/^Bearer\s+/i, "");
-    // Auth resolution happens via the main hub's auth flow
-    // For now, pass through; handleLaunchpadTool checks auth.userId
-    if (token) auth = { token };
-    if (params?.authCode) auth = { ...(auth || {}), authCode: params.authCode };
-  } catch {}
-
-  if (method === "initialize") {
-    return json(res, {
-      jsonrpc: "2.0",
-      id,
-      result: {
-        protocolVersion: "2024-11-05",
-        capabilities: { tools: {} },
-        serverInfo: { name: "OrbitX Launchpad MCP", version: "1.0.0" },
-        instructions: "OrbitX Launchpad MCP. Launch Solana tokens with your desk wallet — no manual signing. Use launchpad_launch to create a token (name, symbol). Use launchpad_tokens to browse launched tokens. Use launchpad_buy/sell to trade. Auth: get your code at https://www.orbitx.world/agent and pass as authCode.",
-      },
-    });
-  }
-
-  if (method === "tools/list") {
-    return json(res, {
-      jsonrpc: "2.0",
-      id,
-      result: { tools: LAUNCHPAD_TOOLS },
-    });
-  }
-
-  if (method === "tools/call") {
-    const name = params?.name;
-    const args = params?.arguments || {};
-    try {
-      const result = await handleLaunchpadTool(name, args, { auth });
-      return json(res, {
-        jsonrpc: "2.0",
-        id,
-        result: {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-          structuredContent: result,
-        },
-      });
-    } catch (e) {
-      return json(res, {
-        jsonrpc: "2.0",
-        id,
-        error: { code: -32603, message: String(e?.message || e) },
-      });
-    }
-  }
-
-  return json(res, {
-    jsonrpc: "2.0",
-    id,
-    error: { code: -32601, message: `Method not found: ${method}` },
-  });
-}
-
 async function handleMcp(req, res, parts) {
   const route = parts.join("/");
   const { base, mcpUrl, authPage } = mcpUrls(req);
@@ -7061,7 +6975,6 @@ export default async function handler(req, res) {
     }
     if (head === "agent") return await handleAgent(req, res, parts.slice(1));
     if (head === "mcp") return await handleMcp(req, res, parts.slice(1));
-    if (head === "mcp-launchpad") return await handleLaunchpadMcp(req, res);
     if (head === "crypto-scan") return await handleCryptoScan(req, res);
     if (head === "anti-vamp-check") {
       // Real checker: api/orbitx/_handlers/_anti-vamp-check.ts (shared with orbitx-anti-vamp-check.ts).
