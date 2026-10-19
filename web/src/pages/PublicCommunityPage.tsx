@@ -74,7 +74,7 @@ export default function PublicCommunityPage() {
       if (error) throw error;
       setIsMember(true);
       // Go to the community
-      navigate("/orbitx-social");
+      navigate("/communities");
     } catch (e) {
       console.error("Join failed:", e);
     } finally {
@@ -192,21 +192,21 @@ export default function PublicCommunityPage() {
 
                 <div className="mt-6 space-y-3">
                   <button
-                    onClick={() => navigate(`/auth?redirect=/c/${community.id}`)}
+                    onClick={() => navigate(`/login?redirect=/c/${community.id}`)}
                     className="w-full rounded-2xl bg-black border border-white/20 px-6 py-4 font-bold hover:bg-white/5 transition-all flex items-center justify-center gap-3"
                   >
                     <span className="text-xl">𝕏</span>
                     Continue with X
                   </button>
                   <button
-                    onClick={() => navigate(`/auth?redirect=/c/${community.id}`)}
+                    onClick={() => navigate(`/login?redirect=/c/${community.id}`)}
                     className="w-full rounded-2xl bg-blue-600 px-6 py-4 font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-3"
                   >
                     <span className="text-xl">✉️</span>
                     Continue with Email
                   </button>
                   <button
-                    onClick={() => navigate(`/auth?redirect=/c/${community.id}`)}
+                    onClick={() => navigate(`/login?redirect=/c/${community.id}`)}
                     className="w-full rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4 font-bold hover:opacity-90 transition-all flex items-center justify-center gap-3"
                   >
                     <span className="text-xl">👛</span>
@@ -225,7 +225,7 @@ export default function PublicCommunityPage() {
                 </div>
                 <h2 className="text-xl font-bold">You're a member!</h2>
                 <button
-                  onClick={() => navigate("/orbitx-social")}
+                  onClick={() => navigate("/communities")}
                   className="mt-4 w-full rounded-2xl bg-blue-600 px-6 py-4 font-bold hover:bg-blue-700 transition-all"
                 >
                   Open Community
