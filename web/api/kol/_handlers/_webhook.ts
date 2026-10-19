@@ -10,7 +10,7 @@ import { buildAlertText, sendTelegram } from "./_send-alert.js";
 //
 // Flow: match tx wallets -> active trackers (Supabase, service role) ->
 // linked telegram bot -> dispatch alert (topic-aware) -> log + last activity.
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://ibojtmeqgzabgeiwbvhf.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const WEBHOOK_SECRET = process.env.HELIUS_WEBHOOK_SECRET || "";
 

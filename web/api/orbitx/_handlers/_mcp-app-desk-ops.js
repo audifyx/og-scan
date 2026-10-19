@@ -494,7 +494,7 @@ export async function appUnwrapWsol(auth, args = {}) {
 
 /* ── NFT marketplace: backend-signed flows for the in-app wallet ── */
 
-const SB_URL = process.env.SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
+const SB_URL = process.env.SUPABASE_URL || "https://ibojtmeqgzabgeiwbvhf.supabase.co";
 
 async function sbRpc(fn, params = {}) {
   const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "";

@@ -4,7 +4,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 // New Solana token launches, filtered to an age window (default 5-10h old),
 // i.e. launches that SURVIVED their first hours — unique signal vs. raw feeds.
 // Sources: Supabase snapshot table (if cron has been running) -> GeckoTerminal new pools.
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://ibojtmeqgzabgeiwbvhf.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 export type Launch = {

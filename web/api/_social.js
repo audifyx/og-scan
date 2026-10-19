@@ -18,7 +18,7 @@
 
 import { createHash } from "node:crypto";
 
-const SB_URL = process.env.SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
+const SB_URL = process.env.SUPABASE_URL || "https://ibojtmeqgzabgeiwbvhf.supabase.co";
 const SB_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const SB_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
