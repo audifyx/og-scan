@@ -1,0 +1,21 @@
+[package]
+name = "orbitx-launchpad"
+version = "0.1.0"
+description = "OrbitX Launchpad — custom Solana token launch program with trade limits, sniper tax, and auto pools"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "orbitx_launchpad"
+
+[features]
+no-entrypoint = []
+no-idl = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.31.1"
+anchor-spl = "0.31.1"
+spl-token-2022 = { version = "6.0.0", features = ["no-entrypoint"] }
+spl-associated-token-account = { version = "6.0.0", features = ["no-entrypoint"] }

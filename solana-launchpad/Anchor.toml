@@ -1,0 +1,21 @@
+[features]
+seeds = false
+skip-lint = false
+
+[programs.localnet]
+orbitx_launchpad = "ORBITXLaunchPad1111111111111111111111111111"
+orbitx_transfer_hook = "ORBITXHook11111111111111111111111111111111"
+
+[programs.devnet]
+orbitx_launchpad = "ORBITXLaunchPad1111111111111111111111111111"
+orbitx_transfer_hook = "ORBITXHook11111111111111111111111111111111"
+
+[registry]
+url = "https://api.reg.crates.io"
+
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

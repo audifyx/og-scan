@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "programs/orbitx-launchpad",
+    "programs/transfer-hook",
+]
+resolver = "2"
