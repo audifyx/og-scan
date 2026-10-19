@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import LaunchpadTicker from "@/components/LaunchpadTicker";
+import LaunchpadMcpGuide from "@/components/LaunchpadMcpGuide";
 
 interface LaunchToken {
   mint: string;
@@ -192,11 +193,8 @@ export default function LaunchpadLive() {
         )}
 
         {/* MCP hint footer */}
-        <div className="mt-12 rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-center">
-          <p className="text-sm text-white/40">
-            Want to launch or trade? Do it through the MCP —{" "}
-            <code className="rounded bg-white/5 px-2 py-0.5 text-xs text-blue-300">orbitx.world/api/mcp-launchpad</code>
-          </p>
+        <div className="mt-12">
+          <LaunchpadMcpGuide />
         </div>
       </div>
     </div>
