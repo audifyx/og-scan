@@ -204,6 +204,7 @@ import InstallApp from "./pages/InstallApp";
 import McpSuperComputer from "./pages/McpSuperComputer";
 import AgentDetailPage from "./pages/AgentDetail";
 import McpAuthPage from "./pages/McpAuthPage";
+import LaunchpadMcpAuthPage from "./pages/LaunchpadMcpAuthPage";
 import XMcpAuthPage from "./pages/XMcpAuthPage";
 import XMcpLinkAuthPage from "./pages/XMcpLinkAuthPage";
 import AgentLinkAuthPage from "./pages/AgentLinkAuthPage";
@@ -795,6 +796,7 @@ const App = () => (
             <Route path="/on-chain/tx/:signature" element={<OnChainWorld />} />
             <Route path="/on-chain/block/:slot" element={<OnChainWorld />} />
             <Route path="/supercomputer/mcp-auth" element={<McpAuthPage />} />
+            <Route path="/supercomputer/launchpad-mcp-auth" element={<LaunchpadMcpAuthPage />} />
             <Route path="/supercomputer/x-mcp-auth" element={<XMcpAuthPage />} />
             <Route path="/agent/mcp-auth" element={<McpAuthPage />} />
             <Route path="/agent/x-mcp-auth" element={<XMcpAuthPage />} />

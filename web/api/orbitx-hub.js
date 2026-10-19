@@ -6141,6 +6141,41 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
  * OrbitX Launchpad MCP — separate MCP server for token launching.
  * Path: /api/mcp-launchpad → orbitx-hub?path=mcp-launchpad
  */
+async function handleLaunchpadAuth(req, res) {
+  if (req.method !== "POST") {
+    res.statusCode = 405;
+    return res.end("Method not allowed");
+  }
+  const body = await readBody(req);
+  const { redirect_uri, state, client_id, user_id } = body || {};
+
+  if (!redirect_uri || !user_id) {
+    return json(res, { error: "redirect_uri and user_id required" }, 400);
+  }
+
+  // Generate a launchpad-specific auth code (separate from main MCP)
+  const code = `lp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+
+  // Store in mcp_link_sessions with launchpad scope
+  try {
+    const { sb } = await getSupabase();
+    if (sb) {
+      await sb.from("mcp_link_sessions").insert({
+        user_id,
+        code,
+        scope: "launchpad",
+        client_id: client_id || "orbitx-launchpad-mcp",
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      });
+    }
+  } catch (e) {
+    console.error("Launchpad auth store failed:", e);
+  }
+
+  const redirect = `${redirect_uri}${redirect_uri.includes("?") ? "&" : "?"}code=${encodeURIComponent(code)}&state=${encodeURIComponent(state || "")}`;
+  return json(res, { redirect, code });
+}
+
 async function handleLaunchpadMcp(req, res) {
   const { LAUNCHPAD_TOOLS, handleLaunchpadTool } = await import("./orbitx/_handlers/_launchpad-mcp.js");
 
@@ -7075,6 +7110,7 @@ export default async function handler(req, res) {
     if (head === "agent") return await handleAgent(req, res, parts.slice(1));
     if (head === "mcp") return await handleMcp(req, res, parts.slice(1));
     if (head === "mcp-launchpad") return await handleLaunchpadMcp(req, res);
+    if (head === "launchpad-auth") return await handleLaunchpadAuth(req, res);
     if (head === "crypto-scan") return await handleCryptoScan(req, res);
     if (head === "anti-vamp-check") {
       // Real checker: api/orbitx/_handlers/_anti-vamp-check.ts (shared with orbitx-anti-vamp-check.ts).

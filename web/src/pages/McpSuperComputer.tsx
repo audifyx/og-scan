@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Bot, ChevronRight, Command, Cpu, KeyRound, Settings2,
+  Bot, ChevronRight, Command, Cpu, KeyRound, Rocket, Settings2,
   ShoppingBag, WalletCards, X, Zap,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,14 +18,15 @@ import {
 } from "@/components/app-shell/IosAppShell";
 import "./mcp-super-computer.css";
 
-/* ── 5 tabs. One place per thing. ──
-   home    → Overview dashboard
-   connect → ALL auth: account, MCP keys, X account, AI connections
-   wallet  → In-app wallet (the ONLY wallet place)
-   trade   → Trade desk (the ONLY trading place)
-   shop    → Shop (the ONLY purchase place)
+/* ── 6 tabs. One place per thing. ──
+   home      → Overview dashboard
+   connect   → ALL auth: account, MCP keys, X account, AI connections
+   wallet    → In-app wallet (the ONLY wallet place)
+   trade     → Trade desk (the ONLY trading place)
+   shop      → Shop (the ONLY purchase place)
+   launchpad → Launchpad MCP (separate auth + connection)
 */
-type MainTab = "home" | "connect" | "wallet" | "trade" | "shop";
+type MainTab = "home" | "connect" | "wallet" | "trade" | "shop" | "launchpad";
 
 const mainTabs: { id: MainTab; label: string; short: string; icon: React.ReactNode }[] = [
   { id: "home", label: "Home", short: "Home", icon: <Command size={18} /> },
@@ -33,6 +34,7 @@ const mainTabs: { id: MainTab; label: string; short: string; icon: React.ReactNo
   { id: "wallet", label: "Wallet", short: "Wallet", icon: <WalletCards size={18} /> },
   { id: "trade", label: "Trade", short: "Trade", icon: <Zap size={18} /> },
   { id: "shop", label: "Shop", short: "Shop", icon: <ShoppingBag size={18} /> },
+  { id: "launchpad", label: "Launchpad", short: "Pad", icon: <Rocket size={18} /> },
 ];
 
 const TAB_ALIASES: Record<string, MainTab> = {
@@ -195,6 +197,79 @@ export default function McpSuperComputer() {
                 </div>
                 <div className="sc-shop-grid">
                   <McpShop variant="both" walletAddress={walletAddress} />
+                </div>
+              </div>
+            )}
+            {tab === "launchpad" && (
+              <div className="sc-launchpad">
+                <div className="sc-section-head">
+                  <p className="sc-eyebrow">ORBITX LAUNCHPAD MCP</p>
+                  <h2>Launch from AI.</h2>
+                  <p>Separate MCP server for token launches. Connect your AI, launch with your desk wallet — no manual signing.</p>
+                </div>
+
+                <div className="sc-panel" style={{ marginBottom: 16 }}>
+                  <div className="sc-panel-h">
+                    <h3>MCP Server</h3>
+                    <StatusPill ready={true}>Live</StatusPill>
+                  </div>
+                  <div className="sc-panel-b">
+                    <div className="sc-row">
+                      <span className="sc-label">Server URL</span>
+                      <code className="sc-value" style={{ fontSize: 12 }}>https://www.orbitx.world/api/mcp-launchpad</code>
+                      <button
+                        className="sc-btn sc-btn--ghost"
+                        onClick={() => navigator.clipboard.writeText("https://www.orbitx.world/api/mcp-launchpad")}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <div className="sc-row">
+                      <span className="sc-label">Auth page</span>
+                      <span className="sc-value">/supercomputer/launchpad-mcp-auth</span>
+                      <a className="sc-btn sc-btn--ghost" href="/supercomputer/launchpad-mcp-auth">
+                        Open
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="sc-panel" style={{ marginBottom: 16 }}>
+                  <div className="sc-panel-h">
+                    <h3>Connection Settings</h3>
+                  </div>
+                  <div className="sc-panel-b">
+                    <div className="sc-row">
+                      <span className="sc-label">Client ID</span>
+                      <code className="sc-value">orbitx-launchpad-mcp</code>
+                    </div>
+                    <div className="sc-row">
+                      <span className="sc-label">Scopes</span>
+                      <span className="sc-value">launch, trade</span>
+                    </div>
+                    <div className="sc-row">
+                      <span className="sc-label">Wallet</span>
+                      <span className="sc-value">Desk wallet (backend signs)</span>
+                      <StatusPill ready={walletReady}>{walletReady ? "Connected" : "Setup needed"}</StatusPill>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="sc-panel">
+                  <div className="sc-panel-h">
+                    <h3>How to connect</h3>
+                  </div>
+                  <div className="sc-panel-b">
+                    <ol style={{ paddingLeft: 20, display: "grid", gap: 8 }}>
+                      <li>Add <code>https://www.orbitx.world/api/mcp-launchpad</code> as an MCP server in Grok, Claude, or ChatGPT</li>
+                      <li>When prompted, authenticate via the launchpad auth page</li>
+                      <li>Say "launch a coin called X with symbol Y" — your desk wallet handles signing</li>
+                    </ol>
+                    <p className="sc-note" style={{ marginTop: 12 }}>
+                      This is completely separate from the main OrbitX MCP. Launchpad auth does not
+                      grant access to your main workspace.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
