@@ -133,12 +133,28 @@ export default function PublicCommunityPage() {
         <div className="mt-8 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 p-6 text-center">
           <p className="font-bold text-lg">Join the conversation on OrbitX</p>
           <p className="mt-1 text-sm text-white/70">Connect your wallet or X account to join</p>
-          <Link
-            to="/orbitx-social"
-            className="mt-4 inline-block rounded-xl bg-white px-6 py-3 font-bold text-black hover:bg-gray-200 transition-colors"
-          >
-            Open OrbitX Social
-          </Link>
+          <div className="mt-4 flex gap-3 justify-center">
+            <Link
+              to="/orbitx-social"
+              className="inline-block rounded-xl bg-white px-6 py-3 font-bold text-black hover:bg-gray-200 transition-colors"
+            >
+              Open OrbitX Social
+            </Link>
+            <button
+              onClick={() => {
+                const url = window.location.href;
+                if (navigator.share) {
+                  navigator.share({ title: community.name, url }).catch(() => {});
+                } else {
+                  navigator.clipboard.writeText(url);
+                  alert("Link copied!");
+                }
+              }}
+              className="inline-block rounded-xl bg-white/10 px-6 py-3 font-bold text-white hover:bg-white/20 transition-colors border border-white/20"
+            >
+              Share
+            </button>
+          </div>
         </div>
       </div>
     </div>
