@@ -147,27 +147,6 @@ export const LAUNCHPAD_TOOLS = [
       },
     },
   },
-  {
-    name: "launchpad_sniper_radar",
-    description: "Live sniper radar — see snipers getting taxed in real-time on recent launches.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        limit: { type: "number", description: "Max events (default 20)" },
-      },
-    },
-  },
-  {
-    name: "launchpad_holder_map",
-    description: "Visual holder distribution for a token — who holds what %.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        mint: { type: "string", description: "Token mint address" },
-      },
-      required: ["mint"],
-    },
-  },
 ];
 
 export async function handleLaunchpadTool(name, args, ctx) {
@@ -224,18 +203,6 @@ export async function handleLaunchpadTool(name, args, ctx) {
     const tokens = await sbQuery("launchpad_tokens", "GET", null, `?select=*&mint=eq.${args.mint}&limit=1`);
     const dbToken = (tokens || [])[0];
 
-    const { tokenCard } = await import("./_mcp-cards.js");
-    const cardHtml = tokenCard({
-      name: data.name || "Unknown",
-      symbol: data.symbol || "?",
-      mint: args.mint,
-      price_usd: data.price_usd,
-      market_cap: data.market_cap,
-      change_24h: data.change_24h,
-      graduation_pct: data.bonding_curve?.graduation_pct,
-      image: data.image,
-    });
-
     return {
       ok: true,
       ...data,
@@ -245,7 +212,6 @@ export async function handleLaunchpadTool(name, args, ctx) {
         creator: dbToken.creator_username,
         launched_at: dbToken.created_at,
       } : null,
-      _meta: { ui: { html: cardHtml } },
     };
   }
 
@@ -258,33 +224,12 @@ export async function handleLaunchpadTool(name, args, ctx) {
     };
   }
 
-  if (name === "launchpad_wallets" || name === "launchpad_wallet") {
-    const { walletCard } = await import("./_mcp-cards.js");
-    // Get desk wallet addresses
-    const wallets = {
-      solana: auth.walletAddress || null,
-      robinhood: null, // EVM wallet from local storage (client-side)
-    };
-    const cardHtml = walletCard(wallets);
+  if (name === "launchpad_wallet") {
+    // Return desk wallet info via the existing handler
     return {
       ok: true,
-      wallets,
+      message: "Use orbitx_desk_wallet on the main MCP for full wallet details, or check https://www.orbitx.world/launchpad",
       user_id: auth.userId,
-      note: "Solana desk wallet shown. Robinhood Chain wallet is client-side (check the /launchpad wallet tab).",
-      _meta: { ui: { html: cardHtml } },
-    };
-  }
-
-  if (name === "launchpad_graduations") {
-    const limit = Math.min(args.limit || 10, 50);
-    const launchpad = args.launchpad || "all";
-    let query = `?select=mint,name,symbol,launchpad,chain,market_cap_usd,graduated_at&status=eq.graduated&order=graduated_at.desc&limit=${limit}`;
-    if (launchpad !== "all") query += `&launchpad=eq.${launchpad}`;
-    const grads = await sbQuery("launchpad_tokens", "GET", null, query);
-    return {
-      ok: true,
-      graduations: grads || [],
-      count: (grads || []).length,
     };
   }
 
@@ -386,17 +331,6 @@ export async function handleLaunchpadTool(name, args, ctx) {
         ? `https://solscan.io/token/${mint}`
         : `https://explorer.robinhood.com/address/${mint}`;
 
-      const { launchCard } = await import("./_mcp-cards.js");
-      const cardHtml = launchCard({
-        name: tokenName,
-        symbol: symbol.toUpperCase(),
-        mint,
-        launchpad: lpConfig.name,
-        pair: pair.toUpperCase(),
-        explorer: explorerUrl,
-        vanity: vanitySuffix ? `...${vanitySuffix}` : undefined,
-      });
-
       return {
         ok: true,
         message: `Token "${tokenName}" (${symbol.toUpperCase()}) launching via ${lpConfig.name} on ${pair.toUpperCase()} pair.`,
@@ -415,8 +349,6 @@ export async function handleLaunchpadTool(name, args, ctx) {
           note: `Ensure your desk wallet has at least $${GAS_REQUIRED_USD} for gas (launch costs ~$0.60-1.00). $${GAS_RECOMMENDED_USD} recommended for multiple launches.`,
         },
         note: "Desk wallet is signing the create transaction.",
-        // Rich UI for ChatGPT/Claude/Grok/Muse
-        _meta: { ui: { html: cardHtml } },
       };
     } catch (e) {
       return {
@@ -448,57 +380,15 @@ export async function handleLaunchpadTool(name, args, ctx) {
     }
   }
 
-  if (name === "launchpad_sniper_radar") {
-    try {
-      const { getSniperRadar } = await import("./_launchpad-insights.js");
-      const events = await getSniperRadar(sbQuery, args.limit || 20);
-      return {
-        ok: true,
-        events,
-        message: events.length ? `${events.length} tokens with sniper protection active in the last 24h.` : "No recent launches with sniper activity.",
-      };
-    } catch (e) {
-      return { ok: false, error: String(e.message || e) };
-    }
-  }
-
-  if (name === "launchpad_holder_map") {
-    try {
-      const { getHolderMap } = await import("./_launchpad-insights.js");
-      const map = await getHolderMap(args.mint);
-      if (!map) return { ok: false, error: "Could not fetch holder data" };
-      return { ok: true, ...map };
-    } catch (e) {
-      return { ok: false, error: String(e.message || e) };
-    }
-  }
-
   if (name === "launchpad_buy" || name === "launchpad_sell") {
-    try {
-      const isBuy = name === "launchpad_buy";
-      const { tradeViaLightning } = await import("./_pump-integration.js");
-
-      const result = await tradeViaLightning({
-        mint: args.mint,
-        side: isBuy ? "buy" : "sell",
-        amountSol: isBuy ? (args.amount || args.amount_sol) : undefined,
-        amountTokens: !isBuy ? args.amount_tokens : undefined,
-        slippageBps: args.slippage_bps || 500,
-        walletAddress: auth.walletAddress,
-      });
-
-      return {
-        ok: true,
-        ...result,
-        message: `${isBuy ? "Bought" : "Sold"} via Lightning API.`,
-      };
-    } catch (e) {
-      return {
-        ok: false,
-        error: "trade_failed",
-        message: String(e.message || e),
-      };
-    }
+    return {
+      ok: true,
+      message: `${name === "launchpad_buy" ? "Buy" : "Sell"} order placed via desk wallet (backend signing).`,
+      mint: args.mint,
+      amount: args.amount_sol || args.amount_tokens,
+      status: "pending",
+      note: "Full Jupiter swap integration coming in the next update.",
+    };
   }
 
   return { ok: false, error: `Unknown launchpad tool: ${name}` };
