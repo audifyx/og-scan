@@ -114,6 +114,7 @@ const ChartsWidget = lazyWithRetry(() => import("./pages/ChartsWidget"));
 const LaunchpadPage = lazyWithRetry(() => import("./pages/LaunchpadPage"));
 const LaunchpadLive = lazyWithRetry(() => import("./pages/LaunchpadLive"));
 const LaunchpadTokenDetail = lazyWithRetry(() => import("./pages/LaunchpadTokenDetail"));
+const LaunchpadStats = lazyWithRetry(() => import("./pages/LaunchpadStats"));
 const ModerationAdmin = lazyWithRetry(() => import("./social/pages/ModerationAdmin"));
 const InviteLanding = lazyWithRetry(() => import("./social/pages/InviteLanding"));
 import LaunchpadPump from "./pages/orbitx/LaunchpadPump";
@@ -552,6 +553,15 @@ const App = () => (
               element={
                 <Suspense fallback={SOCIAL_FALLBACK}>
                   <LaunchpadTokenDetail />
+                </Suspense>
+              }
+            />
+            {/* ── Public: Launchpad stats dashboard (read-only aggregates) ── */}
+            <Route
+              path="/launchpad/stats"
+              element={
+                <Suspense fallback={SOCIAL_FALLBACK}>
+                  <LaunchpadStats />
                 </Suspense>
               }
             />
