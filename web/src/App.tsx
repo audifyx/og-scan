@@ -115,7 +115,7 @@ const LaunchpadPage = lazyWithRetry(() => import("./pages/LaunchpadPage"));
 const LaunchpadLive = lazyWithRetry(() => import("./pages/LaunchpadLive"));
 const LaunchpadTokenDetail = lazyWithRetry(() => import("./pages/LaunchpadTokenDetail"));
 const LaunchpadStats = lazyWithRetry(() => import("./pages/LaunchpadStats"));
-const LaunchpadCreator = lazyWithRetry(() => import("./pages/LaunchpadCreator"));
+const LaunchpadCreatorProfile = lazyWithRetry(() => import("./pages/LaunchpadCreator"));
 const LaunchpadSwipe = lazyWithRetry(() => import("./pages/LaunchpadSwipe"));
 const ModerationAdmin = lazyWithRetry(() => import("./social/pages/ModerationAdmin"));
 const InviteLanding = lazyWithRetry(() => import("./social/pages/InviteLanding"));
@@ -572,7 +572,7 @@ const App = () => (
               path="/launchpad/creator/:username"
               element={
                 <Suspense fallback={SOCIAL_FALLBACK}>
-                  <LaunchpadCreator />
+                  <LaunchpadCreatorProfile />
                 </Suspense>
               }
             />
