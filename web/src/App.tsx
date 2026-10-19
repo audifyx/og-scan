@@ -531,12 +531,12 @@ const App = () => (
                 </Suspense>
               }
             />
-            {/* ── Public: OrbitX Launchpad — full pad (board/launch/trade/wallet) ── */}
+            {/* ── Public: OrbitX Launchpad — redirects to the new live feed ── */}
             <Route
               path="/launchpad"
               element={
                 <Suspense fallback={SOCIAL_FALLBACK}>
-                  <LaunchpadPage />
+                  <LaunchpadLive />
                 </Suspense>
               }
             />
@@ -846,7 +846,6 @@ const App = () => (
             <Route path="/on-chain/tx/:signature" element={<OnChainWorld />} />
             <Route path="/on-chain/block/:slot" element={<OnChainWorld />} />
             <Route path="/supercomputer/mcp-auth" element={<McpAuthPage />} />
-            {/* Launchpad MCP auth — added 2026-10-19 */}
             <Route path="/supercomputer/launchpad-mcp-auth" element={<LaunchpadMcpAuthPage />} />
             <Route path="/supercomputer/x-mcp-auth" element={<XMcpAuthPage />} />
             <Route path="/agent/mcp-auth" element={<McpAuthPage />} />
