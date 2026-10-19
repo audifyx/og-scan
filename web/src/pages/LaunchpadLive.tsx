@@ -13,6 +13,7 @@ import LaunchpadKingOfHill from "@/components/LaunchpadKingOfHill";
 import LaunchpadSparkline from "@/components/LaunchpadSparkline";
 import LaunchpadCommandPalette from "@/components/LaunchpadCommandPalette";
 import LaunchpadTokenOfDay from "@/components/LaunchpadTokenOfDay";
+import LaunchpadActivityFeed from "@/components/LaunchpadActivityFeed";
 
 interface LaunchToken {
   mint: string;
@@ -207,8 +208,9 @@ export default function LaunchpadLive() {
         )}
 
         {/* MCP hint footer */}
-        <div className="mt-12">
+        <div className="mt-12 grid gap-6 lg:grid-cols-[1fr_320px]">
           <LaunchpadMcpGuide />
+          <LaunchpadActivityFeed />
         </div>
       </div>
     </div>
