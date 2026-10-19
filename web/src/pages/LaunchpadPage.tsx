@@ -28,6 +28,57 @@ interface LaunchToken {
 
 const GOLD = "#e8b84a";
 
+function HolderMap({ mint }: { mint: string }) {
+  const [holders, setHolders] = useState<{ address: string; pct: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/orbitx-hub/mcp-launchpad", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0", id: 1, method: "tools/call",
+            params: { name: "launchpad_holder_map", arguments: { mint } },
+          }),
+        });
+        const data = await res.json();
+        const result = data.result?.structuredContent;
+        if (result?.ok) setHolders(result.holders || []);
+      } catch {}
+      setLoading(false);
+    })();
+  }, [mint]);
+
+  if (loading) return <p className="text-[12px] text-white/40 text-center py-3">Loading holders…</p>;
+  if (!holders.length) return null;
+
+  const maxPct = Math.max(...holders.map(h => h.pct), 1);
+
+  return (
+    <div className="rounded-2xl bg-white/[0.04] p-4">
+      <p className="text-[13px] font-bold mb-3">🗺️ Holder Map</p>
+      <div className="space-y-2">
+        {holders.slice(0, 8).map((h, i) => (
+          <div key={h.address} className="flex items-center gap-2">
+            <span className="text-[11px] text-white/40 w-6 font-mono">#{i + 1}</span>
+            <div className="flex-1">
+              <div className="flex justify-between text-[11px] mb-1">
+                <span className="font-mono text-white/60">{h.address.slice(0, 6)}…{h.address.slice(-4)}</span>
+                <span className="font-bold" style={{ color: GOLD }}>{h.pct.toFixed(1)}%</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-white/[0.07] overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${(h.pct / maxPct) * 100}%`, background: i === 0 ? GOLD : "rgba(255,255,255,0.25)" }} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const TABS: { id: PadTab; label: string; icon: JSX.Element }[] = [
   {
     id: "board",
@@ -323,6 +374,8 @@ export default function LaunchpadPage() {
                           className="flex-1 rounded-full py-3 text-[14px] font-bold"
                           style={{ background: `${GOLD}1e`, color: GOLD, border: `1px solid ${GOLD}33` }}>Trade</button>
                       </div>
+                      {/* Holder Map */}
+                      <HolderMap mint={selectedToken.mint} />
                     </div>
                   ) : (
                     <p className="text-center text-white/50 py-8 text-[14px]">Loading…</p>
@@ -330,6 +383,17 @@ export default function LaunchpadPage() {
                 </div>
               </div>
             )}
+            {/* Sniper Radar */}
+            <div className="mt-5 rounded-[20px] bg-[#0c0c12] border border-white/[0.07] p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[14px] font-bold">🎯 Sniper Radar</p>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${GOLD}1e`, color: GOLD }}>LIVE</span>
+              </div>
+              <p className="text-[12px] text-white/50">Snipers getting cooked by the tax in real-time.</p>
+              <div id="sniper-feed" className="mt-3 space-y-2">
+                <p className="text-[12px] text-white/40 text-center py-4">No sniper activity yet — launch a token to activate the radar.</p>
+              </div>
+            </div>
           </>
         )}
 
