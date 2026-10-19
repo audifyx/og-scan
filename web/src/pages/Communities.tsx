@@ -15,7 +15,7 @@ import {
   Zap, Bell, Swords, AlertTriangle, TrendingDown, Wallet, Target,
   Activity, CheckCircle2, Clock, ArrowRight, RefreshCw, Radio,
   Headphones, Globe, Link2, Youtube, Mic2, ChevronDown, ChevronUp,
-  ImageIcon, FilePlus2, FileVideo, MousePointerClick
+  ImageIcon, FilePlus2, FileVideo, MousePointerClick, Volume2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { CoinCommunityFull } from "@/components/CoinCommunityFull";
+import CommunityVoice from "@/components/community/CommunityVoice";
 import { HELIUS_API_KEY, OGSCAN_TOKEN_MINT } from "@/lib/og";
 import { trackActivity } from "@/lib/trackActivity";
 import { CommunityReputation } from "@/components/communities-20x/CommunityReputation";
@@ -1681,7 +1682,7 @@ function CommunityFeed({
   const navigate = useNavigate();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "posts" | "articles" | "threads" | "members" | "settings" | "cc" | "about" | "events" | "reputation">("all");
+  const [filter, setFilter] = useState<"all" | "posts" | "articles" | "threads" | "members" | "settings" | "cc" | "about" | "events" | "reputation" | "voice">("all");
   const [feedSort, setFeedSort] = useState<FeedSort>("latest");
   const [activeTopic, setActiveTopic] = useState<string | null>(null);
   const [members, setMembers] = useState<CommunityMember[]>([]);
@@ -2352,6 +2353,7 @@ function CommunityFeed({
           "posts",
           "threads",
           "articles",
+          "voice",
           "about",
           "events",
           "reputation",
@@ -2368,6 +2370,7 @@ function CommunityFeed({
           >
             {f === "members" ? <Users className="h-3.5 w-3.5 mx-auto" /> :
              f === "settings" ? <Settings className="h-3.5 w-3.5 mx-auto" /> :
+             f === "voice" ? <span className="flex items-center justify-center gap-0.5"><Volume2 className="h-3 w-3" /><span className="text-[10px] hidden sm:inline">Voice</span></span> :
              f === "cc" ? <span className="flex items-center justify-center gap-0.5"><Zap className="h-3 w-3" /><span className="text-[10px]">CC</span></span> :
              f === "about" ? <span className="flex items-center justify-center gap-0.5"><BookOpen className="h-3 w-3" /><span className="text-[10px] hidden sm:inline">About</span></span> :
              f === "events" ? <span className="flex items-center justify-center gap-0.5"><CalendarDays className="h-3 w-3" /><span className="text-[10px] hidden sm:inline">Events</span></span> :
@@ -2391,7 +2394,12 @@ function CommunityFeed({
         </div>
       )}
 
-      {filter !== "members" && filter !== "settings" && filter !== "cc" && filter !== "about" && filter !== "events" && filter !== "reputation" && (
+      {/* Community Voice Lobby — each community gets its own LiveKit room */}
+      {filter === "voice" && (
+        <CommunityVoice communityId={currentCommunity.id} communityName={currentCommunity.name} />
+      )}
+
+      {filter !== "members" && filter !== "settings" && filter !== "cc" && filter !== "about" && filter !== "events" && filter !== "reputation" && filter !== "voice" && (
         <div className="flex items-center justify-between gap-3 border-b border-white/[0.04] px-4 py-2 flex-wrap">
           <div className="flex items-center gap-1">
             {(["latest", "top", "trending"] as FeedSort[]).map(option => (
