@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use spl_transfer_hook_interface::instruction::TransferHookInstruction;
 
-declare_id!("ORBITXHook11111111111111111111111111111111");
+declare_id!("9WobRvPGR37kHaSiMyiss1LCDXvBHBAfJ3VpSJcfZTtW");
 
 /// OrbitX Transfer Hook — enforced on every Token-2022 transfer.
 ///
