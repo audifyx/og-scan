@@ -3316,7 +3316,7 @@ async function handleAgent(req, res, parts) {
       mintedKey: null,
       mcpUrl: MCP_URL,
       x: {
-        connected: Boolean(profile?.twitter_access_token),
+        connected: Boolean(profile?.twitter_access_token || profile?.twitter_username),
         username: profile?.twitter_username || null,
         twitterId: profile?.twitter_id || null,
         displayName: profile?.twitter_name || null,
@@ -3331,7 +3331,7 @@ async function handleAgent(req, res, parts) {
     if (!user?.id) return json(res, { error: "unauthorized" }, 401);
     const profile = await getXProfile(user.id).catch(() => null);
     return json(res, {
-      connected: Boolean(profile?.twitter_access_token),
+      connected: Boolean(profile?.twitter_access_token || profile?.twitter_username),
       username: profile?.twitter_username || null,
       twitterId: profile?.twitter_id || null,
       displayName: profile?.twitter_name || null,
