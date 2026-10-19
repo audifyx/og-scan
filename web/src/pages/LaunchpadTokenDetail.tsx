@@ -6,6 +6,7 @@
 import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import LaunchpadComments from "@/components/LaunchpadComments";
 
 interface TokenDetail {
   mint: string;
@@ -226,6 +227,11 @@ export default function LaunchpadTokenDetail() {
               <p className="mt-2 font-mono text-xs text-white/30">
                 "Buy 0.5 SOL of ${token.symbol}" — your AI handles the rest
               </p>
+            </div>
+
+            {/* Comments */}
+            <div className="mt-6">
+              <LaunchpadComments mint={token.mint} />
             </div>
           </div>
         )}
