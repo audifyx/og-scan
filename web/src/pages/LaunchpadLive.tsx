@@ -10,6 +10,7 @@ import LaunchpadTicker from "@/components/LaunchpadTicker";
 import LaunchpadMcpGuide from "@/components/LaunchpadMcpGuide";
 import LaunchpadUpvote from "@/components/LaunchpadUpvote";
 import LaunchpadKingOfHill from "@/components/LaunchpadKingOfHill";
+import LaunchpadSparkline from "@/components/LaunchpadSparkline";
 
 interface LaunchToken {
   mint: string;
@@ -183,6 +184,7 @@ export default function LaunchpadLive() {
                   <div>
                     <p className="text-white/30">Price</p>
                     <p className="font-bold">{fmtUsd(t.price_usd)}</p>
+                    <div className="mt-1"><LaunchpadSparkline mint={t.mint} /></div>
                   </div>
                   <div>
                     <p className="text-white/30">MCap</p>
