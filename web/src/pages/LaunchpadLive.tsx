@@ -11,6 +11,7 @@ import LaunchpadMcpGuide from "@/components/LaunchpadMcpGuide";
 import LaunchpadUpvote from "@/components/LaunchpadUpvote";
 import LaunchpadKingOfHill from "@/components/LaunchpadKingOfHill";
 import LaunchpadSparkline from "@/components/LaunchpadSparkline";
+import LaunchpadCommandPalette from "@/components/LaunchpadCommandPalette";
 
 interface LaunchToken {
   mint: string;
@@ -86,6 +87,7 @@ export default function LaunchpadLive() {
   return (
     <div className="min-h-screen bg-black text-white">
       <LaunchpadTicker />
+      <LaunchpadCommandPalette />
       {/* Header */}
       <div className="border-b border-white/10">
         <div className="mx-auto max-w-6xl px-4 py-8">
