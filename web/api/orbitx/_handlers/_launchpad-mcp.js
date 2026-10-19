@@ -26,18 +26,15 @@ async function sbQuery(table, method = "GET", body = null, query = "") {
 export const LAUNCHPAD_TOOLS = [
   {
     name: "launchpad_launch",
-    description: "Launch a new Solana token via the OrbitX Launchpad. Uses your in-app desk wallet — no manual signing needed. Enforces: unique name/symbol (no duplicates), max tx % of supply, sniper tax. Launches with $4k initial liquidity pool (SOL or USDC).",
+    description: "Launch a new Solana token via the OrbitX Launchpad. Uses your in-app desk wallet — no manual signing needed. Provide name, symbol, and optional description/image.",
     inputSchema: {
       type: "object",
       properties: {
-        name: { type: "string", description: "Token name (must be unique — duplicates rejected)" },
-        symbol: { type: "string", description: "Token symbol (must be unique — duplicates rejected)" },
+        name: { type: "string", description: "Token name (e.g. 'Moon Dog')" },
+        symbol: { type: "string", description: "Token symbol (e.g. 'MOON')" },
         description: { type: "string", description: "Token description" },
         image_url: { type: "string", description: "Token image/logo URL" },
         supply: { type: "number", description: "Total supply (default 1B)" },
-        max_tx_pct: { type: "number", description: "Max % of supply per buy/sell (default 2.0)" },
-        sniper_tax_bps: { type: "number", description: "Sniper tax in basis points for first 5 min (default 2500 = 25%)" },
-        pool_type: { type: "string", enum: ["sol", "usdc", "both"], description: "Initial liquidity pool type (default sol)" },
       },
       required: ["name", "symbol"],
     },
@@ -157,27 +154,10 @@ export async function handleLaunchpadTool(name, args, ctx) {
     if (!tokenName || !symbol) {
       return { ok: false, error: "name and symbol required" };
     }
-
-    // Anti-duplicate: check name/symbol uniqueness (case-insensitive)
-    const existing = await sbQuery(
-      "launchpad_tokens", "GET", null,
-      `?select=mint,name,symbol&or=(and(name.ilike.${encodeURIComponent(tokenName)},symbol.ilike.${encodeURIComponent(symbol)}))&limit=1`
-    );
-    if (existing && existing.length > 0) {
-      return {
-        ok: false,
-        error: "duplicate_token",
-        message: `A token named "${existing[0].name}" (${existing[0].symbol}) already exists. No one can launch the same token twice. Pick a different name.`,
-        existing_mint: existing[0].mint,
-      };
-    }
-
-    const maxTxPct = args.max_tx_pct ?? 2.0;
-    const sniperTaxBps = args.sniper_tax_bps ?? 2500;
-    const poolType = args.pool_type || "sol";
-
+    // For now, record the launch intent. Full on-chain launch via pump.fun
+    // integration will be wired in the next iteration.
     const mint = `LAUNCHPAD_${Date.now()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-    await sbQuery("launchpad_tokens", "POST", {
+    const record = await sbQuery("launchpad_tokens", "POST", {
       mint,
       name: tokenName,
       symbol: symbol.toUpperCase(),
@@ -188,28 +168,13 @@ export async function handleLaunchpadTool(name, args, ctx) {
       chain: "solana",
       status: "live",
       launched_via: "mcp",
-      max_tx_pct: maxTxPct,
-      sniper_tax_bps: sniperTaxBps,
-      sniper_window_seconds: 300,
-      pool_type: poolType,
-      initial_liquidity_usd: 4000,
     });
     return {
       ok: true,
       message: `Token "${tokenName}" (${symbol.toUpperCase()}) launch initiated via your desk wallet.`,
       mint,
       status: "pending_onchain",
-      protections: {
-        max_tx_pct: maxTxPct,
-        sniper_tax: `${sniperTaxBps / 100}% for first 5 min`,
-        anti_duplicate: true,
-      },
-      pool: {
-        type: poolType,
-        initial_liquidity_usd: 4000,
-        note: "Pool auto-created at launch — tradable immediately, no LP deposit needed.",
-      },
-      note: "On-chain deployment via OrbitX custom program is queued. Check launchpad_tokens to track status.",
+      note: "On-chain deployment is queued. Check launchpad_tokens to track status.",
     };
   }
 

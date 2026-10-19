@@ -80,6 +80,14 @@
       "destination": "/api/mcp?path=mcp/$1"
     },
     {
+      "source": "/api/mcp-launchpad",
+      "destination": "/api/orbitx-hub?path=mcp-launchpad"
+    },
+    {
+      "source": "/api/mcp-launchpad/(.*)",
+      "destination": "/api/orbitx-hub?path=mcp-launchpad/$1"
+    },
+    {
       "source": "/api/mcp/(.*)",
       "destination": "/api/mcp?path=mcp/$1"
     },
