@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Connection } from "@solana/web3.js";
+import { browserWalletRpcUrl } from "@/lib/solanaRpc";
 import {
   Copy, Check, LogOut, Wallet, ExternalLink, Loader2, User, KeyRound,
   Download, TrendingUp, TrendingDown, Eye, EyeOff, ChevronRight, Sparkles,
@@ -25,6 +26,7 @@ interface Holding {
 
 export default function TradeProfile() {
   const { address: walletAddress, connected } = useActiveTradingWallet();
+  const connection = useMemo(() => new Connection(browserWalletRpcUrl(), "confirmed"), []);
   const publicKey = walletAddress ? new PublicKey(walletAddress) : null;
   const { profile, user, loading: authLoading } = useAuth();
   const {
