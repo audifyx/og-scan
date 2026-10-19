@@ -74,7 +74,7 @@ export default function PublicCommunityPage() {
       if (error) throw error;
       setIsMember(true);
       // Go to the community
-      navigate("/communities");
+      navigate("/orbitx-social");
     } catch (e) {
       console.error("Join failed:", e);
     } finally {
@@ -225,7 +225,7 @@ export default function PublicCommunityPage() {
                 </div>
                 <h2 className="text-xl font-bold">You're a member!</h2>
                 <button
-                  onClick={() => navigate("/communities")}
+                  onClick={() => navigate("/orbitx-social")}
                   className="mt-4 w-full rounded-2xl bg-blue-600 px-6 py-4 font-bold hover:bg-blue-700 transition-all"
                 >
                   Open Community
