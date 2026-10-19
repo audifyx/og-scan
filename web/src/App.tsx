@@ -110,6 +110,7 @@ const WalletTracker = lazyWithRetry(() => import("./crypto/pages/WalletTracker")
 const SocialAppPage = lazyWithRetry(() => import("./pages/SocialAppPage"));
 const SocialTweetPage = lazyWithRetry(() => import("./pages/SocialTweetPage"));
 const PublicCommunityPage = lazyWithRetry(() => import("./pages/PublicCommunityPage"));
+const ChartsWidget = lazyWithRetry(() => import("./pages/ChartsWidget"));
 const ModerationAdmin = lazyWithRetry(() => import("./social/pages/ModerationAdmin"));
 const InviteLanding = lazyWithRetry(() => import("./social/pages/InviteLanding"));
 import LaunchpadPump from "./pages/orbitx/LaunchpadPump";
@@ -511,6 +512,15 @@ const App = () => (
               element={
                 <Suspense fallback={SOCIAL_FALLBACK}>
                   <PublicCommunityPage />
+                </Suspense>
+              }
+            />
+            {/* ── Public: multi-token DexScreener chart widget ── */}
+            <Route
+              path="/charts"
+              element={
+                <Suspense fallback={SOCIAL_FALLBACK}>
+                  <ChartsWidget />
                 </Suspense>
               }
             />
