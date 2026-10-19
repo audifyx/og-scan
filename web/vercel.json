@@ -108,10 +108,6 @@
       "destination": "/api/x-mcp?path=agent"
     },
     {
-      "source": "/api/x-session-sync",
-      "destination": "/api/x-mcp?path=oauth/link-supabase"
-    },
-    {
       "source": "/api/admin-tokens",
       "destination": "/api/web?path=admin-tokens"
     },
