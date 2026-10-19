@@ -89,6 +89,10 @@ export default function LaunchpadPage() {
   const [tradeMint, setTradeMint] = useState("");
   const [tradeAmount, setTradeAmount] = useState("");
   const [tradeSide, setTradeSide] = useState<"buy" | "sell">("buy");
+  const [selectedToken, setSelectedToken] = useState<LaunchToken | null>(null);
+  const [detailData, setDetailData] = useState<any>(null);
+  const [slippage, setSlippage] = useState(500);
+  const [showJito, setShowJito] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -126,6 +130,23 @@ export default function LaunchpadPage() {
     } finally {
       setLaunching(false);
     }
+  };
+
+  const openTokenDetail = async (t: LaunchToken) => {
+    setSelectedToken(t);
+    setDetailData(null);
+    try {
+      const res = await fetch("/api/orbitx-hub/mcp-launchpad", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0", id: 1, method: "tools/call",
+          params: { name: "launchpad_token", arguments: { mint: t.mint } },
+        }),
+      });
+      const data = await res.json();
+      setDetailData(data.result?.structuredContent || null);
+    } catch {}
   };
 
   const fmtUsd = (n: number | null) => {
@@ -218,7 +239,8 @@ export default function LaunchpadPage() {
                   </button>
                 </div>
               ) : tokens.map((t) => (
-                <div key={t.mint} className="rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-3.5 flex items-center gap-3">
+                <button key={t.mint} onClick={() => openTokenDetail(t)}
+                  className="w-full rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-3.5 flex items-center gap-3 text-left active:scale-[0.98] transition-transform">
                   <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#1a1a24] to-[#0a0a10] border border-white/10 flex items-center justify-center font-bold text-[15px] shrink-0 overflow-hidden" style={{ color: GOLD }}>
                     {t.image_url ? <img src={t.image_url} alt="" className="h-full w-full object-cover" /> : t.symbol.charAt(0)}
                   </div>
@@ -237,14 +259,77 @@ export default function LaunchpadPage() {
                       </div>
                     )}
                   </div>
-                  <button onClick={() => { setTradeMint(t.mint); setTab("trade"); }}
+                  <button onClick={(e) => { e.stopPropagation(); setTradeMint(t.mint); setTab("trade"); }}
                     className="rounded-full px-4 py-1.5 text-[13px] font-bold shrink-0"
                     style={{ background: `${GOLD}1e`, color: GOLD, border: `1px solid ${GOLD}33` }}>
                     Buy
                   </button>
-                </div>
+                </button>
               ))}
             </div>
+
+            {/* Token detail sheet */}
+            {selectedToken && (
+              <div className="fixed inset-0 z-[60] flex items-end justify-center" onClick={() => setSelectedToken(null)}>
+                <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+                <div className="relative w-full max-w-lg rounded-t-[28px] bg-[#0c0c12] border-t border-white/10 p-5 pb-10 max-h-[85vh] overflow-y-auto"
+                  onClick={(e) => e.stopPropagation()}>
+                  <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-4" />
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-full overflow-hidden bg-white/5 flex items-center justify-center font-bold" style={{ color: GOLD }}>
+                      {selectedToken.image_url ? <img src={selectedToken.image_url} className="h-full w-full object-cover" /> : selectedToken.symbol.charAt(0)}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-[17px] font-bold">{selectedToken.name}</p>
+                      <p className="text-[13px] text-white/50">${selectedToken.symbol} · {selectedToken.launchpad}</p>
+                    </div>
+                    <button onClick={() => setSelectedToken(null)} className="p-2 rounded-full bg-white/10 text-white/70">✕</button>
+                  </div>
+                  {detailData ? (
+                    <div className="mt-4 space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-2xl bg-white/[0.04] p-3">
+                          <p className="text-[11px] text-white/50 uppercase">Price</p>
+                          <p className="text-[16px] font-bold">${detailData.price_usd?.toFixed(6) || "—"}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white/[0.04] p-3">
+                          <p className="text-[11px] text-white/50 uppercase">MCap</p>
+                          <p className="text-[16px] font-bold">{fmtUsd(detailData.market_cap)}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white/[0.04] p-3">
+                          <p className="text-[11px] text-white/50 uppercase">24h</p>
+                          <p className="text-[16px] font-bold" style={{ color: (detailData.change_24h || 0) >= 0 ? "#4ade80" : "#f87171" }}>
+                            {(detailData.change_24h || 0).toFixed(1)}%
+                          </p>
+                        </div>
+                        <div className="rounded-2xl bg-white/[0.04] p-3">
+                          <p className="text-[11px] text-white/50 uppercase">Liquidity</p>
+                          <p className="text-[16px] font-bold">{fmtUsd(detailData.liquidity_usd)}</p>
+                        </div>
+                      </div>
+                      {detailData.bonding_curve && (
+                        <div className="rounded-2xl bg-white/[0.04] p-4">
+                          <p className="text-[12px] text-white/60 mb-2">Bonding curve {detailData.bonding_curve.graduation_pct?.toFixed(0)}%</p>
+                          <div className="h-2 rounded-full bg-white/[0.07] overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${Math.min(100, detailData.bonding_curve.graduation_pct || 0)}%`, background: GOLD }} />
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <a href={detailData.dex_screener_url} target="_blank" rel="noreferrer"
+                          className="flex-1 text-center rounded-full py-3 text-[14px] font-bold text-black"
+                          style={{ background: `linear-gradient(135deg, ${GOLD}, #d4a017)` }}>Chart</a>
+                        <button onClick={() => { setTradeMint(selectedToken.mint); setSelectedToken(null); setTab("trade"); }}
+                          className="flex-1 rounded-full py-3 text-[14px] font-bold"
+                          style={{ background: `${GOLD}1e`, color: GOLD, border: `1px solid ${GOLD}33` }}>Trade</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-center text-white/50 py-8 text-[14px]">Loading…</p>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -284,6 +369,18 @@ export default function LaunchpadPage() {
               <input value={launchSymbol} onChange={(e) => setLaunchSymbol(e.target.value)} placeholder="Symbol" className={inputCls} />
               <textarea value={launchDesc} onChange={(e) => setLaunchDesc(e.target.value)} placeholder="Description" rows={2} className={inputCls} />
               <input value={launchImage} onChange={(e) => setLaunchImage(e.target.value)} placeholder="Image URL" className={inputCls} />
+
+              <button onClick={() => setShowJito(!showJito)}
+                className="w-full rounded-2xl p-3.5 flex items-center justify-between transition-all"
+                style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}>
+                <div className="text-left">
+                  <p className="text-[14px] font-bold">⚡ Jito Bundle</p>
+                  <p className="text-[12px] text-white/50">Atomic launch — anti-sniper</p>
+                </div>
+                <div className="w-11 h-6 rounded-full p-0.5 transition-colors" style={{ background: showJito ? GOLD : "rgba(255,255,255,0.15)" }}>
+                  <div className="h-5 w-5 rounded-full bg-white transition-transform" style={{ transform: showJito ? "translateX(20px)" : "translateX(0)" }} />
+                </div>
+              </button>
 
               <button onClick={handleLaunch} disabled={launching || !launchName || !launchSymbol}
                 className="w-full rounded-full py-3.5 font-bold text-[15px] text-black disabled:opacity-40 transition-opacity"
@@ -325,7 +422,30 @@ export default function LaunchpadPage() {
                 ))}
               </div>
               <input value={tradeMint} onChange={(e) => setTradeMint(e.target.value)} placeholder="Token mint" className={`${inputCls} font-mono !text-[13px]`} />
-              <input value={tradeAmount} onChange={(e) => setTradeAmount(e.target.value)} placeholder={tradeSide === "buy" ? "Amount in SOL" : "Token amount"} type="number" className={inputCls} />
+              <div className="flex gap-2">
+                {[0.1, 0.5, 1, 5].map((amt) => (
+                  <button key={amt} onClick={() => setTradeAmount(String(amt))}
+                    className="flex-1 rounded-full py-2 text-[13px] font-bold transition-all"
+                    style={tradeAmount === String(amt)
+                      ? { background: `${GOLD}22`, color: GOLD, border: `1px solid ${GOLD}44` }
+                      : { background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)" }}>
+                    {amt} SOL
+                  </button>
+                ))}
+              </div>
+              <input value={tradeAmount} onChange={(e) => setTradeAmount(e.target.value)} placeholder="Custom amount" type="number" className={inputCls} />
+              <div className="flex items-center justify-between text-[13px]">
+                <span className="text-white/60">Slippage</span>
+                <div className="flex gap-1.5">
+                  {[100, 500, 1000].map((s) => (
+                    <button key={s} onClick={() => setSlippage(s)}
+                      className="rounded-full px-3 py-1 text-[12px] font-bold"
+                      style={slippage === s ? { background: GOLD, color: "#000" } : { background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.6)" }}>
+                      {s / 100}%
+                    </button>
+                  ))}
+                </div>
+              </div>
               <button className="w-full rounded-full py-3.5 font-bold text-[15px] text-black"
                 style={{ background: `linear-gradient(135deg, ${GOLD}, #d4a017)` }}>
                 {tradeSide === "buy" ? "Buy" : "Sell"}
