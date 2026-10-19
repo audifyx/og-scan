@@ -108,10 +108,6 @@
       "destination": "/api/x-mcp?path=agent"
     },
     {
-      "source": "/api/x-session-sync",
-      "destination": "/api/x-mcp?path=oauth/link-supabase"
-    },
-    {
       "source": "/api/admin-tokens",
       "destination": "/api/web?path=admin-tokens"
     },
@@ -357,32 +353,6 @@
     }
   ],
   "headers": [
-    {
-      "source": "/agent/link-auth",
-      "headers": [
-        {
-          "key": "X-Frame-Options",
-          "value": "ALLOWALL"
-        },
-        {
-          "key": "Content-Security-Policy",
-          "value": "frame-ancestors *"
-        }
-      ]
-    },
-    {
-      "source": "/x-callback",
-      "headers": [
-        {
-          "key": "X-Frame-Options",
-          "value": "ALLOWALL"
-        },
-        {
-          "key": "Content-Security-Policy",
-          "value": "frame-ancestors *"
-        }
-      ]
-    },
     {
       "source": "/ai",
       "headers": [
