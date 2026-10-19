@@ -4,7 +4,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { PLATFORM_WALLET } from "@/lib/platformFee";
-import { xGetStoredUser, xSetStoredUser, xStartLogin, startSignInWithX, type XUser } from "@/lib/xAuth";
+import { xGetStoredUser, xSetStoredUser, xStartLogin, type XUser } from "@/lib/xAuth";
 import {
   approveXAgentQueueItem,
   bootstrapXMcp,
@@ -400,9 +400,7 @@ export default function XMcpPage({ embedded = false, initialTab = "home", initia
     setConnectingX(true);
     setError(null);
     try {
-      // Use Supabase X auth (seamless if already logged in with X).
-      // AuthWallet auto-links the provider tokens to MCP on callback.
-      await startSignInWithX(window.location.pathname + window.location.search);
+      await xStartLogin();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to start X login");
       setConnectingX(false);
