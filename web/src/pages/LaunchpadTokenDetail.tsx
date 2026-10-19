@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import LaunchpadComments from "@/components/LaunchpadComments";
+import LaunchpadShareButton from "@/components/LaunchpadShareButton";
 
 interface TokenDetail {
   mint: string;
@@ -146,6 +147,15 @@ export default function LaunchpadTokenDetail() {
                     <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase ${statusColor(token.status)}`}>
                       {token.status}
                     </span>
+                    <LaunchpadShareButton
+                      token={{
+                        name: token.name,
+                        symbol: token.symbol,
+                        price_usd: token.price_usd,
+                        market_cap_usd: token.market_cap_usd,
+                        mint: token.mint,
+                      }}
+                    />
                   </div>
                   <p className="mt-2 text-sm text-white/40">
                     {token.creator_username ? `by ${token.creator_username} · ` : ""}launched {timeAgo(token.created_at)}
