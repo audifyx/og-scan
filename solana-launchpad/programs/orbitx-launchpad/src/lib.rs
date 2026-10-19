@@ -5,7 +5,7 @@ use anchor_spl::{
     token_interface::{Mint, TokenAccount},
 };
 
-declare_id!("HjmM9TuHd1h4QFBrtYbZWsDCRysSMXYBDXXEmMKWZfh7");
+declare_id!("ORBITXLaunchPad1111111111111111111111111111");
 
 /// OrbitX Launchpad — custom token launch program.
 ///
