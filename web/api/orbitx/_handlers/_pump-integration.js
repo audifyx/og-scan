@@ -174,17 +174,24 @@ export async function tradeViaLightning({ mint, side, amountSol, amountTokens, s
   if (side === "buy" && !amountSol) throw new Error("amountSol required for buy");
   if (side === "sell" && !amountTokens) throw new Error("amountTokens required for sell");
 
+  // PumpDev API key from env (server-side)
+  const apiKey = process.env.PUMPDEV_API_KEY || process.env.PUMP_API_KEY || "";
+  if (!apiKey) {
+    throw new Error("Lightning API key not configured. Set PUMPDEV_API_KEY env var. Get one at https://pumpdev.io");
+  }
+
   const body = {
     mint,
     side,
     slippageBps,
     wallet: walletAddress,
+    apiKey,
     ...(side === "buy" ? { amountSol } : { amountTokens }),
   };
 
   const res = await fetch(`${PUMPDEV_API}/trade-lightning`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(30000),
   });
