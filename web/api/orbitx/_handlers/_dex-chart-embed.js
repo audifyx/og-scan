@@ -274,7 +274,7 @@ export async function buildDexChartEmbed(args = {}) {
     ? String(args.interval)
     : "15m";
   const theme = String(args.theme || "dark").toLowerCase() === "light" ? "light" : "dark";
-  const showIframe = args.iframe !== false && args.showIframe !== false;
+  const showIframe = false; // Disabled: Grok/Claude try to render iframes as apps and fail. Use links instead.
 
   const resolved = await resolveDexPairs(ca, { chain });
   if (!resolved.ok) {
@@ -303,7 +303,6 @@ export async function buildDexChartEmbed(args = {}) {
     ok: true,
     __mcpFormat: "markdown",
     markdown,
-    action: "dex_chart_embed",
     ca: resolved.ca,
     chain: summary.chainId,
     symbol: summary.symbol,
