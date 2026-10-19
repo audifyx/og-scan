@@ -186,12 +186,12 @@ export async function tradeViaLightning({ mint, side, amountSol, amountTokens, s
   }
 
   const body = {
+    action: side,  // "buy" or "sell"
     mint,
-    side,
+    amount: side === "buy" ? amountSol : amountTokens,
     slippageBps,
     wallet: walletAddress,
     apiKey,
-    ...(side === "buy" ? { amountSol } : { amountTokens }),
   };
 
   const res = await fetch(`${apiUrl}/trade-lightning`, {
