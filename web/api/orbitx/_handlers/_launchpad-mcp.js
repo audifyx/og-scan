@@ -249,6 +249,31 @@ export async function handleLaunchpadTool(name, args, ctx) {
     };
   }
 
+  if (name === "launchpad_holder_map") {
+    try {
+      const { getHolderMap } = await import("./_launchpad-insights.js");
+      const map = await getHolderMap(args.mint);
+      if (!map) return { ok: false, error: "Could not fetch holder data. Token may be too new or RPC rate-limited." };
+      return { ok: true, ...map };
+    } catch (e) {
+      return { ok: false, error: String(e.message || e) };
+    }
+  }
+
+  if (name === "launchpad_sniper_radar") {
+    try {
+      const { getSniperRadar } = await import("./_launchpad-insights.js");
+      const events = await getSniperRadar(sbQuery, args.limit || 20);
+      return {
+        ok: true,
+        events,
+        message: events.length ? `${events.length} tokens with sniper protection active in the last 24h.` : "No recent launches with sniper activity.",
+      };
+    } catch (e) {
+      return { ok: false, error: String(e.message || e) };
+    }
+  }
+
   // Auth-required tools
   if (!auth?.userId) {
     return {
@@ -443,31 +468,6 @@ export async function handleLaunchpadTool(name, args, ctx) {
       const { getPumpPnl } = await import("./_pump-integration.js");
       const pnl = await getPumpPnl(auth.walletAddress || "");
       return { ok: true, pnl };
-    } catch (e) {
-      return { ok: false, error: String(e.message || e) };
-    }
-  }
-
-  if (name === "launchpad_sniper_radar") {
-    try {
-      const { getSniperRadar } = await import("./_launchpad-insights.js");
-      const events = await getSniperRadar(sbQuery, args.limit || 20);
-      return {
-        ok: true,
-        events,
-        message: events.length ? `${events.length} tokens with sniper protection active in the last 24h.` : "No recent launches with sniper activity.",
-      };
-    } catch (e) {
-      return { ok: false, error: String(e.message || e) };
-    }
-  }
-
-  if (name === "launchpad_holder_map") {
-    try {
-      const { getHolderMap } = await import("./_launchpad-insights.js");
-      const map = await getHolderMap(args.mint);
-      if (!map) return { ok: false, error: "Could not fetch holder data" };
-      return { ok: true, ...map };
     } catch (e) {
       return { ok: false, error: String(e.message || e) };
     }
