@@ -169,15 +169,20 @@ export const PUMP_CONFIG = {
  * Trade via PumpDev Lightning API — one-call buy/sell.
  * Server-side signing via desk wallet.
  */
-export async function tradeViaLightning({ mint, side, amountSol, amountTokens, slippageBps = 500, walletAddress }) {
+export async function tradeViaLightning({ mint, side, amountSol, amountTokens, slippageBps = 500, walletAddress, chain = "solana" }) {
   if (!mint) throw new Error("mint required");
   if (side === "buy" && !amountSol) throw new Error("amountSol required for buy");
   if (side === "sell" && !amountTokens) throw new Error("amountTokens required for sell");
 
-  // PumpDev API key from env (server-side)
-  const apiKey = process.env.PUMPDEV_API_KEY || process.env.PUMP_API_KEY || "";
+  // Lightning API keys — separate for Solana and Robinhood Chain
+  const isRh = chain === "robinhood" || chain === "rh";
+  const apiKey = isRh
+    ? (process.env.PUMPDEV_LIGHTNING_RH || "")
+    : (process.env.PUMPDEV_LIGHTNING_SOL || process.env.PUMPDEV_API_KEY || "");
+  const apiUrl = isRh ? "https://rhc.pumpdev.io/api" : PUMPDEV_API;
+
   if (!apiKey) {
-    throw new Error("Lightning API key not configured. Set PUMPDEV_API_KEY env var. Get one at https://pumpdev.io");
+    throw new Error(`Lightning API key not configured for ${isRh ? "Robinhood" : "Solana"}.`);
   }
 
   const body = {
@@ -189,7 +194,7 @@ export async function tradeViaLightning({ mint, side, amountSol, amountTokens, s
     ...(side === "buy" ? { amountSol } : { amountTokens }),
   };
 
-  const res = await fetch(`${PUMPDEV_API}/trade-lightning`, {
+  const res = await fetch(`${apiUrl}/trade-lightning`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
     body: JSON.stringify(body),
