@@ -295,7 +295,10 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
   };
 
   const onLinkWallet = async () => {
-    if (!walletAddress) return;
+    if (!walletAddress) {
+      setError("No wallet found. Connect a Solana wallet (Phantom, Solflare) first, then link it here.");
+      return;
+    }
     setLinking(true);
     setError(null);
     try {
