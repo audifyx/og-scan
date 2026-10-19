@@ -2301,12 +2301,16 @@ async function callTool(rawName, args, auth, req = null) {
 
   if (name === "x_connection_status") {
     const profile = await getXProfile(auth.userId);
-    const connected = Boolean(profile?.twitter_access_token);
+    const hasToken = Boolean(profile?.twitter_access_token);
+    const hasUsername = Boolean(profile?.twitter_username);
+    const connected = hasToken || hasUsername;
     const scope = xScopeInfo(profile);
     const warn =
-      connected && scope.scopes && !scope.hasTweetWrite
+      hasToken && scope.scopes && !scope.hasTweetWrite
         ? "Token is missing tweet.write — revoke OrbitX at x.com/settings/connected_apps, then Reconnect X on /x while signed in."
-        : null;
+        : !hasToken && hasUsername
+          ? "X linked via login. For posting via MCP, complete Connect X to grant API access."
+          : null;
     return {
       ok: true,
       connected,
