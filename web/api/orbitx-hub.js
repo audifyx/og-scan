@@ -1765,6 +1765,8 @@ const PUBLIC_TOOL_EXACT = new Set([
   "orbitx_social_communities",
   "orbitx_social_feed",
   "orbitx_social_members",
+  "orbitx_spaces_list",
+  "orbitx_spaces_join",
   "orbitx_paper_desk",
   "orbitx_paper_agent",
   "orbitx_paper_buying",
@@ -3250,6 +3252,45 @@ const CORE_TOOLS = [
         communityId: { type: "string" },
         limit: { type: "integer", default: 40 },
       },
+    },
+  },
+  {
+    name: "orbitx_spaces_list",
+    description:
+      "List live and scheduled OrbitX Spaces (voice rooms). Returns live spaces first with host, title, listener count, and join URLs. Ask the user which one to join.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        liveOnly: { type: "boolean", description: "Only return live spaces (default true)" },
+        limit: { type: "integer", default: 20 },
+      },
+    },
+  },
+  {
+    name: "orbitx_spaces_join",
+    description:
+      "Get join info for an OrbitX Space. Returns the join URL, LiveKit room name, and space details. Open the joinUrl in a browser to join the voice room.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        spaceId: { type: "string", description: "The space ID from orbitx_spaces_list" },
+      },
+      required: ["spaceId"],
+    },
+  },
+  {
+    name: "orbitx_spaces_create",
+    description:
+      "Create a new OrbitX Space (voice room). Requires authentication. Returns the space ID and join URL.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Space title" },
+        description: { type: "string", description: "What you'll discuss" },
+        topic: { type: "string", description: "Topic/category" },
+        isPrivate: { type: "boolean", default: false },
+      },
+      required: ["title"],
     },
   },
   {
@@ -5425,6 +5466,86 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
     let path = `community_posts?order=created_at.desc&limit=${limit}&select=id,community_id,user_id,username,avatar_url,content,image_url,likes_count,replies_count,post_type,created_at`;
     if (args.communityId) path += `&community_id=eq.${encodeURIComponent(String(args.communityId))}`;
     return sb(path);
+  }
+
+  if (name === "orbitx_spaces_list") {
+    const limit = Math.min(Number(args.limit) || 20, 50);
+    const liveOnly = args.liveOnly !== false;
+    let path = `spaces?order=created_at.desc&limit=${limit}&select=id,title,description,host_username,host_avatar,topic,is_live,listener_count,speaker_count,peak_listeners,scheduled_for,created_at`;
+    if (liveOnly) path += `&is_live=eq.true`;
+    const rows = await sb(path);
+    const spaces = (Array.isArray(rows) ? rows : []).map((s) => ({
+      ...s,
+      joinUrl: `${base}/spaces/${s.id}`,
+      listenUrl: `${base}/listen/${s.id}`,
+    }));
+    return {
+      ok: true,
+      count: spaces.length,
+      spaces,
+      hint: spaces.length > 0
+        ? "Ask the user which space they'd like to join, then call orbitx_spaces_join with the spaceId."
+        : "No live spaces right now.",
+    };
+  }
+
+  if (name === "orbitx_spaces_join") {
+    const spaceId = String(args.spaceId || "").trim();
+    if (!spaceId) throw new Error("spaceId required");
+    const rows = await sb(
+      `spaces?id=eq.${encodeURIComponent(spaceId)}&limit=1&select=id,title,description,host_username,host_avatar,topic,is_live,is_private,listener_count,speaker_count,scheduled_for,created_at`
+    );
+    const space = Array.isArray(rows) ? rows[0] : null;
+    if (!space) throw new Error("Space not found");
+    return {
+      ok: true,
+      space: {
+        ...space,
+        joinUrl: `${base}/spaces/${space.id}`,
+        listenUrl: `${base}/listen/${space.id}`,
+        livekitRoom: `space-${space.id}`,
+      },
+      message: space.is_live
+        ? `Join "${space.title}" now: ${base}/spaces/${space.id}`
+        : `This space is not live yet. Join link: ${base}/spaces/${space.id}`,
+    };
+  }
+
+  if (name === "orbitx_spaces_create") {
+    const session = await resolveSocialUser(auth, args);
+    if (!session?.userId) {
+      throw new Error(
+        "Authentication required to create a space. Link your account via orbitx_auth_link first.",
+      );
+    }
+    const title = String(args.title || "").trim();
+    if (!title) throw new Error("title required");
+    const created = await sb("spaces", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        title: title.slice(0, 120),
+        description: String(args.description || "").slice(0, 280) || null,
+        host_id: session.userId,
+        host_username: session.username || null,
+        topic: String(args.topic || "").slice(0, 60) || null,
+        is_live: true,
+        is_private: Boolean(args.isPrivate),
+        listener_count: 1,
+        speaker_count: 1,
+        host_last_seen_at: new Date().toISOString(),
+      }),
+    });
+    const space = Array.isArray(created) ? created[0] : created;
+    return {
+      ok: true,
+      space: {
+        ...space,
+        joinUrl: `${base}/spaces/${space.id}`,
+        listenUrl: `${base}/listen/${space.id}`,
+      },
+      message: `Space "${title}" is live! Join: ${base}/spaces/${space.id}`,
+    };
   }
 
   if (name === "orbitx_social_members") {
