@@ -1765,9 +1765,6 @@ const PUBLIC_TOOL_EXACT = new Set([
   "orbitx_social_communities",
   "orbitx_social_feed",
   "orbitx_social_members",
-  "orbitx_spaces_list",
-  "orbitx_spaces_join",
-  "orbitx_charts",
   "orbitx_paper_desk",
   "orbitx_paper_agent",
   "orbitx_paper_buying",
@@ -3253,63 +3250,6 @@ const CORE_TOOLS = [
         communityId: { type: "string" },
         limit: { type: "integer", default: 40 },
       },
-    },
-  },
-  {
-    name: "orbitx_spaces_list",
-    description:
-      "List live and scheduled OrbitX Spaces (voice rooms). Returns live spaces first with host, title, listener count, and join URLs. Ask the user which one to join.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        liveOnly: { type: "boolean", description: "Only return live spaces (default true)" },
-        limit: { type: "integer", default: 20 },
-      },
-    },
-  },
-  {
-    name: "orbitx_spaces_join",
-    description:
-      "Get join info for an OrbitX Space. Returns the join URL, LiveKit room name, and space details. Open the joinUrl in a browser to join the voice room.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        spaceId: { type: "string", description: "The space ID from orbitx_spaces_list" },
-      },
-      required: ["spaceId"],
-    },
-  },
-  {
-    name: "orbitx_spaces_create",
-    description:
-      "Create a new OrbitX Space (voice room). Requires authentication. Returns the space ID and join URL.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        title: { type: "string", description: "Space title" },
-        description: { type: "string", description: "What you'll discuss" },
-        topic: { type: "string", description: "Topic/category" },
-        isPrivate: { type: "boolean", default: false },
-      },
-      required: ["title"],
-    },
-  },
-  {
-    name: "orbitx_charts",
-    description:
-      "Show embedded DexScreener charts for 1-4 Solana tokens side by side. Pass token contract addresses (CAs). Returns a sharable URL with all charts embedded in a grid — no more switching between tabs.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        tokens: {
-          type: "array",
-          items: { type: "string" },
-          description: "Solana token contract addresses (1-4)",
-          minItems: 1,
-          maxItems: 4,
-        },
-      },
-      required: ["tokens"],
     },
   },
   {
@@ -5487,104 +5427,6 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
     return sb(path);
   }
 
-  if (name === "orbitx_spaces_list") {
-    const limit = Math.min(Number(args.limit) || 20, 50);
-    const liveOnly = args.liveOnly !== false;
-    let path = `spaces?order=created_at.desc&limit=${limit}&select=id,title,description,host_username,host_avatar,topic,is_live,listener_count,speaker_count,peak_listeners,scheduled_for,created_at`;
-    if (liveOnly) path += `&is_live=eq.true`;
-    const rows = await sb(path);
-    const spaces = (Array.isArray(rows) ? rows : []).map((s) => ({
-      ...s,
-      joinUrl: `${base}/spaces/${s.id}`,
-      listenUrl: `${base}/listen/${s.id}`,
-    }));
-    return {
-      ok: true,
-      count: spaces.length,
-      spaces,
-      hint: spaces.length > 0
-        ? "Ask the user which space they'd like to join, then call orbitx_spaces_join with the spaceId."
-        : "No live spaces right now.",
-    };
-  }
-
-  if (name === "orbitx_spaces_join") {
-    const spaceId = String(args.spaceId || "").trim();
-    if (!spaceId) throw new Error("spaceId required");
-    const rows = await sb(
-      `spaces?id=eq.${encodeURIComponent(spaceId)}&limit=1&select=id,title,description,host_username,host_avatar,topic,is_live,is_private,listener_count,speaker_count,scheduled_for,created_at`
-    );
-    const space = Array.isArray(rows) ? rows[0] : null;
-    if (!space) throw new Error("Space not found");
-    return {
-      ok: true,
-      space: {
-        ...space,
-        joinUrl: `${base}/spaces/${space.id}`,
-        listenUrl: `${base}/listen/${space.id}`,
-        livekitRoom: `space-${space.id}`,
-      },
-      message: space.is_live
-        ? `Join "${space.title}" now: ${base}/spaces/${space.id}`
-        : `This space is not live yet. Join link: ${base}/spaces/${space.id}`,
-    };
-  }
-
-  if (name === "orbitx_spaces_create") {
-    const session = await resolveSocialUser(auth, args);
-    if (!session?.userId) {
-      throw new Error(
-        "Authentication required to create a space. Link your account via orbitx_auth_link first.",
-      );
-    }
-    const title = String(args.title || "").trim();
-    if (!title) throw new Error("title required");
-    const created = await sb("spaces", {
-      method: "POST",
-      headers: { Prefer: "return=representation" },
-      body: JSON.stringify({
-        title: title.slice(0, 120),
-        description: String(args.description || "").slice(0, 280) || null,
-        host_id: session.userId,
-        host_username: session.username || null,
-        topic: String(args.topic || "").slice(0, 60) || null,
-        is_live: true,
-        is_private: Boolean(args.isPrivate),
-        listener_count: 1,
-        speaker_count: 1,
-        host_last_seen_at: new Date().toISOString(),
-      }),
-    });
-    const space = Array.isArray(created) ? created[0] : created;
-    return {
-      ok: true,
-      space: {
-        ...space,
-        joinUrl: `${base}/spaces/${space.id}`,
-        listenUrl: `${base}/listen/${space.id}`,
-      },
-      message: `Space "${title}" is live! Join: ${base}/spaces/${space.id}`,
-    };
-  }
-
-  if (name === "orbitx_charts") {
-    const tokens = (Array.isArray(args.tokens) ? args.tokens : [])
-      .map((t) => String(t).trim())
-      .filter(Boolean)
-      .slice(0, 4);
-    if (tokens.length === 0) throw new Error("tokens required (1-4 Solana contract addresses)");
-    const url = `${base}/charts?tokens=${tokens.map(encodeURIComponent).join(",")}`;
-    return {
-      ok: true,
-      count: tokens.length,
-      tokens,
-      url,
-      embedUrls: tokens.map((t) => `https://dexscreener.com/solana/${t}?embed=1&theme=dark`),
-      message: `Charts ready: ${url}`,
-      hint: "Open the URL to see all charts side by side. Each chart links out to DexScreener.",
-    };
-  }
-
   if (name === "orbitx_social_members") {
     const communityId = String(args.communityId || "").trim();
     if (!communityId) throw new Error("communityId required");
@@ -6135,92 +5977,6 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
   }
 
   throw new Error(`Unknown tool: ${name}`);
-}
-
-/**
- * OrbitX Launchpad MCP — separate MCP server for token launching.
- * Path: /api/mcp-launchpad → orbitx-hub?path=mcp-launchpad
- */
-async function handleLaunchpadMcp(req, res) {
-  const { LAUNCHPAD_TOOLS, handleLaunchpadTool } = await import("./orbitx/_handlers/_launchpad-mcp.js");
-
-  if (req.method === "GET") {
-    return json(res, {
-      name: "OrbitX Launchpad MCP",
-      version: "1.0.0",
-      description: "Launch Solana tokens via MCP using your OrbitX desk wallet. No manual signing.",
-      mcp_url: "https://www.orbitx.world/api/mcp-launchpad",
-      tools: LAUNCHPAD_TOOLS.map((t) => t.name),
-    });
-  }
-
-  if (req.method !== "POST") {
-    res.statusCode = 405;
-    return res.end("Method not allowed");
-  }
-
-  const body = await readBody(req);
-  const { jsonrpc, id, method, params } = body || {};
-
-  // Extract auth from bearer token or authCode
-  let auth = null;
-  try {
-    const authHeader = req.headers?.authorization || "";
-    const token = authHeader.replace(/^Bearer\s+/i, "");
-    // Auth resolution happens via the main hub's auth flow
-    // For now, pass through; handleLaunchpadTool checks auth.userId
-    if (token) auth = { token };
-    if (params?.authCode) auth = { ...(auth || {}), authCode: params.authCode };
-  } catch {}
-
-  if (method === "initialize") {
-    return json(res, {
-      jsonrpc: "2.0",
-      id,
-      result: {
-        protocolVersion: "2024-11-05",
-        capabilities: { tools: {} },
-        serverInfo: { name: "OrbitX Launchpad MCP", version: "1.0.0" },
-        instructions: "OrbitX Launchpad MCP. Launch Solana tokens with your desk wallet — no manual signing. Use launchpad_launch to create a token (name, symbol). Use launchpad_tokens to browse launched tokens. Use launchpad_buy/sell to trade. Auth: get your code at https://www.orbitx.world/agent and pass as authCode.",
-      },
-    });
-  }
-
-  if (method === "tools/list") {
-    return json(res, {
-      jsonrpc: "2.0",
-      id,
-      result: { tools: LAUNCHPAD_TOOLS },
-    });
-  }
-
-  if (method === "tools/call") {
-    const name = params?.name;
-    const args = params?.arguments || {};
-    try {
-      const result = await handleLaunchpadTool(name, args, { auth });
-      return json(res, {
-        jsonrpc: "2.0",
-        id,
-        result: {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-          structuredContent: result,
-        },
-      });
-    } catch (e) {
-      return json(res, {
-        jsonrpc: "2.0",
-        id,
-        error: { code: -32603, message: String(e?.message || e) },
-      });
-    }
-  }
-
-  return json(res, {
-    jsonrpc: "2.0",
-    id,
-    error: { code: -32601, message: `Method not found: ${method}` },
-  });
 }
 
 async function handleMcp(req, res, parts) {
@@ -7061,7 +6817,6 @@ export default async function handler(req, res) {
     }
     if (head === "agent") return await handleAgent(req, res, parts.slice(1));
     if (head === "mcp") return await handleMcp(req, res, parts.slice(1));
-    if (head === "mcp-launchpad") return await handleLaunchpadMcp(req, res);
     if (head === "crypto-scan") return await handleCryptoScan(req, res);
     if (head === "anti-vamp-check") {
       // Real checker: api/orbitx/_handlers/_anti-vamp-check.ts (shared with orbitx-anti-vamp-check.ts).
