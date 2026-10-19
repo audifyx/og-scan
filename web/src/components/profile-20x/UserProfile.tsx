@@ -79,6 +79,7 @@ interface ProfileData {
   avatar_url?: string | null;
   banner_url?: string | null;
   bio?: string | null;
+  bio_links?: Array<{ title: string; url: string }> | null;
   badge?: string | null;
   mcp_beta_access?: boolean | null;
   location?: string | null;
@@ -1042,7 +1043,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
     setLoading(true);
     try {
-      const { data: profile, error } = await supabase.from("profiles").select("user_id, username, display_name, avatar_url, banner_url, bio, badge, mcp_beta_access, verified, is_official_account, affiliate_org_id, theme_preset, custom_wallpaper_url, referral_code, og_score, og_rank, created_at, sol_wallet, first_seen_ip, last_fingerprint").eq("user_id", targetUserId).single();
+      const { data: profile, error } = await supabase.from("profiles").select("user_id, username, display_name, avatar_url, banner_url, bio, bio_links, badge, mcp_beta_access, verified, is_official_account, affiliate_org_id, theme_preset, custom_wallpaper_url, referral_code, og_score, og_rank, created_at, sol_wallet, first_seen_ip, last_fingerprint").eq("user_id", targetUserId).single();
       if (error) throw error;
       const profileRecord = applyOfficialBrand(profile as ProfileData);
       setProfileData(profileRecord);
@@ -1687,6 +1688,22 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
               ) : null}
 
               {profileData.bio ? <p className="whitespace-pre-wrap text-[15px] leading-6 text-white/92">{profileData.bio}</p> : null}
+
+              {Array.isArray(profileData.bio_links) && profileData.bio_links.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {profileData.bio_links.map((link, i) => (
+                    <a
+                      key={i}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[13px] font-medium text-blue-300 hover:bg-white/10 hover:border-blue-400/40 transition-colors"
+                    >
+                      {link.title}
+                    </a>
+                  ))}
+                </div>
+              ) : null}
 
               {showHoldings && targetUserId ? <VerifiedHoldings userId={targetUserId} /> : null}
 
