@@ -115,6 +115,8 @@ const LaunchpadPage = lazyWithRetry(() => import("./pages/LaunchpadPage"));
 const LaunchpadLive = lazyWithRetry(() => import("./pages/LaunchpadLive"));
 const LaunchpadTokenDetail = lazyWithRetry(() => import("./pages/LaunchpadTokenDetail"));
 const LaunchpadStats = lazyWithRetry(() => import("./pages/LaunchpadStats"));
+const LaunchpadCreator = lazyWithRetry(() => import("./pages/LaunchpadCreator"));
+const LaunchpadSwipe = lazyWithRetry(() => import("./pages/LaunchpadSwipe"));
 const ModerationAdmin = lazyWithRetry(() => import("./social/pages/ModerationAdmin"));
 const InviteLanding = lazyWithRetry(() => import("./social/pages/InviteLanding"));
 import LaunchpadPump from "./pages/orbitx/LaunchpadPump";
@@ -562,6 +564,24 @@ const App = () => (
               element={
                 <Suspense fallback={SOCIAL_FALLBACK}>
                   <LaunchpadStats />
+                </Suspense>
+              }
+            />
+            {/* ── Public: Launchpad creator profile (read-only) ── */}
+            <Route
+              path="/launchpad/creator/:username"
+              element={
+                <Suspense fallback={SOCIAL_FALLBACK}>
+                  <LaunchpadCreator />
+                </Suspense>
+              }
+            />
+            {/* ── Public: Launchpad swipe discovery (read-only) ── */}
+            <Route
+              path="/launchpad/swipe"
+              element={
+                <Suspense fallback={SOCIAL_FALLBACK}>
+                  <LaunchpadSwipe />
                 </Suspense>
               }
             />

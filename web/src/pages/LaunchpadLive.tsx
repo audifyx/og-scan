@@ -8,6 +8,8 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import LaunchpadTicker from "@/components/LaunchpadTicker";
 import LaunchpadMcpGuide from "@/components/LaunchpadMcpGuide";
+import LaunchpadUpvote from "@/components/LaunchpadUpvote";
+import LaunchpadKingOfHill from "@/components/LaunchpadKingOfHill";
 
 interface LaunchToken {
   mint: string;
@@ -123,6 +125,7 @@ export default function LaunchpadLive() {
 
       {/* Token grid */}
       <div className="mx-auto max-w-6xl px-4 py-8">
+        <LaunchpadKingOfHill />
         {loading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -166,6 +169,9 @@ export default function LaunchpadLive() {
                     <span className={`mt-1.5 inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${statusColor(t.status)}`}>
                       {t.status}
                     </span>
+                    <div className="mt-2" onClick={(e) => e.preventDefault()}>
+                      <LaunchpadUpvote mint={t.mint} />
+                    </div>
                   </div>
                 </div>
 
