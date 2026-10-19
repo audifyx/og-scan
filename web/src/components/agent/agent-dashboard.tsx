@@ -135,6 +135,29 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
   const [setupOpen, setSetupOpen] = useState<"claude" | "chatgpt" | "grok">("claude");
   const [chatAuth, setChatAuth] = useState<McpChatAuthMint | null>(null);
   const [mintingAuth, setMintingAuth] = useState(false);
+  const [inAppWallet, setInAppWallet] = useState<string | null>(null);
+
+  // Fetch in-app wallet address (from /api/orbitx/desk-wallet)
+  useEffect(() => {
+    (async () => {
+      try {
+        const { supabase } = await import("@/lib/supabase");
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (!token) return;
+        const r = await fetch("/api/orbitx/desk-wallet", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (j?.publicKey && typeof j.publicKey === "string" && j.publicKey.length > 20) {
+          setInAppWallet(j.publicKey);
+        }
+      } catch {
+        /* in-app wallet optional */
+      }
+    })();
+  }, []);
 
   const walletAddress = useMemo(
     () =>
@@ -143,12 +166,13 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
         email: user?.email,
         userMetadata: (user?.user_metadata as Record<string, unknown> | undefined) ?? null,
         profileWallet:
+          inAppWallet ||
           (profile as { wallet_address?: string | null; sol_wallet?: string | null } | null)
             ?.wallet_address ||
           (profile as { sol_wallet?: string | null } | null)?.sol_wallet ||
           null,
       }),
-    [publicKey, user?.email, user?.user_metadata, profile],
+    [publicKey, user?.email, user?.user_metadata, profile, inAppWallet],
   );
 
   const oauth = useMemo(() => mcpOAuthCredentials(), []);
