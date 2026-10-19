@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocalWallets } from "@/lib/localWallets";
 
 type PadTab = "board" | "launch" | "trade" | "wallet";
 
@@ -27,6 +28,181 @@ interface LaunchToken {
 }
 
 const GOLD = "#e8b84a";
+
+function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
+  wallets: { solana: { publicKey: string; secretKey: string } | null; evm: { address: string; privateKey: string } | null } | null;
+  walletsReady: boolean;
+  pnlData: any;
+  tokens: LaunchToken[];
+  fmtUsd: (n: number | null) => string;
+}) {
+  const [showExport, setShowExport] = useState<"solana" | "evm" | null>(null);
+  const [sendTo, setSendTo] = useState("");
+  const [sendAmount, setSendAmount] = useState("");
+  const [sendChain, setSendChain] = useState<"solana" | "evm">("solana");
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text).catch(() => {});
+    setCopied(label);
+    setTimeout(() => setCopied(null), 1500);
+  };
+
+  if (!walletsReady) {
+    return (
+      <div className="mt-4">
+        <h1 className="text-[24px] font-bold tracking-tight">Wallet</h1>
+        <p className="mt-4 text-[14px] text-white/50 text-center py-10">Generating your wallets…</p>
+      </div>
+    );
+  }
+
+  if (!wallets?.solana) {
+    return (
+      <div className="mt-4">
+        <h1 className="text-[24px] font-bold tracking-tight">Wallet</h1>
+        <p className="mt-4 text-[14px] text-white/50 text-center py-10">No wallets found on this device.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4">
+      <h1 className="text-[24px] font-bold tracking-tight">Wallet</h1>
+      <p className="mt-1 text-[13px] text-white/60">🔒 Keys stay on this device. Never uploaded.</p>
+
+      {/* PnL */}
+      {pnlData && (
+        <div className="mt-4 rounded-[20px] p-5 text-center"
+          style={{ background: "linear-gradient(135deg, #101018, #0a0a12)", border: `1px solid ${GOLD}22` }}>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-white/50">Total PnL</p>
+          <p className="mt-1 text-[32px] font-extrabold"
+            style={{ color: (pnlData.total_pnl_usd || 0) >= 0 ? "#4ade80" : "#f87171" }}>
+            {(pnlData.total_pnl_usd || 0) >= 0 ? "+" : ""}${Math.abs(pnlData.total_pnl_usd || 0).toFixed(2)}
+          </p>
+          <p className="mt-1 text-[12px] text-white/50">{pnlData.wins || 0}W · {pnlData.losses || 0}L</p>
+        </div>
+      )}
+
+      {/* Solana wallet */}
+      <div className="mt-3 rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full flex items-center justify-center text-[18px]" style={{ background: `${GOLD}14`, color: GOLD }}>◎</div>
+          <div className="flex-1">
+            <p className="text-[15px] font-semibold">Solana</p>
+            <p className="text-[12px] text-white/50">pump.fun + StonkFun</p>
+          </div>
+          <button onClick={() => copy(wallets.solana!.publicKey, "sol-addr")}
+            className="text-[12px] font-bold px-3 py-1.5 rounded-full" style={{ background: `${GOLD}1e`, color: GOLD }}>
+            {copied === "sol-addr" ? "Copied!" : "Copy"}
+          </button>
+        </div>
+        <p className="mt-2.5 font-mono text-[11px] text-white/55 break-all bg-black/40 rounded-xl p-2.5 leading-relaxed">{wallets.solana.publicKey}</p>
+        <div className="mt-2.5 grid grid-cols-3 gap-2">
+          <button onClick={() => copy(wallets.solana!.publicKey, "sol-dep")}
+            className="rounded-full py-2 text-[13px] font-bold" style={{ background: `${GOLD}1e`, color: GOLD }}>
+            {copied === "sol-dep" ? "Copied!" : "Receive"}
+          </button>
+          <button onClick={() => { setSendChain("solana"); document.getElementById("send-section")?.scrollIntoView({ behavior: "smooth" }); }}
+            className="rounded-full py-2 text-[13px] font-bold bg-white/[0.07] text-white/80">Send</button>
+          <button onClick={() => setShowExport(showExport === "solana" ? null : "solana")}
+            className="rounded-full py-2 text-[13px] font-bold bg-white/[0.07] text-white/80">Export</button>
+        </div>
+        {showExport === "solana" && (
+          <div className="mt-2.5 rounded-xl bg-red-500/[0.07] border border-red-500/20 p-3">
+            <p className="text-[11px] font-bold text-red-400 uppercase mb-1.5">⚠️ Private key — keep secret</p>
+            <p className="font-mono text-[11px] text-white/70 break-all leading-relaxed">{wallets.solana.secretKey}</p>
+            <button onClick={() => copy(wallets.solana!.secretKey, "sol-key")}
+              className="mt-2 text-[12px] font-bold text-red-400">{copied === "sol-key" ? "Copied!" : "Copy key"}</button>
+          </div>
+        )}
+      </div>
+
+      {/* EVM wallet */}
+      {wallets.evm && (
+        <div className="mt-2.5 rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full flex items-center justify-center text-[18px]" style={{ background: `${GOLD}14`, color: GOLD }}>⬡</div>
+            <div className="flex-1">
+              <p className="text-[15px] font-semibold">Robinhood Chain</p>
+              <p className="text-[12px] text-white/50">Pons V2</p>
+            </div>
+            <button onClick={() => copy(wallets.evm!.address, "evm-addr")}
+              className="text-[12px] font-bold px-3 py-1.5 rounded-full" style={{ background: `${GOLD}1e`, color: GOLD }}>
+              {copied === "evm-addr" ? "Copied!" : "Copy"}
+            </button>
+          </div>
+          <p className="mt-2.5 font-mono text-[11px] text-white/55 break-all bg-black/40 rounded-xl p-2.5 leading-relaxed">{wallets.evm.address}</p>
+          <div className="mt-2.5 grid grid-cols-3 gap-2">
+            <button onClick={() => copy(wallets.evm!.address, "evm-dep")}
+              className="rounded-full py-2 text-[13px] font-bold" style={{ background: `${GOLD}1e`, color: GOLD }}>
+              {copied === "evm-dep" ? "Copied!" : "Receive"}
+            </button>
+            <button onClick={() => { setSendChain("evm"); document.getElementById("send-section")?.scrollIntoView({ behavior: "smooth" }); }}
+              className="rounded-full py-2 text-[13px] font-bold bg-white/[0.07] text-white/80">Send</button>
+            <button onClick={() => setShowExport(showExport === "evm" ? null : "evm")}
+              className="rounded-full py-2 text-[13px] font-bold bg-white/[0.07] text-white/80">Export</button>
+          </div>
+          {showExport === "evm" && (
+            <div className="mt-2.5 rounded-xl bg-red-500/[0.07] border border-red-500/20 p-3">
+              <p className="text-[11px] font-bold text-red-400 uppercase mb-1.5">⚠️ Private key — keep secret</p>
+              <p className="font-mono text-[11px] text-white/70 break-all leading-relaxed">{wallets.evm.privateKey}</p>
+              <button onClick={() => copy(wallets.evm!.privateKey, "evm-key")}
+                className="mt-2 text-[12px] font-bold text-red-400">{copied === "evm-key" ? "Copied!" : "Copy key"}</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Send */}
+      <div id="send-section" className="mt-2.5 rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-4">
+        <p className="text-[14px] font-bold mb-3">Send funds</p>
+        <div className="grid grid-cols-2 gap-2 p-1 rounded-full bg-white/[0.04] mb-3">
+          {(["solana", "evm"] as const).map((c) => (
+            <button key={c} onClick={() => setSendChain(c)}
+              className="rounded-full py-2 text-[13px] font-bold transition-all"
+              style={sendChain === c ? { background: GOLD, color: "#000" } : { color: "rgba(255,255,255,0.5)" }}>
+              {c === "solana" ? "◎ Solana" : "⬡ Robinhood"}
+            </button>
+          ))}
+        </div>
+        <input value={sendTo} onChange={(e) => setSendTo(e.target.value)} placeholder="Recipient address"
+          className="w-full rounded-2xl bg-white/[0.04] border border-white/10 px-4 py-3 text-[14px] font-mono placeholder-white/40 outline-none focus:border-[#e8b84a]/50 mb-2" />
+        <input value={sendAmount} onChange={(e) => setSendAmount(e.target.value)} placeholder={`Amount (${sendChain === "solana" ? "SOL" : "ETH"})`} type="number"
+          className="w-full rounded-2xl bg-white/[0.04] border border-white/10 px-4 py-3 text-[14px] placeholder-white/40 outline-none focus:border-[#e8b84a]/50 mb-3" />
+        <button className="w-full rounded-full py-3 font-bold text-[14px] text-black"
+          style={{ background: `linear-gradient(135deg, ${GOLD}, #d4a017)` }}>
+          Send {sendChain === "solana" ? "SOL" : "ETH"}
+        </button>
+        <p className="mt-2 text-[11px] text-white/40 text-center">Signing happens on-device. Keys never leave.</p>
+      </div>
+
+      {/* Holdings */}
+      <div className="mt-2.5 rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-4">
+        <p className="text-[14px] font-bold mb-3">Holdings</p>
+        {tokens.length > 0 ? (
+          <div className="space-y-2">
+            {tokens.slice(0, 8).map((t) => (
+              <div key={t.mint} className="flex items-center gap-3 py-1">
+                <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center text-[13px] font-bold overflow-hidden" style={{ color: GOLD }}>
+                  {t.image_url ? <img src={t.image_url} className="h-full w-full object-cover" /> : t.symbol.charAt(0)}
+                </div>
+                <span className="flex-1 text-[14px] font-medium truncate">{t.name}</span>
+                <span className="text-[12px] text-white/50">${t.symbol}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[13px] text-white/40 text-center py-4">No tokens yet</p>
+        )}
+      </div>
+
+      <p className="mt-4 mb-2 text-[11px] text-white/35 text-center leading-relaxed">
+        🔒 Your keys are generated and stored only on this device.<br />OrbitX never sees or stores them.
+      </p>
+    </div>
+  );
+}
 
 function HolderMap({ mint }: { mint: string }) {
   const [holders, setHolders] = useState<{ address: string; pct: number }[]>([]);
@@ -123,6 +299,7 @@ const TABS: { id: PadTab; label: string; icon: JSX.Element }[] = [
 
 export default function LaunchpadPage() {
   const { user } = useAuth();
+  const { wallets, ready: walletsReady } = useLocalWallets();
   const [tab, setTab] = useState<PadTab>("board");
   const [tokens, setTokens] = useState<LaunchToken[]>([]);
   const [loading, setLoading] = useState(true);
@@ -628,74 +805,9 @@ export default function LaunchpadPage() {
           </div>
         )}
 
-        {/* WALLET */}
+        {/* WALLET — full local wallet */}
         {tab === "wallet" && (
-          <div className="mt-4">
-            <h1 className="text-[24px] font-bold tracking-tight">Wallet</h1>
-            <p className="mt-1 text-[13px] text-white/60">Your desk — balances, holdings, PnL.</p>
-
-            {/* PnL card */}
-            {pnlData && (
-              <div className="mt-4 rounded-[20px] p-5 text-center"
-                style={{ background: "linear-gradient(135deg, #101018, #0a0a12)", border: `1px solid ${GOLD}22` }}>
-                <p className="text-[11px] font-bold uppercase tracking-widest text-white/50">Total PnL</p>
-                <p className="mt-1 text-[32px] font-extrabold"
-                  style={{ color: (pnlData.total_pnl_usd || 0) >= 0 ? "#4ade80" : "#f87171" }}>
-                  {(pnlData.total_pnl_usd || 0) >= 0 ? "+" : ""}${Math.abs(pnlData.total_pnl_usd || 0).toFixed(2)}
-                </p>
-                <p className="mt-1 text-[12px] text-white/50">{pnlData.wins || 0}W · {pnlData.losses || 0}L</p>
-              </div>
-            )}
-
-            {/* Wallet addresses */}
-            <div className="mt-3 space-y-2.5">
-              {[
-                { chain: "Solana", desc: "pump.fun + StonkFun", icon: "◎", addr: walletData?.solana },
-                { chain: "Robinhood Chain", desc: "Pons V2", icon: "⬡", addr: walletData?.robinhood },
-              ].map((w) => (
-                <div key={w.chain} className="rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full flex items-center justify-center text-[18px] shrink-0"
-                      style={{ background: `${GOLD}14`, color: GOLD }}>{w.icon}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[15px] font-semibold">{w.chain}</p>
-                      <p className="text-[12px] text-white/50">{w.desc}</p>
-                    </div>
-                  </div>
-                  {w.addr && (
-                    <p className="mt-2 font-mono text-[11px] text-white/50 break-all bg-black/30 rounded-xl p-2.5">{w.addr}</p>
-                  )}
-                  <div className="mt-2 flex gap-2">
-                    <Link to="/supercomputer?tab=wallet"
-                      className="flex-1 text-center rounded-full py-2 text-[13px] font-bold"
-                      style={{ background: `${GOLD}1e`, color: GOLD }}>Deposit</Link>
-                    <Link to="/supercomputer?tab=wallet"
-                      className="flex-1 text-center rounded-full py-2 text-[13px] font-bold bg-white/[0.06] text-white/70">Manage</Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Holdings */}
-            <div className="mt-3 rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-4">
-              <p className="text-[14px] font-bold mb-3">Holdings</p>
-              {tokens.filter(t => t.creator_username).length > 0 ? (
-                <div className="space-y-2">
-                  {tokens.slice(0, 5).map((t) => (
-                    <div key={t.mint} className="flex items-center gap-3 py-1.5">
-                      <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center text-[13px] font-bold overflow-hidden" style={{ color: GOLD }}>
-                        {t.image_url ? <img src={t.image_url} className="h-full w-full object-cover" /> : t.symbol.charAt(0)}
-                      </div>
-                      <span className="flex-1 text-[14px] font-medium">${t.symbol}</span>
-                      <span className="text-[13px] text-white/60">{fmtUsd(t.market_cap_usd)}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-[13px] text-white/40 text-center py-4">No holdings yet</p>
-              )}
-            </div>
-          </div>
+          <WalletTab wallets={wallets} walletsReady={walletsReady} pnlData={pnlData} tokens={tokens} fmtUsd={fmtUsd} />
         )}
       </main>
 
