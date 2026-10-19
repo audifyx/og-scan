@@ -6167,11 +6167,24 @@ async function handleLaunchpadMcp(req, res) {
   try {
     const authHeader = req.headers?.authorization || "";
     const token = authHeader.replace(/^Bearer\s+/i, "");
-    // Auth resolution happens via the main hub's auth flow
-    // For now, pass through; handleLaunchpadTool checks auth.userId
     if (token) auth = { token };
-    if (params?.authCode) auth = { ...(auth || {}), authCode: params.authCode };
+    const rawAuthCode = params?.authCode || params?.arguments?.authCode;
+    if (rawAuthCode) auth = { ...(auth || {}), authCode: rawAuthCode };
   } catch {}
+
+  // Resolve authCode to userId via the shared agent link-auth flow
+  // (same mcp_link_sessions table the main Agent MCP uses)
+  if (auth?.authCode && !auth?.userId) {
+    try {
+      const link = await resolveAgentLinkAuth({
+        authCode: auth.authCode,
+        mcpSessionId: req.headers?.["mcp-session-id"] || "",
+      });
+      if (link?.userId) {
+        auth = { ...auth, userId: link.userId, username: link.username || null, walletAddress: link.walletAddress || null };
+      }
+    } catch {}
+  }
 
   if (method === "initialize") {
     return json(res, {
