@@ -115,51 +115,86 @@ export default function LaunchpadPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col">
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-black/90 backdrop-blur">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 max-w-[1400px] mx-auto w-full">
-          <div className="flex items-center gap-6">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-lime-400 to-green-600 flex items-center justify-center font-black text-black text-lg">O</div>
-              <span className="font-black tracking-tight text-white">ORBITX</span>
-            </Link>
-            <nav className="hidden md:flex items-center gap-1">
-              {([
-                ["board", "Board"],
-                ["launch", "Launch"],
-                ["trade", "Trade"],
-                ["wallet", "Wallet"],
-              ] as [PadTab, string][]).map(([id, label]) => (
-                <button key={id} onClick={() => setTab(id)}
-                  className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
-                    tab === id ? "text-white bg-white/10" : "text-white/60 hover:text-white hover:bg-white/5"
-                  }`}>
-                  {label}
-                </button>
-              ))}
-            </nav>
+    <div className="min-h-screen bg-[#0a0a0a] text-white flex">
+      {/* Sidebar */}
+      <aside className="hidden md:flex flex-col w-56 shrink-0 border-r border-white/5 bg-black/40 p-4">
+        <Link to="/launchpad" className="flex items-center gap-2 mb-8 px-2">
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-lime-400 to-green-600 flex items-center justify-center font-black text-black">O</div>
+          <span className="font-black tracking-tight">ORBITX PAD</span>
+        </Link>
+
+        <nav className="space-y-1">
+          <p className="px-2 text-[10px] font-bold text-white/30 tracking-widest mb-2">PAD</p>
+          {([
+            ["board", "Board"],
+            ["launch", "Launch"],
+            ["trade", "Trade"],
+            ["wallet", "Wallet"],
+          ] as [PadTab, string][]).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`w-full text-left px-3 py-2 rounded-lg text-sm font-bold transition-colors ${
+                tab === id ? "bg-lime-400/10 text-lime-300" : "text-white/50 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+
+          <p className="px-2 text-[10px] font-bold text-white/30 tracking-widest mb-2 mt-6">DISCOVER</p>
+          {["Trending", "Live", "Graduated"].map((label) => (
+            <button
+              key={label}
+              onClick={() => { setTab("board"); setFilter(label.toLowerCase() === "trending" ? "all" : label.toLowerCase()); }}
+              className="w-full text-left px-3 py-2 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+            >
+              {label}
+            </button>
+          ))}
+
+          <p className="px-2 text-[10px] font-bold text-white/30 tracking-widest mb-2 mt-6">MCP</p>
+          <a
+            href="/supercomputer?tab=launchpad"
+            className="block w-full text-left px-3 py-2 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+          >
+            Connect AI
+          </a>
+        </nav>
+
+        <div className="mt-auto px-2 py-4 border-t border-white/5">
+          <p className="text-[10px] text-white/30">Solana + Robinhood Chain</p>
+          <div className="flex gap-2 mt-2">
+            <span className="text-[10px] font-bold text-green-400">● SOLANA LIVE</span>
+            <span className="text-[10px] font-bold text-green-400">● RH LIVE</span>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <div className="flex-1 min-w-0">
+        {/* Top bar */}
+        <header className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-white/5 bg-black/20">
+          <div className="flex items-center gap-4">
+            <h1 className="font-black tracking-tight text-lg">
+              {tab === "board" && "Board"}
+              {tab === "launch" && "Launch"}
+              {tab === "trade" && "Trade"}
+              {tab === "wallet" && "Wallet"}
+            </h1>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 text-xs">
-              <span className="flex items-center gap-1 text-green-400 font-bold"><span className="h-1.5 w-1.5 rounded-full bg-green-400" /> SOLANA</span>
-              <span className="flex items-center gap-1 text-green-400 font-bold"><span className="h-1.5 w-1.5 rounded-full bg-green-400" /> RH CHAIN</span>
-            </div>
             {!user ? (
-              <Link to="/auth" className="rounded-full bg-lime-400 px-5 py-2 text-sm font-black text-black hover:bg-lime-300 transition-colors">
+              <Link to="/auth" className="rounded-full bg-lime-400 px-4 py-1.5 text-sm font-black text-black hover:bg-lime-300">
                 Sign in with X
               </Link>
             ) : (
-              <span className="text-sm font-bold text-white/80">Connected</span>
+              <span className="text-sm text-white/50">Connected</span>
             )}
           </div>
-        </div>
-      </header>
+        </header>
 
-      <div className="flex flex-1">
-      {/* Main */}
-      <div className="flex-1 min-w-0">
-        <main className="p-4 sm:p-6 max-w-6xl mx-auto pb-24 md:pb-6">
+        <main className="p-4 sm:p-6 max-w-6xl mx-auto">
           {/* BOARD */}
           {tab === "board" && (
             <>
@@ -345,87 +380,15 @@ export default function LaunchpadPage() {
         </main>
       </div>
 
-      {/* ── iOS-style glass tab bar (mobile) ── */}
-      <div className="md:hidden fixed bottom-4 left-4 right-4 z-50">
-        <div className="mx-auto max-w-sm rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl px-2 py-2 flex justify-around">
-          {([
-            ["board", "Board", "▦"],
-            ["launch", "Launch", "🚀"],
-            ["trade", "Trade", "⇄"],
-            ["wallet", "Wallet", "◈"],
-          ] as [PadTab, string, string][]).map(([id, label, icon]) => (
-            <button key={id} onClick={() => setTab(id)}
-              className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-full transition-all ${
-                tab === id ? "bg-lime-400/20 text-lime-300" : "text-white/50"
-              }`}>
-              <span className="text-lg">{icon}</span>
-              <span className="text-[10px] font-bold">{label}</span>
-            </button>
-          ))}
-        </div>
+      {/* Mobile tab bar */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/90 backdrop-blur flex">
+        {(["board", "launch", "trade", "wallet"] as PadTab[]).map((id) => (
+          <button key={id} onClick={() => setTab(id)}
+            className={`flex-1 py-3 text-xs font-bold uppercase ${tab === id ? "text-lime-300" : "text-white/40"}`}>
+            {id}
+          </button>
+        ))}
       </div>
-
-      {/* ── iOS-style glass tab bar (desktop, centered) ── */}
-      <div className="hidden md:flex fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-        <div className="rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl px-3 py-2 flex gap-1">
-          {([
-            ["board", "Board", "▦"],
-            ["launch", "Launch", "🚀"],
-            ["trade", "Trade", "⇄"],
-            ["wallet", "Wallet", "◈"],
-          ] as [PadTab, string, string][]).map(([id, label, icon]) => (
-            <button key={id} onClick={() => setTab(id)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-all ${
-                tab === id ? "bg-lime-400 text-black shadow-lg" : "text-white/60 hover:text-white hover:bg-white/10"
-              }`}>
-              <span>{icon}</span>
-              <span>{label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-      </div>{/* close flex */}
-
-      {/* ── Footer ── */}
-      <footer className="border-t border-white/10 bg-black/60 mt-auto">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
-          <div className="grid gap-8 md:grid-cols-4">
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-lime-400 to-green-600 flex items-center justify-center font-black text-black">O</div>
-                <span className="font-black text-white">ORBITX PAD</span>
-              </div>
-              <p className="text-sm text-white/50">Launch tokens on Solana and Robinhood Chain. Via web or AI.</p>
-            </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-widest text-white/40 mb-3">Pad</p>
-              <div className="space-y-2 text-sm">
-                <button onClick={() => setTab("board")} className="block text-white/60 hover:text-white">Board</button>
-                <button onClick={() => setTab("launch")} className="block text-white/60 hover:text-white">Launch</button>
-                <button onClick={() => setTab("trade")} className="block text-white/60 hover:text-white">Trade</button>
-                <button onClick={() => setTab("wallet")} className="block text-white/60 hover:text-white">Wallet</button>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-widest text-white/40 mb-3">Launchpads</p>
-              <div className="space-y-2 text-sm text-white/60">
-                <p>pump.fun <span className="text-white/30">— Solana</span></p>
-                <p>StonkFun <span className="text-white/30">— Solana stocks</span></p>
-                <p>Pons V2 <span className="text-white/30">— Robinhood Chain</span></p>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-widest text-white/40 mb-3">MCP</p>
-              <p className="text-sm text-white/60 mb-2">Launch via AI:</p>
-              <code className="block rounded-lg bg-black/40 border border-white/10 px-3 py-2 text-[10px] text-lime-300 break-all">{MCP_URL}</code>
-            </div>
-          </div>
-          <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between text-xs text-white/30">
-            <span>© 2026 OrbitX</span>
-            <span>Solana + Robinhood Chain</span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
