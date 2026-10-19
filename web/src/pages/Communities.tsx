@@ -2072,6 +2072,21 @@ function CommunityFeed({
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0 ml-3">
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/c/${currentCommunity.id}`;
+                      if (navigator.share) {
+                        navigator.share({ title: currentCommunity.name, url }).catch(() => {});
+                      } else {
+                        navigator.clipboard.writeText(url);
+                        toast.success("Community link copied!");
+                      }
+                    }}
+                    title="Share community"
+                    className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                  >
+                    <Share className="h-4 w-4" />
+                  </button>
                   {isMember ? (
                     <>
                       <button onClick={onCompose}
