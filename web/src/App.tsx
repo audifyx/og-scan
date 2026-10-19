@@ -531,12 +531,12 @@ const App = () => (
                 </Suspense>
               }
             />
-            {/* ── Public: OrbitX Launchpad — redirects to the new live feed ── */}
+            {/* ── Public: OrbitX Launchpad — full pad (board/launch/trade/wallet) ── */}
             <Route
               path="/launchpad"
               element={
                 <Suspense fallback={SOCIAL_FALLBACK}>
-                  <LaunchpadLive />
+                  <LaunchpadPage />
                 </Suspense>
               }
             />
