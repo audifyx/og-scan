@@ -258,12 +258,33 @@ export async function handleLaunchpadTool(name, args, ctx) {
     };
   }
 
-  if (name === "launchpad_wallet") {
-    // Return desk wallet info via the existing handler
+  if (name === "launchpad_wallets" || name === "launchpad_wallet") {
+    const { walletCard } = await import("./_mcp-cards.js");
+    // Get desk wallet addresses
+    const wallets = {
+      solana: auth.walletAddress || null,
+      robinhood: null, // EVM wallet from local storage (client-side)
+    };
+    const cardHtml = walletCard(wallets);
     return {
       ok: true,
-      message: "Use orbitx_desk_wallet on the main MCP for full wallet details, or check https://www.orbitx.world/launchpad",
+      wallets,
       user_id: auth.userId,
+      note: "Solana desk wallet shown. Robinhood Chain wallet is client-side (check the /launchpad wallet tab).",
+      _meta: { ui: { html: cardHtml } },
+    };
+  }
+
+  if (name === "launchpad_graduations") {
+    const limit = Math.min(args.limit || 10, 50);
+    const launchpad = args.launchpad || "all";
+    let query = `?select=mint,name,symbol,launchpad,chain,market_cap_usd,graduated_at&status=eq.graduated&order=graduated_at.desc&limit=${limit}`;
+    if (launchpad !== "all") query += `&launchpad=eq.${launchpad}`;
+    const grads = await sbQuery("launchpad_tokens", "GET", null, query);
+    return {
+      ok: true,
+      graduations: grads || [],
+      count: (grads || []).length,
     };
   }
 
@@ -453,14 +474,31 @@ export async function handleLaunchpadTool(name, args, ctx) {
   }
 
   if (name === "launchpad_buy" || name === "launchpad_sell") {
-    return {
-      ok: true,
-      message: `${name === "launchpad_buy" ? "Buy" : "Sell"} order placed via desk wallet (backend signing).`,
-      mint: args.mint,
-      amount: args.amount_sol || args.amount_tokens,
-      status: "pending",
-      note: "Full Jupiter swap integration coming in the next update.",
-    };
+    try {
+      const isBuy = name === "launchpad_buy";
+      const { tradeViaLightning } = await import("./_pump-integration.js");
+
+      const result = await tradeViaLightning({
+        mint: args.mint,
+        side: isBuy ? "buy" : "sell",
+        amountSol: isBuy ? (args.amount || args.amount_sol) : undefined,
+        amountTokens: !isBuy ? args.amount_tokens : undefined,
+        slippageBps: args.slippage_bps || 500,
+        walletAddress: auth.walletAddress,
+      });
+
+      return {
+        ok: true,
+        ...result,
+        message: `${isBuy ? "Bought" : "Sold"} via Lightning API.`,
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        error: "trade_failed",
+        message: String(e.message || e),
+      };
+    }
   }
 
   return { ok: false, error: `Unknown launchpad tool: ${name}` };
