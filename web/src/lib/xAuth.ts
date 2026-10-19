@@ -82,6 +82,7 @@ export async function xStartLogin(): Promise<void> {
   } finally {
     clearTimeout(timeout);
   }
+  });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.authorizeUrl) {
     throw new Error(
