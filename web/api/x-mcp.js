@@ -2301,16 +2301,12 @@ async function callTool(rawName, args, auth, req = null) {
 
   if (name === "x_connection_status") {
     const profile = await getXProfile(auth.userId);
-    const hasToken = Boolean(profile?.twitter_access_token);
-    const hasUsername = Boolean(profile?.twitter_username);
-    const connected = hasToken || hasUsername;
+    const connected = Boolean(profile?.twitter_access_token);
     const scope = xScopeInfo(profile);
     const warn =
-      hasToken && scope.scopes && !scope.hasTweetWrite
+      connected && scope.scopes && !scope.hasTweetWrite
         ? "Token is missing tweet.write — revoke OrbitX at x.com/settings/connected_apps, then Reconnect X on /x while signed in."
-        : !hasToken && hasUsername
-          ? "X linked via login. For posting via MCP, complete Connect X to grant API access."
-          : null;
+        : null;
     return {
       ok: true,
       connected,
@@ -3316,7 +3312,7 @@ async function handleAgent(req, res, parts) {
       mintedKey: null,
       mcpUrl: MCP_URL,
       x: {
-        connected: Boolean(profile?.twitter_access_token || profile?.twitter_username),
+        connected: Boolean(profile?.twitter_access_token),
         username: profile?.twitter_username || null,
         twitterId: profile?.twitter_id || null,
         displayName: profile?.twitter_name || null,
@@ -3331,7 +3327,7 @@ async function handleAgent(req, res, parts) {
     if (!user?.id) return json(res, { error: "unauthorized" }, 401);
     const profile = await getXProfile(user.id).catch(() => null);
     return json(res, {
-      connected: Boolean(profile?.twitter_access_token || profile?.twitter_username),
+      connected: Boolean(profile?.twitter_access_token),
       username: profile?.twitter_username || null,
       twitterId: profile?.twitter_id || null,
       displayName: profile?.twitter_name || null,
@@ -4029,65 +4025,6 @@ async function handleAgent(req, res, parts) {
       clientId: TWITTER_CLIENT_ID,
       redirectUri,
       scope: X_OAUTH_SCOPES,
-    });
-  }
-
-  // Link X via Supabase Auth provider token (auto-link after X login).
-  // Frontend sends the provider_token from the Supabase session; we store it
-  // so the MCP can post/reply/DM without a second OAuth flow.
-  if (route === "oauth/link-supabase" && req.method === "POST") {
-    const body = await readBody(req);
-    const providerToken = String(body.provider_token || body.providerToken || "").trim();
-    const providerRefreshToken = String(body.provider_refresh_token || body.providerRefreshToken || "").trim();
-    const expiresIn = Number(body.expires_in || body.expiresIn || 7200);
-    if (!providerToken) {
-      return json(res, { error: "Missing provider_token" }, 400);
-    }
-    const authUser = await getAuthUser(req);
-    if (!authUser?.id) {
-      return json(res, { error: "Sign in to OrbitX first" }, 401);
-    }
-    // Fetch X user info
-    let twitterId = "", twitterUsername = "", twitterName = "", twitterAvatar = "";
-    try {
-      const userRes = await fetch(
-        "https://api.twitter.com/2/users/me?user.fields=profile_image_url,name,username",
-        { headers: { Authorization: `Bearer ${providerToken}` } },
-      );
-      if (userRes.ok) {
-        const ud = await userRes.json();
-        twitterId = ud.data?.id ?? "";
-        twitterUsername = ud.data?.username ?? "";
-        twitterName = ud.data?.name ?? "";
-        twitterAvatar = String(ud.data?.profile_image_url || "").replace("_normal", "");
-      }
-    } catch { /* optional */ }
-    const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
-    const patch = {
-      twitter_access_token: providerToken,
-      twitter_refresh_token: providerRefreshToken || null,
-      twitter_token_expires_at: expiresAt,
-      twitter_id: twitterId || null,
-      twitter_username: twitterUsername || null,
-      twitter_name: twitterName || null,
-      twitter_avatar: twitterAvatar || null,
-      twitter_oauth_scopes: "tweet.read tweet.write users.read offline.access",
-    };
-    try {
-      await sb(`profiles?user_id=eq.${encodeURIComponent(authUser.id)}`, {
-        method: "PATCH",
-        body: JSON.stringify(patch),
-        headers: { Prefer: "return=minimal" },
-      });
-    } catch (e) {
-      return json(res, { error: "Failed to save X tokens", details: e?.message }, 500);
-    }
-    return json(res, {
-      ok: true,
-      linked: true,
-      twitter_id: twitterId,
-      twitter_username: twitterUsername,
-      message: "X account linked via Supabase Auth. MCP can now post/reply/DM.",
     });
   }
 
