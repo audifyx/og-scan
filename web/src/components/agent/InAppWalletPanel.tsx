@@ -33,7 +33,16 @@ export function InAppWalletPanel() {
   const load = useCallback(async () => {
     if (!user) { setRow(null); return; }
     setErr("");
-    try { setRow(await api("GET")); } catch (e: any) { setErr(String(e.message || e)); }
+    try {
+      const result = await api("GET");
+      // Auto-create if no wallet exists
+      if (!result?.publicKey) {
+        const created = await api("POST", {});
+        setRow(created);
+      } else {
+        setRow(result);
+      }
+    } catch (e: any) { setErr(String(e.message || e)); }
   }, [user]);
   useEffect(() => { void load(); }, [load]);
 
@@ -87,9 +96,7 @@ export function InAppWalletPanel() {
           {secret ? <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{secret}</pre> : null}
         </>
       ) : (
-        <button type="button" className="supercomputer-button supercomputer-button--primary" onClick={create} disabled={busy}>
-          <Plus size={16} /> Create my desk wallet
-        </button>
+        <p className="text-white/50">Setting up your desk wallet…</p>
       )}
     </section>
   );
