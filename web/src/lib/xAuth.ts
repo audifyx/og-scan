@@ -61,14 +61,27 @@ export async function xStartLogin(): Promise<void> {
   localStorage.setItem(LS_REDIRECT, redirectUri);
   sessionStorage.setItem("x_return_to", window.location.pathname + window.location.search);
 
-  const res = await fetch("/api/x/agent/oauth/start", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      redirectUri,
-      codeChallenge: challenge,
-      state,
-    }),
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  let res: Response;
+  try {
+    res = await fetch("/api/x/agent/oauth/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        redirectUri,
+        codeChallenge: challenge,
+        state,
+      }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    throw new Error(e instanceof Error && e.name === "AbortError" 
+      ? "X login timed out. Check your connection and try again."
+      : `Failed to start X login: ${e instanceof Error ? e.message : "network error"}`);
+  } finally {
+    clearTimeout(timeout);
+  }
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.authorizeUrl) {
