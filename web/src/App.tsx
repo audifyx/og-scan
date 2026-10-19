@@ -113,6 +113,7 @@ const PublicCommunityPage = lazyWithRetry(() => import("./pages/PublicCommunityP
 const ChartsWidget = lazyWithRetry(() => import("./pages/ChartsWidget"));
 const LaunchpadPage = lazyWithRetry(() => import("./pages/LaunchpadPage"));
 const LaunchpadLive = lazyWithRetry(() => import("./pages/LaunchpadLive"));
+const LaunchpadTokenDetail = lazyWithRetry(() => import("./pages/LaunchpadTokenDetail"));
 const ModerationAdmin = lazyWithRetry(() => import("./social/pages/ModerationAdmin"));
 const InviteLanding = lazyWithRetry(() => import("./social/pages/InviteLanding"));
 import LaunchpadPump from "./pages/orbitx/LaunchpadPump";
@@ -542,6 +543,15 @@ const App = () => (
               element={
                 <Suspense fallback={SOCIAL_FALLBACK}>
                   <LaunchpadLive />
+                </Suspense>
+              }
+            />
+            {/* ── Public: Launchpad token detail (read-only, no wallet/trading) ── */}
+            <Route
+              path="/launchpad/token/:mint"
+              element={
+                <Suspense fallback={SOCIAL_FALLBACK}>
+                  <LaunchpadTokenDetail />
                 </Suspense>
               }
             />

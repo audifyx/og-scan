@@ -4,7 +4,9 @@
  * All actions (launch/buy/sell) happen through the MCP.
  */
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import LaunchpadTicker from "@/components/LaunchpadTicker";
 
 interface LaunchToken {
   mint: string;
@@ -79,6 +81,7 @@ export default function LaunchpadLive() {
 
   return (
     <div className="min-h-screen bg-black text-white">
+      <LaunchpadTicker />
       {/* Header */}
       <div className="border-b border-white/10">
         <div className="mx-auto max-w-6xl px-4 py-8">
@@ -137,11 +140,9 @@ export default function LaunchpadLive() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {visible.map((t) => (
-              <a
+              <Link
                 key={t.mint}
-                href={`https://dexscreener.com/solana/${t.mint}`}
-                target="_blank"
-                rel="noopener noreferrer"
+                to={`/launchpad/token/${t.mint}`}
                 className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-all hover:border-blue-500/30 hover:bg-white/[0.05]"
               >
                 <div className="flex items-start gap-4">
@@ -185,7 +186,7 @@ export default function LaunchpadLive() {
                     {t.creator_username && <p className="truncate text-white/50">by {t.creator_username}</p>}
                   </div>
                 </div>
-              </a>
+              </Link>
             ))}
           </div>
         )}
