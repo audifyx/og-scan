@@ -166,7 +166,7 @@ export default function LaunchpadPage() {
               <div className="rounded-2xl bg-gradient-to-br from-lime-400/10 via-transparent to-transparent border border-lime-400/20 p-6 sm:p-8 mb-6">
                 <p className="text-[10px] font-black tracking-[0.2em] text-lime-300 mb-2">LAUNCH CONTROL</p>
                 <h2 className="text-2xl sm:text-4xl font-black tracking-tight">Launch where the tape is already moving.</h2>
-                <p className="mt-2 text-white/50">Every launch signs from your in-app desk wallet. No Phantom, no MetaMask.</p>
+                <p className="mt-2 text-white/70">Every launch signs from your in-app desk wallet. No Phantom, no MetaMask.</p>
                 <div className="mt-4 flex gap-3">
                   <button onClick={() => setTab("launch")} className="rounded-xl bg-orange-500 px-6 py-3 font-black hover:bg-orange-400">
                     Launch a token
@@ -176,8 +176,8 @@ export default function LaunchpadPage() {
                   </button>
                 </div>
                 <div className="mt-4 flex gap-6 text-sm">
-                  <span><span className="font-black">{tokens.length}</span> <span className="text-white/40">Live now</span></span>
-                  <span><span className="font-black">{tokens.filter(t => t.status === "graduated").length}</span> <span className="text-white/40">Graduated</span></span>
+                  <span><span className="font-black">{tokens.length}</span> <span className="text-white/60">Live now</span></span>
+                  <span><span className="font-black">{tokens.filter(t => t.status === "graduated").length}</span> <span className="text-white/60">Graduated</span></span>
                 </div>
               </div>
 
@@ -186,14 +186,14 @@ export default function LaunchpadPage() {
                 <div className="flex gap-2">
                   {["all", "live", "graduated"].map((s) => (
                     <button key={s} onClick={() => { setFilter(s); setLoading(true); }}
-                      className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${filter === s ? "bg-lime-400 text-black" : "bg-white/5 text-white/50"}`}>
+                      className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${filter === s ? "bg-lime-400 text-black" : "bg-white/5 text-white/70"}`}>
                       {s}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {loading ? <p className="text-white/40 py-8 text-center">Loading…</p> :
+              {loading ? <p className="text-white/60 py-8 text-center">Loading…</p> :
                 tokens.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center">
                     <p className="font-bold text-white/60">No tokens yet</p>
@@ -210,9 +210,9 @@ export default function LaunchpadPage() {
                           <div className="flex items-center gap-2">
                             <span className="font-bold truncate">{t.name}</span>
                             <span className="text-xs font-bold text-lime-300">${t.symbol}</span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 uppercase">{t.launchpad}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70 uppercase">{t.launchpad}</span>
                           </div>
-                          <div className="flex gap-4 mt-1 text-xs text-white/40">
+                          <div className="flex gap-4 mt-1 text-xs text-white/60">
                             <span>MCap <span className="text-white/70 font-bold">{fmtUsd(t.market_cap_usd)}</span></span>
                             {t.graduation_pct != null && <span>Grad <span className="text-white/70 font-bold">{t.graduation_pct.toFixed(0)}%</span></span>}
                             {t.creator_username && <span>by {t.creator_username}</span>}
@@ -235,7 +235,7 @@ export default function LaunchpadPage() {
           {tab === "launch" && (
             <div className="max-w-2xl">
               <h2 className="text-2xl font-black mb-1">Launch a token</h2>
-              <p className="text-white/50 text-sm mb-6">Same wallet as MCP launches. Pick a launchpad and pair.</p>
+              <p className="text-white/70 text-sm mb-6">Same wallet as MCP launches. Pick a launchpad and pair.</p>
 
               <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 space-y-4">
                 <div className="grid grid-cols-3 gap-2">
@@ -243,7 +243,7 @@ export default function LaunchpadPage() {
                     <button key={lp} onClick={() => setLaunchpad(lp)}
                       className={`rounded-xl border p-3 text-left ${launchpad === lp ? "border-lime-400 bg-lime-400/10" : "border-white/10 hover:border-white/20"}`}>
                       <p className="font-black uppercase text-sm">{lp}</p>
-                      <p className="text-[10px] text-white/40 mt-1">{lp === "pump" ? "Solana" : lp === "stonk" ? "Solana stocks" : "Robinhood"}</p>
+                      <p className="text-[10px] text-white/60 mt-1">{lp === "pump" ? "Solana" : lp === "stonk" ? "Solana stocks" : "Robinhood"}</p>
                     </button>
                   ))}
                 </div>
@@ -271,7 +271,7 @@ export default function LaunchpadPage() {
                   {launching ? "Launching…" : `Launch on ${launchpad} (${pair.toUpperCase()})`}
                 </button>
 
-                <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-xs text-white/50">
+                <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-xs text-white/70">
                   <p className="font-bold text-white/70">⛽ Gas fees</p>
                   <p className="mt-1">Each launch costs ~$0.60-1.00 in gas. Make sure your desk wallet has at least <span className="font-bold text-white">$1</span> ($4 recommended for multiple launches).</p>
                 </div>
@@ -282,7 +282,7 @@ export default function LaunchpadPage() {
                   </p>
                 )}
 
-                <p className="text-xs text-white/30 text-center">
+                <p className="text-xs text-white/70 text-center">
                   Or launch via AI: <code className="text-lime-300">"{`launch ${launchName || "a coin"} on ${launchpad}`}"</code> in Grok/Claude/ChatGPT
                 </p>
               </div>
@@ -293,12 +293,12 @@ export default function LaunchpadPage() {
           {tab === "trade" && (
             <div className="max-w-md mx-auto">
               <h2 className="text-2xl font-black mb-1">Trade</h2>
-              <p className="text-white/50 text-sm mb-6">Swap from the desk. Same wallet as MCP.</p>
+              <p className="text-white/70 text-sm mb-6">Swap from the desk. Same wallet as MCP.</p>
               <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-2">
                   {(["buy", "sell"] as const).map((s) => (
                     <button key={s} onClick={() => setTradeSide(s)}
-                      className={`rounded-xl py-3 font-black uppercase ${tradeSide === s ? (s === "buy" ? "bg-lime-400 text-black" : "bg-red-500 text-white") : "bg-white/5 text-white/50"}`}>
+                      className={`rounded-xl py-3 font-black uppercase ${tradeSide === s ? (s === "buy" ? "bg-lime-400 text-black" : "bg-red-500 text-white") : "bg-white/5 text-white/70"}`}>
                       {s}
                     </button>
                   ))}
@@ -310,7 +310,7 @@ export default function LaunchpadPage() {
                 <button className={`w-full rounded-xl py-4 font-black text-lg ${tradeSide === "buy" ? "bg-lime-400 text-black hover:bg-lime-300" : "bg-red-500 hover:bg-red-400"}`}>
                   {tradeSide === "buy" ? "Buy" : "Sell"}
                 </button>
-                <p className="text-xs text-white/30 text-center">Jupiter routing · desk wallet signs</p>
+                <p className="text-xs text-white/70 text-center">Jupiter routing · desk wallet signs</p>
               </div>
             </div>
           )}
@@ -319,24 +319,24 @@ export default function LaunchpadPage() {
           {tab === "wallet" && (
             <div className="max-w-2xl">
               <h2 className="text-2xl font-black mb-1">Wallet</h2>
-              <p className="text-white/50 text-sm mb-6">Your desk — same wallet the MCP uses.</p>
+              <p className="text-white/70 text-sm mb-6">Your desk — same wallet the MCP uses.</p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
-                  <p className="text-xs font-bold text-white/40 uppercase tracking-widest">Solana</p>
+                  <p className="text-xs font-bold text-white/60 uppercase tracking-widest">Solana</p>
                   <p className="mt-2 font-mono text-sm text-white/60">Desk wallet</p>
-                  <p className="mt-1 text-white/30 text-xs">Used for pump.fun + StonkFun launches</p>
+                  <p className="mt-1 text-white/70 text-xs">Used for pump.fun + StonkFun launches</p>
                   <Link to="/supercomputer?tab=wallet" className="mt-4 inline-block rounded-xl bg-lime-400 px-4 py-2 text-sm font-black text-black">Manage</Link>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
-                  <p className="text-xs font-bold text-white/40 uppercase tracking-widest">Robinhood Chain</p>
+                  <p className="text-xs font-bold text-white/60 uppercase tracking-widest">Robinhood Chain</p>
                   <p className="mt-2 font-mono text-sm text-white/60">EVM wallet</p>
-                  <p className="mt-1 text-white/30 text-xs">Used for Pons V2 launches</p>
+                  <p className="mt-1 text-white/70 text-xs">Used for Pons V2 launches</p>
                   <Link to="/supercomputer?tab=wallet" className="mt-4 inline-block rounded-xl bg-lime-400 px-4 py-2 text-sm font-black text-black">Manage</Link>
                 </div>
               </div>
               <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.02] p-6">
                 <h3 className="font-bold mb-2">MCP Connection</h3>
-                <p className="text-sm text-white/50">Launch via AI with the same wallet:</p>
+                <p className="text-sm text-white/70">Launch via AI with the same wallet:</p>
                 <code className="mt-2 block rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-xs text-lime-300 break-all">{MCP_URL}</code>
                 <a href="/supercomputer?tab=launchpad" className="mt-3 inline-block text-sm text-lime-300 hover:underline">Connection settings →</a>
               </div>
@@ -356,7 +356,7 @@ export default function LaunchpadPage() {
           ] as [PadTab, string, string][]).map(([id, label, icon]) => (
             <button key={id} onClick={() => setTab(id)}
               className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-full transition-all ${
-                tab === id ? "bg-lime-400/20 text-lime-300" : "text-white/50"
+                tab === id ? "bg-lime-400/20 text-lime-300" : "text-white/70"
               }`}>
               <span className="text-lg">{icon}</span>
               <span className="text-[10px] font-bold">{label}</span>
@@ -395,10 +395,10 @@ export default function LaunchpadPage() {
                 <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-lime-400 to-green-600 flex items-center justify-center font-black text-black">O</div>
                 <span className="font-black text-white">ORBITX PAD</span>
               </div>
-              <p className="text-sm text-white/50">Launch tokens on Solana and Robinhood Chain. Via web or AI.</p>
+              <p className="text-sm text-white/70">Launch tokens on Solana and Robinhood Chain. Via web or AI.</p>
             </div>
             <div>
-              <p className="text-xs font-black uppercase tracking-widest text-white/40 mb-3">Pad</p>
+              <p className="text-xs font-black uppercase tracking-widest text-white/60 mb-3">Pad</p>
               <div className="space-y-2 text-sm">
                 <button onClick={() => setTab("board")} className="block text-white/60 hover:text-white">Board</button>
                 <button onClick={() => setTab("launch")} className="block text-white/60 hover:text-white">Launch</button>
@@ -407,20 +407,20 @@ export default function LaunchpadPage() {
               </div>
             </div>
             <div>
-              <p className="text-xs font-black uppercase tracking-widest text-white/40 mb-3">Launchpads</p>
+              <p className="text-xs font-black uppercase tracking-widest text-white/60 mb-3">Launchpads</p>
               <div className="space-y-2 text-sm text-white/60">
-                <p>pump.fun <span className="text-white/30">— Solana</span></p>
-                <p>StonkFun <span className="text-white/30">— Solana stocks</span></p>
-                <p>Pons V2 <span className="text-white/30">— Robinhood Chain</span></p>
+                <p>pump.fun <span className="text-white/70">— Solana</span></p>
+                <p>StonkFun <span className="text-white/70">— Solana stocks</span></p>
+                <p>Pons V2 <span className="text-white/70">— Robinhood Chain</span></p>
               </div>
             </div>
             <div>
-              <p className="text-xs font-black uppercase tracking-widest text-white/40 mb-3">MCP</p>
+              <p className="text-xs font-black uppercase tracking-widest text-white/60 mb-3">MCP</p>
               <p className="text-sm text-white/60 mb-2">Launch via AI:</p>
               <code className="block rounded-lg bg-black/40 border border-white/10 px-3 py-2 text-[10px] text-lime-300 break-all">{MCP_URL}</code>
             </div>
           </div>
-          <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between text-xs text-white/30">
+          <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between text-xs text-white/70">
             <span>© 2026 OrbitX</span>
             <span>Solana + Robinhood Chain</span>
           </div>
