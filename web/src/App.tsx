@@ -110,8 +110,6 @@ const WalletTracker = lazyWithRetry(() => import("./crypto/pages/WalletTracker")
 const SocialAppPage = lazyWithRetry(() => import("./pages/SocialAppPage"));
 const SocialTweetPage = lazyWithRetry(() => import("./pages/SocialTweetPage"));
 const PublicCommunityPage = lazyWithRetry(() => import("./pages/PublicCommunityPage"));
-const ChartsWidget = lazyWithRetry(() => import("./pages/ChartsWidget"));
-const LaunchpadPage = lazyWithRetry(() => import("./pages/LaunchpadPage"));
 const ModerationAdmin = lazyWithRetry(() => import("./social/pages/ModerationAdmin"));
 const InviteLanding = lazyWithRetry(() => import("./social/pages/InviteLanding"));
 import LaunchpadPump from "./pages/orbitx/LaunchpadPump";
@@ -516,24 +514,6 @@ const App = () => (
                 </Suspense>
               }
             />
-            {/* ── Public: multi-token DexScreener chart widget ── */}
-            <Route
-              path="/charts"
-              element={
-                <Suspense fallback={SOCIAL_FALLBACK}>
-                  <ChartsWidget />
-                </Suspense>
-              }
-            />
-            {/* ── Public: OrbitX Launchpad (MCP-powered) ── */}
-            <Route
-              path="/launchpad"
-              element={
-                <Suspense fallback={SOCIAL_FALLBACK}>
-                  <LaunchpadPage />
-                </Suspense>
-              }
-            />
             {/* ── Public: shareable tweet detail pages (no login needed) ── */}
             <Route
               path="/social/t/:id"
@@ -801,7 +781,6 @@ const App = () => (
             <Route path="/mcp-auth" element={<McpAuthPage />} />
             <Route path="/agent/link-auth" element={<AgentLinkAuthPage />} />
             <Route path="/agent/x-link-auth" element={<XMcpLinkAuthPage />} />
-            <Route path="/x/link-auth" element={<XMcpLinkAuthPage />} />
             <Route path="/supercomputer/link-auth" element={<AgentLinkAuthPage />} />
             <Route path="/supercomputer/x-link-auth" element={<XMcpLinkAuthPage />} />
             <Route path="/supercomputer/sign" element={<AgentSignPage />} />
