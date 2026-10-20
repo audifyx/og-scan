@@ -58,7 +58,10 @@ export function HumanGate() {
   const [verified, setVerified] = useState<boolean>(() => isVerified());
   const [round, setRound] = useState(0);
   const [target, setTarget] = useState(() => TARGETS[Math.floor(Math.random() * TARGETS.length)]);
-  const [tiles, setTiles] = useState<Tile[]>(() => buildRound(TARGETS[0]));
+  // Tiles must be built from the SAME target shown in the instruction —
+  // building from a fixed TARGETS[0] made round 1 ask for an emoji
+  // that wasn't in the grid.
+  const [tiles, setTiles] = useState<Tile[]>(() => buildRound(target));
   const [picked, setPicked] = useState<number[]>([]);
   const [shake, setShake] = useState(false);
   const [failed, setFailed] = useState(0);
