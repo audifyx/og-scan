@@ -510,7 +510,7 @@ export async function handleLaunchpadTool(name, args, ctx) {
       }, { publicKey: auth.walletAddress || "pending" });
 
       // Record the launch
-      const mint = launchResult.mint || mintKeypair ? "vanity-pending" : `${launchpadId}-${Date.now()}`;
+      const mint = launchResult.mint || (mintKeypair ? "vanity-pending" : `${launchpadId}-${Date.now()}`);
       await sbQuery("launchpad_tokens", "POST", {
         mint,
         name: tokenName,
