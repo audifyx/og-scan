@@ -652,10 +652,32 @@ export async function handleLaunchpadTool(name, args, ctx) {
 
   if (name === "launchpad_claim_fees") {
     try {
-      const { claimPumpFees } = await import("./_pump-integration.js");
-      // Get wallet address from auth
-      const result = await claimPumpFees(args.mint, auth.walletAddress || "pending");
-      return { ok: true, ...result };
+      const { getUserWallet, signAndSendUserTx } = await import("./_user-trading-wallet.js");
+      const { preparePumpClaim } = await import("./_mcp-ops.js");
+      const row = await getUserWallet(auth.userId);
+      if (!row) {
+        return { ok: false, error: "no_wallet", message: "Create a desk wallet first." };
+      }
+      const isUsdc = (args.launchpad === "pump" && args.pair === "usdc") ||
+        (await sbQuery("launchpad_tokens", "GET", null,
+          `?select=pool_type&mint=eq.${encodeURIComponent(args.mint || "")}&limit=1`))?.[0]?.pool_type === "usdc";
+      const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+      const built = await preparePumpClaim(row.public_key, isUsdc ? USDC : undefined);
+      if (!built?.transaction) {
+        return { ok: false, error: "claim_build_failed", message: "No claimable creator fees found (or claim build failed).", built };
+      }
+      const live = await signAndSendUserTx(row, built.transaction);
+      if (!live?.signature) {
+        return { ok: false, error: "claim_send_failed", message: live?.error || "Claim built but could not be submitted." };
+      }
+      return {
+        ok: true,
+        message: "Creator fees claimed to your desk wallet.",
+        signature: live.signature,
+        tx: `https://solscan.io/tx/${live.signature}`,
+        mint: args.mint || null,
+        pair: isUsdc ? "usdc" : "sol",
+      };
     } catch (e) {
       return { ok: false, error: String(e.message || e) };
     }
