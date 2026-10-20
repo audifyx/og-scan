@@ -471,7 +471,7 @@ export async function handleLaunchpadTool(name, args, ctx) {
     if (useVanity) {
       try {
         const { getVanityMint } = await import("./_pump-integration.js");
-        const vanity = await getVanityMint();
+        const vanity = await getVanityMint(sbQuery);
         if (vanity) {
           mintKeypair = vanity.keypair;
           vanitySuffix = vanity.vanity;
