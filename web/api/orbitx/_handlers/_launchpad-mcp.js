@@ -30,7 +30,6 @@ export const LAUNCHPAD_TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        authCode: { type: "string", description: "Your OrbitX auth code (same as main MCP). Get one at https://www.orbitx.world/agent" },
         name: { type: "string", description: "Token name (must be unique)" },
         symbol: { type: "string", description: "Token symbol (must be unique)" },
         description: { type: "string", description: "Token description" },
@@ -93,7 +92,6 @@ export const LAUNCHPAD_TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        authCode: { type: "string", description: "Your OrbitX auth code (same as main MCP). Get one at https://www.orbitx.world/agent" },
         mint: { type: "string", description: "Token mint" },
         amount: { type: "number", description: "Amount in SOL/ETH to spend" },
         slippage_bps: { type: "number", description: "Slippage in bps (default 500)" },
@@ -108,7 +106,6 @@ export const LAUNCHPAD_TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        authCode: { type: "string", description: "Your OrbitX auth code (same as main MCP). Get one at https://www.orbitx.world/agent" },
         mint: { type: "string", description: "Token mint" },
         amount_tokens: { type: "number", description: "Tokens to sell (or 'all')" },
         slippage_bps: { type: "number", description: "Slippage in bps (default 500)" },
@@ -122,7 +119,6 @@ export const LAUNCHPAD_TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        authCode: { type: "string", description: "Your OrbitX auth code (same as main MCP). Get one at https://www.orbitx.world/agent" },
         mint: { type: "string", description: "Token mint" },
         launchpad: { type: "string", enum: ["pump", "stonk", "pons"], description: "Launchpad" },
       },
@@ -135,7 +131,6 @@ export const LAUNCHPAD_TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        authCode: { type: "string", description: "Your OrbitX auth code (same as main MCP). Get one at https://www.orbitx.world/agent" },
         chain: { type: "string", enum: ["solana", "robinhood", "all"], description: "Filter by chain" },
       },
     },
@@ -144,8 +139,7 @@ export const LAUNCHPAD_TOOLS = [
     name: "launchpad_wallets",
     description: "Check all your launchpad wallets — Solana desk + Robinhood Chain.",
     _meta: { ui: { resourceUri: "ui://orbitx-launchpad/wallet-dashboard" } },
-    inputSchema: { type: "object", properties: {
-        authCode: { type: "string", description: "Your OrbitX auth code (same as main MCP). Get one at https://www.orbitx.world/agent" },} },
+    inputSchema: { type: "object", properties: {} },
   },
   {
     name: "launchpad_graduations",
@@ -156,25 +150,6 @@ export const LAUNCHPAD_TOOLS = [
         launchpad: { type: "string", enum: ["pump", "stonk", "pons", "all"], description: "Filter" },
         limit: { type: "number", description: "Max results (default 10)" },
       },
-    },
-  },
-  {
-    name: "launchpad_dry_run",
-    description: "Validate a launch WITHOUT spending funds — checks name/ticker uniqueness, pair support, vanity mint, required params, and estimated costs. Use this before launchpad_launch.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        authCode: { type: "string", description: "Your OrbitX auth code (same as main MCP)" },
-        name: { type: "string", description: "Token name" },
-        symbol: { type: "string", description: "Token symbol/ticker" },
-        description: { type: "string", description: "Token description" },
-        launchpad: { type: "string", enum: ["pump", "stonk", "pons"], description: "Launchpad (default pump)" },
-        pair: { type: "string", description: "Trading pair (default sol; usdc supported on pump)" },
-        style: { type: "string", enum: ["standard", "custom_pair", "jito_bundle", "memecoin_quote"], description: "Launch style (default standard)" },
-        dev_buy_sol: { type: "number", description: "Dev buy amount in SOL (default 0)" },
-        vanity: { type: "boolean", description: "Vanity mint ending in 'obx' (default true, Solana only)" },
-      },
-      required: ["name", "symbol"],
     },
   },
   {
@@ -343,91 +318,6 @@ export async function handleLaunchpadTool(name, args, ctx) {
     };
   }
 
-  if (name === "launchpad_dry_run") {
-    // Non-financial validation — verifies everything about a launch without submitting a transaction.
-    const { name: tokenName, symbol } = args;
-    const checks = [];
-    const errors = [];
-
-    // 1. Required params
-    if (!tokenName) errors.push("name is required");
-    if (!symbol) errors.push("symbol is required");
-    checks.push({ check: "required_params", pass: !!(tokenName && symbol) });
-
-    // 2. Name/symbol uniqueness (case-insensitive)
-    let nameUnique = true, symbolUnique = true;
-    try {
-      if (tokenName && symbol) {
-        const existing = await sbQuery("launchpad_tokens", "GET", null,
-          `?select=name,symbol&or=(name.ilike.${encodeURIComponent(tokenName)},symbol.ilike.${encodeURIComponent(symbol)})&limit=5`);
-        if (existing?.length) {
-          nameUnique = !existing.some(t => t.name?.toLowerCase() === tokenName.toLowerCase());
-          symbolUnique = !existing.some(t => t.symbol?.toLowerCase() === symbol.toLowerCase());
-          if (!nameUnique) errors.push(`Name "${tokenName}" is already taken`);
-          if (!symbolUnique) errors.push(`Symbol "${symbol}" is already taken`);
-        }
-      }
-    } catch {}
-    checks.push({ check: "name_unique", pass: nameUnique });
-    checks.push({ check: "symbol_unique", pass: symbolUnique });
-
-    // 3. Launchpad + pair support
-    const launchpadId = (args.launchpad || "pump").toLowerCase();
-    const pair = (args.pair || "sol").toLowerCase();
-    const validLaunchpads = ["pump", "stonk", "pons"];
-    const launchpadValid = validLaunchpads.includes(launchpadId);
-    if (!launchpadValid) errors.push(`Unknown launchpad: ${launchpadId}. Use: pump, stonk, pons`);
-    checks.push({ check: "launchpad_valid", pass: launchpadValid });
-
-    // Pair support matrix
-    const pairSupport = {
-      pump: ["sol", "usdc", "nvda", "tsla", "ba", "baba", "dell", "openai", "anthropic", "anduril", "neuralink", "figure", "kalshi", "polymarket", "oura", "wbtc", "weth", "gold", "silver"],
-      stonk: ["spyx", "nvdax", "sol", "usdc"],
-      pons: ["eth", "usdc"],
-    };
-    const pairValid = (pairSupport[launchpadId] || []).includes(pair);
-    if (!pairValid) errors.push(`Pair "${pair}" not supported on ${launchpadId}. Supported: ${(pairSupport[launchpadId] || []).join(", ")}`);
-    checks.push({ check: "pair_supported", pass: pairValid, pair, launchpad: launchpadId });
-
-    // 4. Vanity mint (Solana only)
-    const vanity = args.vanity !== false;
-    const vanityOk = launchpadId === "pump" ? true : !vanity; // vanity only on Solana/pump
-    if (launchpadId !== "pump" && vanity) errors.push("Vanity mint (obx) is only available on Solana/pump.fun");
-    checks.push({ check: "vanity_mint", pass: vanityOk, suffix: vanity && launchpadId === "pump" ? "obx" : null });
-
-    // 5. Style validation
-    const style = args.style || "standard";
-    const validStyles = ["standard", "custom_pair", "jito_bundle", "memecoin_quote"];
-    const styleValid = validStyles.includes(style);
-    if (!styleValid) errors.push(`Unknown style: ${style}`);
-    checks.push({ check: "style_valid", pass: styleValid, style });
-
-    // 6. Estimated costs (no funds spent)
-    const devBuy = Number(args.dev_buy_sol || 0);
-    const gasEstimateUsd = launchpadId === "pons" ? 0.50 : 1.00; // ~$1 SOL, ~$0.50 RH
-    const estimatedCostUsd = gasEstimateUsd + devBuy * 150; // rough SOL price
-    checks.push({
-      check: "estimated_cost",
-      pass: true,
-      gas_usd: gasEstimateUsd,
-      dev_buy_sol: devBuy,
-      total_usd: Number(estimatedCostUsd.toFixed(2)),
-      note: "Estimate only — no funds spent in dry run",
-    });
-
-    const allPass = errors.length === 0;
-    return {
-      ok: allPass,
-      dry_run: true,
-      message: allPass
-        ? `Dry run passed for "${tokenName}" (${symbol}) on ${launchpadId}/${pair}. Ready to launch.`
-        : `Dry run found ${errors.length} issue(s).`,
-      errors,
-      checks,
-      params: { name: tokenName, symbol, launchpad: launchpadId, pair, style, dev_buy_sol: devBuy, vanity },
-    };
-  }
-
   if (name === "launchpad_launch") {
     const { name: tokenName, symbol, description, image_url, twitter, telegram, website } = args;
     if (!tokenName || !symbol) {
@@ -471,7 +361,7 @@ export async function handleLaunchpadTool(name, args, ctx) {
     if (useVanity) {
       try {
         const { getVanityMint } = await import("./_pump-integration.js");
-        const vanity = await getVanityMint(sbQuery);
+        const vanity = await getVanityMint();
         if (vanity) {
           mintKeypair = vanity.keypair;
           vanitySuffix = vanity.vanity;
@@ -491,108 +381,21 @@ export async function handleLaunchpadTool(name, args, ctx) {
         twitter, telegram, website,
       });
 
-      // ── Backend-signed launch via desk wallet (same flow as OrbitX in-app launches) ──
-      if (launchpadId !== "pump") {
-        return { ok: false, error: "unsupported_launchpad", message: `Backend-signed launch currently supports pump.fun only. ${launchpadId} coming soon.` };
-      }
-      const { getUserWallet, getDeskFunds, signAndSendUserTx } = await import("./_user-trading-wallet.js");
-      const row = await getUserWallet(auth.userId);
-      if (!row) {
-        return { ok: false, error: "no_wallet", message: "Create a desk wallet first (open the OrbitX app or use the wallet tab)." };
-      }
-
-      const devBuy = Number(args.dev_buy_sol || 0);
-      const funds = await getDeskFunds(row.public_key);
-      if (pair === "sol" && funds.sol < 0.004 + devBuy) {
-        return {
-          ok: false,
-          error: "underfunded",
-          message: `Desk has ${funds.sol.toFixed(4)} SOL. Launch needs rent + priority (~0.004 SOL) plus any dev buy.`,
-          publicKey: row.public_key,
-        };
-      }
-
-      // Grind vanity mint ending in "obx" (budget 8s, random fallback)
-      const { ed25519 } = await import("@noble/curves/ed25519");
-      const bs58mod = await import("bs58");
-      const bs58 = bs58mod.default || bs58mod;
-      let mintKp = null;
-      let mintPub = null;
-      let vanityHit = false;
-      if (useVanity) {
-        const t0 = Date.now();
-        while (Date.now() - t0 < 8000) {
-          const kp = ed25519.keygen();
-          const sk64 = new Uint8Array(64);
-          sk64.set(kp.secretKey, 0);
-          sk64.set(kp.publicKey, 32);
-          const pub = bs58.encode(kp.publicKey);
-          if (pub.toLowerCase().endsWith("obx")) {
-            mintPub = pub;
-            const { Keypair } = await import("@solana/web3.js");
-            mintKp = Keypair.fromSecretKey(sk64);
-            vanityHit = true;
-            break;
-          }
-        }
-      }
-      if (!mintKp) {
-        const { Keypair } = await import("@solana/web3.js");
-        mintKp = Keypair.generate();
-        mintPub = mintKp.publicKey.toBase58();
-      }
-
-      // Build the create transaction via PumpPortal (trade-local)
-      const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-      const useUsdc = pair === "usdc";
-      const payload = {
-        publicKey: row.public_key,
-        action: "create",
-        tokenMetadata: { name: tokenName, symbol: symbol.toUpperCase(), uri },
-        mint: mintPub,
-        denominatedInSol: useUsdc ? "false" : "true",
-        amount: devBuy,
-        slippage: 15,
-        priorityFee: 0.0005,
-        pool: "pump",
-      };
-      if (useUsdc) payload.quoteMint = USDC_MINT;
-      let ppRes = await fetch("https://pumpportal.fun/api/trade-local", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(30000),
-      });
-      if (!ppRes.ok && useUsdc) {
-        ppRes = await fetch("https://pumpportal.fun/api/trade-local", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...payload, denominatedInSol: "true", quoteMint: USDC_MINT }),
-          signal: AbortSignal.timeout(30000),
-        });
-      }
-      if (!ppRes.ok) {
-        const errText = await ppRes.text().catch(() => "");
-        throw new Error(`PumpPortal create failed (${ppRes.status}): ${errText.slice(0, 200)}`);
-      }
-      const txBytes = new Uint8Array(await ppRes.arrayBuffer());
-      const txBase64 = Buffer.from(txBytes).toString("base64");
-
-      // Sign with desk wallet + mint keypair, submit on-chain
-      const live = await signAndSendUserTx(row, txBase64, [mintKp]);
-      const signature = live?.signature || null;
-      if (!signature) {
-        return {
-          ok: false,
-          error: "launch_send_failed",
-          message: live?.error || "Transaction was built but the desk wallet could not submit it.",
-          mint: mintPub,
-        };
-      }
-
-      const mint = mintPub;
+      // Route to the correct launchpad
+      const { routeLaunch } = await import("./_launchpads.js");
+      const launchResult = await routeLaunch(launchpadId, {
+        name: tokenName,
+        symbol: symbol.toUpperCase(),
+        uri,
+        mintKeypair,
+        quote: pair,
+        devBuy: args.dev_buy_sol || 0,
+        jito: useJito,
+        jitoTip: args.jito_tip || 0.01,
+      }, { publicKey: auth.walletAddress || "pending" });
 
       // Record the launch
+      const mint = launchResult.mint || mintKeypair ? "vanity-pending" : `${launchpadId}-${Date.now()}`;
       await sbQuery("launchpad_tokens", "POST", {
         mint,
         name: tokenName,
@@ -609,7 +412,9 @@ export async function handleLaunchpadTool(name, args, ctx) {
         initial_liquidity_usd: 4000,
       });
 
-      const explorerUrl = `https://solscan.io/token/${mint}`;
+      const explorerUrl = chain === "solana"
+        ? `https://solscan.io/token/${mint}`
+        : `https://explorer.robinhood.com/address/${mint}`;
 
       const { launchCard } = await import("./_mcp-cards.js");
       const cardHtml = launchCard({
@@ -619,25 +424,27 @@ export async function handleLaunchpadTool(name, args, ctx) {
         launchpad: lpConfig.name,
         pair: pair.toUpperCase(),
         explorer: explorerUrl,
-        vanity: vanityHit ? "...obx" : undefined,
+        vanity: vanitySuffix ? `...${vanitySuffix}` : undefined,
       });
 
       return {
         ok: true,
-        message: `Token "${tokenName}" (${symbol.toUpperCase()}) launched via ${lpConfig.name} on ${pair.toUpperCase()} pair. Desk signed — no popup.`,
+        message: `Token "${tokenName}" (${symbol.toUpperCase()}) launching via ${lpConfig.name} on ${pair.toUpperCase()} pair.`,
         mint,
-        signature,
         launchpad: launchpadId,
         chain,
         pair,
-        vanity: vanityHit ? "Mint ends in ...obx" : "Random mint (vanity budget missed)",
+        vanity: vanitySuffix ? `Mint ends in ...${vanitySuffix}` : (useVanity ? "Grinding..." : "N/A"),
         jito_bundle: useJito,
         metadata_uri: uri,
         explorer: explorerUrl,
-        tx: `https://solscan.io/tx/${signature}`,
-        pump: `https://pump.fun/${mint}`,
-        status: "live",
-        note: "Desk wallet signed and submitted the create transaction.",
+        status: "launching",
+        gas: {
+          required_usd: GAS_REQUIRED_USD,
+          recommended_usd: GAS_RECOMMENDED_USD,
+          note: `Ensure your desk wallet has at least $${GAS_REQUIRED_USD} for gas (launch costs ~$0.60-1.00). $${GAS_RECOMMENDED_USD} recommended for multiple launches.`,
+        },
+        note: "Desk wallet is signing the create transaction.",
         // Rich UI for ChatGPT/Claude/Grok/Muse
         _meta: { ui: { html: cardHtml } },
       };
@@ -652,32 +459,10 @@ export async function handleLaunchpadTool(name, args, ctx) {
 
   if (name === "launchpad_claim_fees") {
     try {
-      const { getUserWallet, signAndSendUserTx } = await import("./_user-trading-wallet.js");
-      const { preparePumpClaim } = await import("./_mcp-ops.js");
-      const row = await getUserWallet(auth.userId);
-      if (!row) {
-        return { ok: false, error: "no_wallet", message: "Create a desk wallet first." };
-      }
-      const isUsdc = (args.launchpad === "pump" && args.pair === "usdc") ||
-        (await sbQuery("launchpad_tokens", "GET", null,
-          `?select=pool_type&mint=eq.${encodeURIComponent(args.mint || "")}&limit=1`))?.[0]?.pool_type === "usdc";
-      const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-      const built = await preparePumpClaim(row.public_key, isUsdc ? USDC : undefined);
-      if (!built?.transaction) {
-        return { ok: false, error: "claim_build_failed", message: "No claimable creator fees found (or claim build failed).", built };
-      }
-      const live = await signAndSendUserTx(row, built.transaction);
-      if (!live?.signature) {
-        return { ok: false, error: "claim_send_failed", message: live?.error || "Claim built but could not be submitted." };
-      }
-      return {
-        ok: true,
-        message: "Creator fees claimed to your desk wallet.",
-        signature: live.signature,
-        tx: `https://solscan.io/tx/${live.signature}`,
-        mint: args.mint || null,
-        pair: isUsdc ? "usdc" : "sol",
-      };
+      const { claimPumpFees } = await import("./_pump-integration.js");
+      // Get wallet address from auth
+      const result = await claimPumpFees(args.mint, auth.walletAddress || "pending");
+      return { ok: true, ...result };
     } catch (e) {
       return { ok: false, error: String(e.message || e) };
     }

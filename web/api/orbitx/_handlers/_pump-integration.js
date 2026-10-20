@@ -12,14 +12,9 @@ const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const PUMPDEV_API = "https://pumpdev.io/api";
 
 async function fetchJson(url, opts = {}) {
-  const apiKey = process.env.PUMPDEV_API_KEY || process.env.PUMPDEV_LIGHTNING_SOL || "";
   const res = await fetch(url, {
     ...opts,
-    headers: {
-      "Content-Type": "application/json",
-      ...(apiKey ? { "X-API-Key": apiKey } : {}),
-      ...(opts.headers || {}),
-    },
+    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
     signal: AbortSignal.timeout(30000),
   });
   if (!res.ok) {
@@ -48,30 +43,7 @@ export async function uploadMetadata({ name, symbol, description, imageUrl, twit
   if (telegram) metadata.telegram = telegram;
   if (website) metadata.website = website;
 
-  // Upload to Supabase Storage (public bucket) — PumpDev's /api/ipfs is dead (404).
-  // Pump.fun accepts any public metadata URI, not just IPFS.
-  const sbUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-  const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-  if (sbUrl && sbKey) {
-    try {
-      const fileName = `launchpad-meta/${Date.now()}-${symbol.toLowerCase().replace(/[^a-z0-9]/g, "")}.json`;
-      const uploadRes = await fetch(`${sbUrl}/storage/v1/object/assets/${fileName}`, {
-        method: "POST",
-        headers: {
-          apikey: sbKey,
-          Authorization: `Bearer ${sbKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(metadata),
-        signal: AbortSignal.timeout(30000),
-      });
-      if (uploadRes.ok) {
-        return `${sbUrl}/storage/v1/object/public/assets/${fileName}`;
-      }
-    } catch {}
-  }
-
-  // Fallback: try PumpDev IPFS (may 404)
+  // Use PumpDev IPFS upload
   const result = await fetchJson(`${PUMPDEV_API}/ipfs`, {
     method: "POST",
     body: JSON.stringify(metadata),
@@ -80,57 +52,25 @@ export async function uploadMetadata({ name, symbol, description, imageUrl, twit
 }
 
 /**
- * Get a vanity mint keypair from the pool.
- * Keypairs are stored as Vercel env vars (VANITY_<SUFFIX>) since the
- * filesystem pool is unavailable in production (serverless).
- * Used mints are tracked via launchpad_tokens to avoid reuse.
- * Prefers suffixes ending in 'obx' (case-insensitive).
+ * Get a vanity mint keypair from the grinder pool.
+ * Returns the best available (ending in 'bx' or similar).
  */
-export async function getVanityMint(sbQueryFn) {
-  // Minimal base58 encoder for the pubkey (last 32 bytes of the keypair)
-  const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-  const toBase58 = (bytes) => {
-    let n = BigInt("0x" + Buffer.from(bytes).toString("hex"));
-    let s = "";
-    while (n > 0n) { s = B58[Number(n % 58n)] + s; n = n / 58n; }
-    for (const b of bytes) { if (b === 0) s = "1" + s; else break; }
-    return s || "1";
-  };
-
-  const candidates = [];
-  for (const [key, val] of Object.entries(process.env)) {
-    if (key.startsWith("VANITY_") && val) {
-      try {
-        const keypair = JSON.parse(val);
-        const suffix = key.replace("VANITY_", "").toLowerCase();
-        const address = toBase58(keypair.slice(-32));
-        candidates.push({ keypair, suffix, address });
-      } catch {}
+export async function getVanityMint() {
+  // Check for pre-ground vanity keys
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const dir = "/home/hatch/workspace/orbitx-launchpad";
+  try {
+    const files = fs.readdirSync(dir).filter((f) => f.startsWith("vanity-") && f.endsWith(".json"));
+    if (files.length > 0) {
+      const file = files[0];
+      const keypair = JSON.parse(fs.readFileSync(path.join(dir, file), "utf8"));
+      // Move to used
+      fs.renameSync(path.join(dir, file), path.join(dir, `used-${file}`));
+      return { keypair, vanity: file.replace("vanity-", "").replace(".json", "") };
     }
-  }
-  if (!candidates.length) return null;
-
-  // Sort: best obx-like suffix first
-  candidates.sort((a, b) => {
-    const score = (s) => (s.endsWith("obx") ? 3 : s.includes("obx") ? 2 : s.endsWith("bx") ? 1 : 0);
-    return score(b.suffix) - score(a.suffix);
-  });
-
-  // Skip keypairs whose mint was already used (check launchpad_tokens)
-  if (sbQueryFn) {
-    for (const c of candidates) {
-      try {
-        const existing = await sbQueryFn("launchpad_tokens", "GET", null, `?select=mint&mint=eq.${encodeURIComponent(c.address || "")}&limit=1`);
-        if (!existing?.length) return { keypair: c.keypair, vanity: c.suffix };
-      } catch {
-        return { keypair: c.keypair, vanity: c.suffix };
-      }
-    }
-    // All candidates used — return null so launch proceeds without vanity
-    return null;
-  }
-
-  return { keypair: candidates[0].keypair, vanity: candidates[0].suffix };
+  } catch {}
+  return null;
 }
 
 /**
