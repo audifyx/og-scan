@@ -12,9 +12,14 @@ const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const PUMPDEV_API = "https://pumpdev.io/api";
 
 async function fetchJson(url, opts = {}) {
+  const apiKey = process.env.PUMPDEV_API_KEY || process.env.PUMPDEV_LIGHTNING_SOL || "";
   const res = await fetch(url, {
     ...opts,
-    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...(apiKey ? { "X-API-Key": apiKey } : {}),
+      ...(opts.headers || {}),
+    },
     signal: AbortSignal.timeout(30000),
   });
   if (!res.ok) {
