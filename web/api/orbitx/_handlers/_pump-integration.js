@@ -48,7 +48,30 @@ export async function uploadMetadata({ name, symbol, description, imageUrl, twit
   if (telegram) metadata.telegram = telegram;
   if (website) metadata.website = website;
 
-  // Use PumpDev IPFS upload
+  // Upload to Supabase Storage (public bucket) — PumpDev's /api/ipfs is dead (404).
+  // Pump.fun accepts any public metadata URI, not just IPFS.
+  const sbUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+  const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  if (sbUrl && sbKey) {
+    try {
+      const fileName = `launchpad-meta/${Date.now()}-${symbol.toLowerCase().replace(/[^a-z0-9]/g, "")}.json`;
+      const uploadRes = await fetch(`${sbUrl}/storage/v1/object/assets/${fileName}`, {
+        method: "POST",
+        headers: {
+          apikey: sbKey,
+          Authorization: `Bearer ${sbKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(metadata),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (uploadRes.ok) {
+        return `${sbUrl}/storage/v1/object/public/assets/${fileName}`;
+      }
+    } catch {}
+  }
+
+  // Fallback: try PumpDev IPFS (may 404)
   const result = await fetchJson(`${PUMPDEV_API}/ipfs`, {
     method: "POST",
     body: JSON.stringify(metadata),
