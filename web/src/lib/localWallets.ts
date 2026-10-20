@@ -77,14 +77,56 @@ export function deleteLocalWallets() {
   localStorage.removeItem(LS_KEY);
 }
 
+/**
+ * Import a Solana wallet from a base58 secret key (Phantom format)
+ * or JSON byte array (CLI format). Preserves the original address.
+ */
+export function importSolanaWallet(secretKeyInput: string): LocalWallets["solana"] {
+  const input = secretKeyInput.trim();
+  let secretKeyBytes: Uint8Array;
+  try {
+    if (input.startsWith("[")) {
+      const arr = JSON.parse(input);
+      secretKeyBytes = new Uint8Array(arr);
+    } else {
+      secretKeyBytes = bs58.decode(input);
+    }
+  } catch {
+    throw new Error("Invalid key format. Paste a base58 key (Phantom) or JSON array (CLI).");
+  }
+  const kp = Keypair.fromSecretKey(secretKeyBytes);
+  return {
+    publicKey: kp.publicKey.toBase58(),
+    secretKey: bs58.encode(kp.secretKey),
+    secretKeyJson: JSON.stringify(Array.from(kp.secretKey)),
+  };
+}
+
 export function useLocalWallets() {
   const [wallets, setWallets] = useState<LocalWallets | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Clean up broken v1 wallets (invalid key format)
-    try { localStorage.removeItem("orbitx_local_wallets_v1"); } catch {}
     let w = loadLocalWallets();
+    // Migrate v1 wallets: keep the same address (do NOT delete)
+    try {
+      const v1raw = localStorage.getItem("orbitx_local_wallets_v1");
+      if (v1raw && !w) {
+        const v1 = JSON.parse(v1raw);
+        if (v1?.solana?.publicKey) {
+          w = {
+            solana: {
+              publicKey: v1.solana.publicKey,
+              secretKey: v1.solana.secretKey || "",
+              secretKeyJson: "",
+            },
+            evm: v1.evm || null,
+            createdAt: v1.createdAt || new Date().toISOString(),
+          };
+          saveLocalWallets(w);
+        }
+      }
+    } catch {}
     if (!w) {
       w = createLocalWallets();
     }
