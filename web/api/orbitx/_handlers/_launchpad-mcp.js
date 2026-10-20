@@ -491,26 +491,108 @@ export async function handleLaunchpadTool(name, args, ctx) {
         twitter, telegram, website,
       });
 
-      // Route to the correct launchpad
-      const { routeLaunch } = await import("./_launchpads.js");
-      // Map pair string → quote mint address (pump: sol = native, usdc = USDC mint)
+      // ── Backend-signed launch via desk wallet (same flow as OrbitX in-app launches) ──
+      if (launchpadId !== "pump") {
+        return { ok: false, error: "unsupported_launchpad", message: `Backend-signed launch currently supports pump.fun only. ${launchpadId} coming soon.` };
+      }
+      const { getUserWallet, getDeskFunds, signAndSendUserTx } = await import("./_user-trading-wallet.js");
+      const row = await getUserWallet(auth.userId);
+      if (!row) {
+        return { ok: false, error: "no_wallet", message: "Create a desk wallet first (open the OrbitX app or use the wallet tab)." };
+      }
+
+      const devBuy = Number(args.dev_buy_sol || 0);
+      const funds = await getDeskFunds(row.public_key);
+      if (pair === "sol" && funds.sol < 0.004 + devBuy) {
+        return {
+          ok: false,
+          error: "underfunded",
+          message: `Desk has ${funds.sol.toFixed(4)} SOL. Launch needs rent + priority (~0.004 SOL) plus any dev buy.`,
+          publicKey: row.public_key,
+        };
+      }
+
+      // Grind vanity mint ending in "obx" (budget 8s, random fallback)
+      const { ed25519 } = await import("@noble/curves/ed25519");
+      const bs58mod = await import("bs58");
+      const bs58 = bs58mod.default || bs58mod;
+      let mintKp = null;
+      let mintPub = null;
+      let vanityHit = false;
+      if (useVanity) {
+        const t0 = Date.now();
+        while (Date.now() - t0 < 8000) {
+          const kp = ed25519.keygen();
+          const sk64 = new Uint8Array(64);
+          sk64.set(kp.secretKey, 0);
+          sk64.set(kp.publicKey, 32);
+          const pub = bs58.encode(kp.publicKey);
+          if (pub.toLowerCase().endsWith("obx")) {
+            mintPub = pub;
+            const { Keypair } = await import("@solana/web3.js");
+            mintKp = Keypair.fromSecretKey(sk64);
+            vanityHit = true;
+            break;
+          }
+        }
+      }
+      if (!mintKp) {
+        const { Keypair } = await import("@solana/web3.js");
+        mintKp = Keypair.generate();
+        mintPub = mintKp.publicKey.toBase58();
+      }
+
+      // Build the create transaction via PumpPortal (trade-local)
       const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-      const quoteMint = pair === "usdc" ? USDC_MINT : (args.quote_mint || null);
-      const launchResult = await routeLaunch(launchpadId, {
-        name: tokenName,
-        symbol: symbol.toUpperCase(),
-        uri,
-        mintKeypair,
-        quoteMint,
-        quote: pair,
-        devBuySol: args.dev_buy_sol || 0,
-        devBuy: args.dev_buy_sol || 0,
-        jito: useJito,
-        jitoTip: args.jito_tip || 0.01,
-      }, { publicKey: auth.walletAddress || "pending" });
+      const useUsdc = pair === "usdc";
+      const payload = {
+        publicKey: row.public_key,
+        action: "create",
+        tokenMetadata: { name: tokenName, symbol: symbol.toUpperCase(), uri },
+        mint: mintPub,
+        denominatedInSol: useUsdc ? "false" : "true",
+        amount: devBuy,
+        slippage: 15,
+        priorityFee: 0.0005,
+        pool: "pump",
+      };
+      if (useUsdc) payload.quoteMint = USDC_MINT;
+      let ppRes = await fetch("https://pumpportal.fun/api/trade-local", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!ppRes.ok && useUsdc) {
+        ppRes = await fetch("https://pumpportal.fun/api/trade-local", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, denominatedInSol: "true", quoteMint: USDC_MINT }),
+          signal: AbortSignal.timeout(30000),
+        });
+      }
+      if (!ppRes.ok) {
+        const errText = await ppRes.text().catch(() => "");
+        throw new Error(`PumpPortal create failed (${ppRes.status}): ${errText.slice(0, 200)}`);
+      }
+      const txBytes = new Uint8Array(await ppRes.arrayBuffer());
+      const txBase64 = Buffer.from(txBytes).toString("base64");
+
+      // Sign with desk wallet + mint keypair, submit on-chain
+      const live = await signAndSendUserTx(row, txBase64, [mintKp]);
+      const signature = live?.signature || null;
+      if (!signature) {
+        return {
+          ok: false,
+          error: "launch_send_failed",
+          message: live?.error || "Transaction was built but the desk wallet could not submit it.",
+          mint: mintPub,
+        };
+      }
+
+      const mint = mintPub;
 
       // Record the launch
-      const mint = launchResult.mint || (mintKeypair ? "vanity-pending" : `${launchpadId}-${Date.now()}`);
       await sbQuery("launchpad_tokens", "POST", {
         mint,
         name: tokenName,
@@ -527,9 +609,7 @@ export async function handleLaunchpadTool(name, args, ctx) {
         initial_liquidity_usd: 4000,
       });
 
-      const explorerUrl = chain === "solana"
-        ? `https://solscan.io/token/${mint}`
-        : `https://explorer.robinhood.com/address/${mint}`;
+      const explorerUrl = `https://solscan.io/token/${mint}`;
 
       const { launchCard } = await import("./_mcp-cards.js");
       const cardHtml = launchCard({
@@ -539,27 +619,25 @@ export async function handleLaunchpadTool(name, args, ctx) {
         launchpad: lpConfig.name,
         pair: pair.toUpperCase(),
         explorer: explorerUrl,
-        vanity: vanitySuffix ? `...${vanitySuffix}` : undefined,
+        vanity: vanityHit ? "...obx" : undefined,
       });
 
       return {
         ok: true,
-        message: `Token "${tokenName}" (${symbol.toUpperCase()}) launching via ${lpConfig.name} on ${pair.toUpperCase()} pair.`,
+        message: `Token "${tokenName}" (${symbol.toUpperCase()}) launched via ${lpConfig.name} on ${pair.toUpperCase()} pair. Desk signed — no popup.`,
         mint,
+        signature,
         launchpad: launchpadId,
         chain,
         pair,
-        vanity: vanitySuffix ? `Mint ends in ...${vanitySuffix}` : (useVanity ? "Grinding..." : "N/A"),
+        vanity: vanityHit ? "Mint ends in ...obx" : "Random mint (vanity budget missed)",
         jito_bundle: useJito,
         metadata_uri: uri,
         explorer: explorerUrl,
-        status: "launching",
-        gas: {
-          required_usd: GAS_REQUIRED_USD,
-          recommended_usd: GAS_RECOMMENDED_USD,
-          note: `Ensure your desk wallet has at least $${GAS_REQUIRED_USD} for gas (launch costs ~$0.60-1.00). $${GAS_RECOMMENDED_USD} recommended for multiple launches.`,
-        },
-        note: "Desk wallet is signing the create transaction.",
+        tx: `https://solscan.io/tx/${signature}`,
+        pump: `https://pump.fun/${mint}`,
+        status: "live",
+        note: "Desk wallet signed and submitted the create transaction.",
         // Rich UI for ChatGPT/Claude/Grok/Muse
         _meta: { ui: { html: cardHtml } },
       };
