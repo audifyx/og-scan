@@ -80,7 +80,7 @@ function ClaimFeeButton({ label, launchpad }: { label: string; launchpad: string
 }
 
 function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
-  wallets: { solana: { publicKey: string; secretKey: string } | null; evm: { address: string; privateKey: string } | null } | null;
+  wallets: { solana: { publicKey: string; secretKey: string; secretKeyJson: string } | null; evm: { address: string; privateKey: string } | null } | null;
   walletsReady: boolean;
   pnlData: any;
   tokens: LaunchToken[];
@@ -216,9 +216,14 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
         {showExport === "solana" && (
           <div className="mt-2.5 rounded-xl bg-red-500/[0.07] border border-red-500/20 p-3">
             <p className="text-[11px] font-bold text-red-400 uppercase mb-1.5">⚠️ Private key — keep secret</p>
+            <p className="text-[11px] font-bold text-white/70 mb-1">Phantom / wallet import (base58):</p>
             <p className="font-mono text-[11px] text-white/70 break-all leading-relaxed">{wallets.solana.secretKey}</p>
             <button onClick={() => copy(wallets.solana!.secretKey, "sol-key")}
-              className="mt-2 text-[12px] font-bold text-red-400">{copied === "sol-key" ? "Copied!" : "Copy key"}</button>
+              className="mt-1.5 text-[12px] font-bold text-red-400">{copied === "sol-key" ? "Copied!" : "Copy base58 key"}</button>
+            <p className="text-[11px] font-bold text-white/70 mb-1 mt-3">Solana CLI (JSON byte array):</p>
+            <p className="font-mono text-[10px] text-white/50 break-all leading-relaxed max-h-20 overflow-y-auto">{wallets.solana.secretKeyJson}</p>
+            <button onClick={() => copy(wallets.solana!.secretKeyJson, "sol-json")}
+              className="mt-1.5 text-[12px] font-bold text-red-400">{copied === "sol-json" ? "Copied!" : "Copy JSON key"}</button>
           </div>
         )}
       </div>

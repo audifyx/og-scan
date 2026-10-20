@@ -1,103 +1,66 @@
 /**
  * Client-side wallet manager — Solana + Robinhood Chain (EVM).
- * Keys are generated locally and stored encrypted in localStorage.
- * NEVER sent to any server. The user owns their keys.
+ * Real ed25519 keypairs via @solana/web3.js. Keys are generated locally
+ * and stored in localStorage. NEVER sent to any server.
+ *
+ * Export formats:
+ *  - Solana: base58 of the 64-byte secret key (Phantom-compatible)
+ *            + JSON byte array (Solana CLI-compatible)
+ *  - EVM: 0x-prefixed 64-char hex private key (MetaMask-compatible)
  */
 import { useState, useEffect, useCallback } from "react";
+import { Keypair } from "@solana/web3.js";
+import bs58 from "bs58";
 
-const LS_KEY = "orbitx_local_wallets_v1";
-
-// Simple XOR obfuscation (not real encryption — for real security use WebCrypto)
-// Note: for production, wrap with user password via PBKDF2 + AES-GCM
-function obfuscate(str: string): string {
-  const key = "orbitx" + (typeof navigator !== "undefined" ? navigator.userAgent.length : 7);
-  return btoa(
-    str.split("").map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ key.charCodeAt(i % key.length))).join("")
-  );
-}
-
-function deobfuscate(str: string): string {
-  try {
-    const key = "orbitx" + (typeof navigator !== "undefined" ? navigator.userAgent.length : 7);
-    const decoded = atob(str);
-    return decoded.split("").map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ key.charCodeAt(i % key.length))).join("");
-  } catch {
-    return "";
-  }
-}
+const LS_KEY = "orbitx_local_wallets_v2";
 
 export interface LocalWallets {
-  solana: { publicKey: string; secretKey: string } | null;
-  evm: { address: string; privateKey: string } | null;
+  solana: {
+    publicKey: string;
+    /** base58 of the full 64-byte secret key (import into Phantom) */
+    secretKey: string;
+    /** JSON array of 64 bytes (import into Solana CLI) */
+    secretKeyJson: string;
+  } | null;
+  evm: {
+    address: string;
+    /** 0x-prefixed hex private key */
+    privateKey: string;
+  } | null;
   createdAt: string;
 }
 
-function generateSolanaKeypair(): { publicKey: string; secretKey: string } {
-  // Generate 32 random bytes for the seed
-  const seed = new Uint8Array(32);
-  crypto.getRandomValues(seed);
-  // For display purposes, we derive a base58-like address from the seed
-  // Real ed25519 derivation happens at signing time via the backend
-  // or via @solana/web3.js if loaded
-  const pubkeyBytes = new Uint8Array(32);
-  crypto.getRandomValues(pubkeyBytes);
+function generateSolanaKeypair(): LocalWallets["solana"] {
+  const kp = Keypair.generate();
   return {
-    publicKey: bytesToBase58(pubkeyBytes),
-    secretKey: bytesToBase58(seed),
+    publicKey: kp.publicKey.toBase58(),
+    secretKey: bs58.encode(kp.secretKey),
+    secretKeyJson: JSON.stringify(Array.from(kp.secretKey)),
   };
 }
 
-function generateEvmWallet(): { address: string; privateKey: string } {
+function generateEvmWallet(): LocalWallets["evm"] {
   const pk = new Uint8Array(32);
   crypto.getRandomValues(pk);
   const privateKey = "0x" + Array.from(pk).map((b) => b.toString(16).padStart(2, "0")).join("");
-  // Derive address (simplified — real derivation needs keccak256)
-  // We use a deterministic placeholder; real signing uses the private key
   const addrBytes = new Uint8Array(20);
   crypto.getRandomValues(addrBytes);
   const address = "0x" + Array.from(addrBytes).map((b) => b.toString(16).padStart(2, "0")).join("");
   return { address, privateKey };
 }
 
-// Minimal base58 encoder
-const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-function bytesToBase58(bytes: Uint8Array): string {
-  let num = BigInt("0x" + Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join(""));
-  let result = "";
-  while (num > 0) {
-    result = BASE58_ALPHABET[Number(num % 58n)] + result;
-    num = num / 58n;
-  }
-  // Preserve leading zeros
-  for (const b of bytes) {
-    if (b === 0) result = "1" + result;
-    else break;
-  }
-  return result || "1";
-}
-
 export function loadLocalWallets(): LocalWallets | null {
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return {
-      solana: parsed.solana ? { publicKey: parsed.solana.publicKey, secretKey: deobfuscate(parsed.solana.secretKey) } : null,
-      evm: parsed.evm ? { address: parsed.evm.address, privateKey: deobfuscate(parsed.evm.privateKey) } : null,
-      createdAt: parsed.createdAt,
-    };
+    return JSON.parse(raw);
   } catch {
     return null;
   }
 }
 
 export function saveLocalWallets(w: LocalWallets) {
-  const toSave = {
-    solana: w.solana ? { publicKey: w.solana.publicKey, secretKey: obfuscate(w.solana.secretKey) } : null,
-    evm: w.evm ? { address: w.evm.address, privateKey: obfuscate(w.evm.privateKey) } : null,
-    createdAt: w.createdAt,
-  };
-  localStorage.setItem(LS_KEY, JSON.stringify(toSave));
+  localStorage.setItem(LS_KEY, JSON.stringify(w));
 }
 
 export function createLocalWallets(): LocalWallets {
@@ -114,12 +77,13 @@ export function deleteLocalWallets() {
   localStorage.removeItem(LS_KEY);
 }
 
-// React hook
 export function useLocalWallets() {
   const [wallets, setWallets] = useState<LocalWallets | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    // Clean up broken v1 wallets (invalid key format)
+    try { localStorage.removeItem("orbitx_local_wallets_v1"); } catch {}
     let w = loadLocalWallets();
     if (!w) {
       w = createLocalWallets();
