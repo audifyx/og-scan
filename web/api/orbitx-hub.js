@@ -6219,15 +6219,28 @@ async function handleLaunchpadMcp(req, res) {
       if (link?.userId) {
         auth = { ...auth, userId: link.userId, username: link.username || null, walletAddress: link.walletAddress || null };
       } else {
-        // Fallback: check for launchpad-scoped code directly
+        // Fallback: accept ANY valid non-expired code from the shared table
         const { sb } = await getSupabase();
         if (sb) {
-          const rows = await sb(`mcp_link_sessions?code=eq.${encodeURIComponent(auth.authCode)}&scope=eq.launchpad&select=*&limit=1`);
+          const rows = await sb(`mcp_link_sessions?code=eq.${encodeURIComponent(auth.authCode)}&select=*&limit=1`);
           const row = Array.isArray(rows) ? rows[0] : null;
           if (row?.user_id && new Date(row.expires_at).getTime() >= Date.now()) {
-            auth = { ...auth, userId: row.user_id, username: null, walletAddress: null };
+            auth = { ...auth, userId: row.user_id, username: null, walletAddress: row.wallet_address || null };
           }
         }
+      }
+    } catch {}
+  }
+
+  // Also resolve by session ID if no authCode was provided (ChatGPT session flow)
+  if (!auth?.userId && req.headers?.["mcp-session-id"]) {
+    try {
+      const link = await resolveAgentLinkAuth({
+        authCode: "",
+        mcpSessionId: req.headers["mcp-session-id"],
+      });
+      if (link?.userId) {
+        auth = { ...(auth || {}), userId: link.userId, username: link.username || null, walletAddress: link.walletAddress || null };
       }
     } catch {}
   }
