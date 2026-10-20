@@ -80,25 +80,57 @@ export async function uploadMetadata({ name, symbol, description, imageUrl, twit
 }
 
 /**
- * Get a vanity mint keypair from the grinder pool.
- * Returns the best available (ending in 'bx' or similar).
+ * Get a vanity mint keypair from the pool.
+ * Keypairs are stored as Vercel env vars (VANITY_<SUFFIX>) since the
+ * filesystem pool is unavailable in production (serverless).
+ * Used mints are tracked via launchpad_tokens to avoid reuse.
+ * Prefers suffixes ending in 'obx' (case-insensitive).
  */
-export async function getVanityMint() {
-  // Check for pre-ground vanity keys
-  const fs = await import("node:fs");
-  const path = await import("node:path");
-  const dir = "/home/hatch/workspace/orbitx-launchpad";
-  try {
-    const files = fs.readdirSync(dir).filter((f) => f.startsWith("vanity-") && f.endsWith(".json"));
-    if (files.length > 0) {
-      const file = files[0];
-      const keypair = JSON.parse(fs.readFileSync(path.join(dir, file), "utf8"));
-      // Move to used
-      fs.renameSync(path.join(dir, file), path.join(dir, `used-${file}`));
-      return { keypair, vanity: file.replace("vanity-", "").replace(".json", "") };
+export async function getVanityMint(sbQueryFn) {
+  // Minimal base58 encoder for the pubkey (last 32 bytes of the keypair)
+  const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  const toBase58 = (bytes) => {
+    let n = BigInt("0x" + Buffer.from(bytes).toString("hex"));
+    let s = "";
+    while (n > 0n) { s = B58[Number(n % 58n)] + s; n = n / 58n; }
+    for (const b of bytes) { if (b === 0) s = "1" + s; else break; }
+    return s || "1";
+  };
+
+  const candidates = [];
+  for (const [key, val] of Object.entries(process.env)) {
+    if (key.startsWith("VANITY_") && val) {
+      try {
+        const keypair = JSON.parse(val);
+        const suffix = key.replace("VANITY_", "").toLowerCase();
+        const address = toBase58(keypair.slice(-32));
+        candidates.push({ keypair, suffix, address });
+      } catch {}
     }
-  } catch {}
-  return null;
+  }
+  if (!candidates.length) return null;
+
+  // Sort: best obx-like suffix first
+  candidates.sort((a, b) => {
+    const score = (s) => (s.endsWith("obx") ? 3 : s.includes("obx") ? 2 : s.endsWith("bx") ? 1 : 0);
+    return score(b.suffix) - score(a.suffix);
+  });
+
+  // Skip keypairs whose mint was already used (check launchpad_tokens)
+  if (sbQueryFn) {
+    for (const c of candidates) {
+      try {
+        const existing = await sbQueryFn("launchpad_tokens", "GET", null, `?select=mint&mint=eq.${encodeURIComponent(c.address || "")}&limit=1`);
+        if (!existing?.length) return { keypair: c.keypair, vanity: c.suffix };
+      } catch {
+        return { keypair: c.keypair, vanity: c.suffix };
+      }
+    }
+    // All candidates used — return null so launch proceeds without vanity
+    return null;
+  }
+
+  return { keypair: candidates[0].keypair, vanity: candidates[0].suffix };
 }
 
 /**
