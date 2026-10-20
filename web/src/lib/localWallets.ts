@@ -94,7 +94,11 @@ export function importSolanaWallet(secretKeyInput: string): LocalWallets["solana
   } catch {
     throw new Error("Invalid key format. Paste a base58 key (Phantom) or JSON array (CLI).");
   }
-  const kp = Keypair.fromSecretKey(secretKeyBytes);
+  const kp = secretKeyBytes.length === 64
+    ? Keypair.fromSecretKey(secretKeyBytes)
+    : secretKeyBytes.length === 32
+      ? Keypair.fromSeed(secretKeyBytes)
+      : (() => { throw new Error(`Invalid key length: ${secretKeyBytes.length} bytes. Expected 32 (seed) or 64 (secret key).`); })();
   return {
     publicKey: kp.publicKey.toBase58(),
     secretKey: bs58.encode(kp.secretKey),
