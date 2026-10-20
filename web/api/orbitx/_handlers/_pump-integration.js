@@ -12,14 +12,9 @@ const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const PUMPDEV_API = "https://pumpdev.io/api";
 
 async function fetchJson(url, opts = {}) {
-  const apiKey = process.env.PUMPDEV_API_KEY || process.env.PUMPDEV_LIGHTNING_SOL || "";
   const res = await fetch(url, {
     ...opts,
-    headers: {
-      "Content-Type": "application/json",
-      ...(apiKey ? { "X-API-Key": apiKey } : {}),
-      ...(opts.headers || {}),
-    },
+    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
     signal: AbortSignal.timeout(30000),
   });
   if (!res.ok) {
@@ -48,30 +43,7 @@ export async function uploadMetadata({ name, symbol, description, imageUrl, twit
   if (telegram) metadata.telegram = telegram;
   if (website) metadata.website = website;
 
-  // Upload to Supabase Storage (public bucket) — PumpDev's /api/ipfs is dead (404).
-  // Pump.fun accepts any public metadata URI, not just IPFS.
-  const sbUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-  const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-  if (sbUrl && sbKey) {
-    try {
-      const fileName = `launchpad-meta/${Date.now()}-${symbol.toLowerCase().replace(/[^a-z0-9]/g, "")}.json`;
-      const uploadRes = await fetch(`${sbUrl}/storage/v1/object/assets/${fileName}`, {
-        method: "POST",
-        headers: {
-          apikey: sbKey,
-          Authorization: `Bearer ${sbKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(metadata),
-        signal: AbortSignal.timeout(30000),
-      });
-      if (uploadRes.ok) {
-        return `${sbUrl}/storage/v1/object/public/assets/${fileName}`;
-      }
-    } catch {}
-  }
-
-  // Fallback: try PumpDev IPFS (may 404)
+  // Use PumpDev IPFS upload
   const result = await fetchJson(`${PUMPDEV_API}/ipfs`, {
     method: "POST",
     body: JSON.stringify(metadata),
