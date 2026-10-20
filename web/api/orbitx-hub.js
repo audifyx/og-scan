@@ -6209,6 +6209,7 @@ async function handleLaunchpadMcp(req, res) {
 
   // Resolve authCode to userId via the shared agent link-auth flow
   // (same mcp_link_sessions table the main Agent MCP uses)
+  // Accepts BOTH main MCP codes and launchpad-scoped codes — one auth connects both
   if (auth?.authCode && !auth?.userId) {
     try {
       const link = await resolveAgentLinkAuth({
@@ -6217,6 +6218,16 @@ async function handleLaunchpadMcp(req, res) {
       });
       if (link?.userId) {
         auth = { ...auth, userId: link.userId, username: link.username || null, walletAddress: link.walletAddress || null };
+      } else {
+        // Fallback: check for launchpad-scoped code directly
+        const { sb } = await getSupabase();
+        if (sb) {
+          const rows = await sb(`mcp_link_sessions?code=eq.${encodeURIComponent(auth.authCode)}&scope=eq.launchpad&select=*&limit=1`);
+          const row = Array.isArray(rows) ? rows[0] : null;
+          if (row?.user_id && new Date(row.expires_at).getTime() >= Date.now()) {
+            auth = { ...auth, userId: row.user_id, username: null, walletAddress: null };
+          }
+        }
       }
     } catch {}
   }
