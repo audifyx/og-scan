@@ -158,7 +158,7 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
     return (
       <div className="mt-4">
         <h1 className="text-[24px] font-bold tracking-tight">Wallet</h1>
-        <p className="mt-4 text-[14px] text-white/50 text-center py-10">Generating your wallets…</p>
+        <p className="mt-4 text-[14px] text-white/75 text-center py-10">Generating your wallets…</p>
       </div>
     );
   }
@@ -167,7 +167,7 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
     return (
       <div className="mt-4">
         <h1 className="text-[24px] font-bold tracking-tight">Wallet</h1>
-        <p className="mt-4 text-[14px] text-white/50 text-center py-10">No wallets found on this device.</p>
+        <p className="mt-4 text-[14px] text-white/75 text-center py-10">No wallets found on this device.</p>
       </div>
     );
   }
@@ -181,12 +181,12 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
       {pnlData && (
         <div className="mt-4 rounded-[20px] p-5 text-center"
           style={{ background: "linear-gradient(135deg, #101018, #0a0a12)", border: `1px solid ${GOLD}22` }}>
-          <p className="text-[11px] font-bold uppercase tracking-widest text-white/50">Total PnL</p>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-white/75">Total PnL</p>
           <p className="mt-1 text-[32px] font-extrabold"
             style={{ color: (pnlData.total_pnl_usd || 0) >= 0 ? "#4ade80" : "#f87171" }}>
             {(pnlData.total_pnl_usd || 0) >= 0 ? "+" : ""}${Math.abs(pnlData.total_pnl_usd || 0).toFixed(2)}
           </p>
-          <p className="mt-1 text-[12px] text-white/50">{pnlData.wins || 0}W · {pnlData.losses || 0}L</p>
+          <p className="mt-1 text-[12px] text-white/75">{pnlData.wins || 0}W · {pnlData.losses || 0}L</p>
         </div>
       )}
 
@@ -196,7 +196,7 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
           <div className="h-10 w-10 rounded-full flex items-center justify-center text-[18px]" style={{ background: `${GOLD}14`, color: GOLD }}>◎</div>
           <div className="flex-1">
             <p className="text-[15px] font-semibold">Solana</p>
-            <p className="text-[12px] text-white/50">
+            <p className="text-[12px] text-white/75">
               {solBalance !== null ? `${solBalance.toFixed(4)} SOL` : "pump.fun + StonkFun"}
             </p>
           </div>
@@ -205,7 +205,7 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
             {copied === "sol-addr" ? "Copied!" : "Copy"}
           </button>
         </div>
-        <p className="mt-2.5 font-mono text-[11px] text-white/55 break-all bg-black/40 rounded-xl p-2.5 leading-relaxed">{wallets.solana.publicKey}</p>
+        <p className="mt-2.5 font-mono text-[11px] text-white/85 break-all bg-black/60 rounded-xl p-2.5 leading-relaxed">{wallets.solana.publicKey}</p>
         <div className="mt-2.5 grid grid-cols-3 gap-2">
           <button onClick={() => copy(wallets.solana!.publicKey, "sol-dep")}
             className="rounded-full py-2 text-[13px] font-bold" style={{ background: `${GOLD}1e`, color: GOLD }}>
@@ -217,15 +217,15 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
             className="rounded-full py-2 text-[13px] font-bold bg-white/[0.07] text-white/80">Export</button>
         </div>
         <button onClick={() => setShowImport(!showImport)}
-          className="mt-2 w-full text-[12px] font-semibold text-white/45 hover:text-white/70">
+          className="mt-2 w-full text-[12px] font-semibold text-white/70 hover:text-white/70">
           {showImport ? "Cancel import" : "Import existing wallet"}
         </button>
         {showImport && (
-          <div className="mt-2 rounded-xl bg-white/[0.03] border border-white/10 p-3">
+          <div className="mt-2 rounded-xl bg-white/[0.07] border border-white/10 p-3">
             <p className="text-[12px] font-bold text-white/70 mb-2">Paste your private key (base58 or JSON):</p>
             <textarea value={importKey} onChange={(e) => { setImportKey(e.target.value); setImportError(null); }}
               placeholder="5K..." rows={3}
-              className="w-full rounded-xl bg-black/40 border border-white/10 px-3 py-2 font-mono text-[11px] text-white/80 placeholder-white/30 outline-none focus:border-[#e8b84a]/50" />
+              className="w-full rounded-xl bg-black/60 border border-white/10 px-3 py-2 font-mono text-[11px] text-white/80 placeholder-white/30 outline-none focus:border-[#e8b84a]/50" />
             {importError && <p className="mt-1.5 text-[12px] text-red-400">{importError}</p>}
             <button onClick={() => {
               try {
@@ -253,7 +253,7 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
             <button onClick={() => copy(wallets.solana!.secretKey, "sol-key")}
               className="mt-1.5 text-[12px] font-bold text-red-400">{copied === "sol-key" ? "Copied!" : "Copy base58 key"}</button>
             <p className="text-[11px] font-bold text-white/70 mb-1 mt-3">Solana CLI (JSON byte array):</p>
-            <p className="font-mono text-[10px] text-white/50 break-all leading-relaxed max-h-20 overflow-y-auto">{wallets.solana.secretKeyJson}</p>
+            <p className="font-mono text-[10px] text-white/75 break-all leading-relaxed max-h-20 overflow-y-auto">{wallets.solana.secretKeyJson}</p>
             <button onClick={() => copy(wallets.solana!.secretKeyJson, "sol-json")}
               className="mt-1.5 text-[12px] font-bold text-red-400">{copied === "sol-json" ? "Copied!" : "Copy JSON key"}</button>
           </div>
@@ -267,14 +267,14 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
             <div className="h-10 w-10 rounded-full flex items-center justify-center text-[18px]" style={{ background: `${GOLD}14`, color: GOLD }}>⬡</div>
             <div className="flex-1">
               <p className="text-[15px] font-semibold">Robinhood Chain</p>
-              <p className="text-[12px] text-white/50">Pons V2</p>
+              <p className="text-[12px] text-white/75">Pons V2</p>
             </div>
             <button onClick={() => copy(wallets.evm!.address, "evm-addr")}
               className="text-[12px] font-bold px-3 py-1.5 rounded-full" style={{ background: `${GOLD}1e`, color: GOLD }}>
               {copied === "evm-addr" ? "Copied!" : "Copy"}
             </button>
           </div>
-          <p className="mt-2.5 font-mono text-[11px] text-white/55 break-all bg-black/40 rounded-xl p-2.5 leading-relaxed">{wallets.evm.address}</p>
+          <p className="mt-2.5 font-mono text-[11px] text-white/85 break-all bg-black/60 rounded-xl p-2.5 leading-relaxed">{wallets.evm.address}</p>
           <div className="mt-2.5 grid grid-cols-3 gap-2">
             <button onClick={() => copy(wallets.evm!.address, "evm-dep")}
               className="rounded-full py-2 text-[13px] font-bold" style={{ background: `${GOLD}1e`, color: GOLD }}>
@@ -299,7 +299,7 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
       {/* Send */}
       <div id="send-section" className="mt-2.5 rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-4">
         <p className="text-[14px] font-bold mb-3">Send funds</p>
-        <div className="grid grid-cols-2 gap-2 p-1 rounded-full bg-white/[0.04] mb-3">
+        <div className="grid grid-cols-2 gap-2 p-1 rounded-full bg-white/[0.09] mb-3">
           {(["solana", "evm"] as const).map((c) => (
             <button key={c} onClick={() => setSendChain(c)}
               className="rounded-full py-2 text-[13px] font-bold transition-all"
@@ -309,9 +309,9 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
           ))}
         </div>
         <input value={sendTo} onChange={(e) => setSendTo(e.target.value)} placeholder="Recipient address"
-          className="w-full rounded-2xl bg-white/[0.04] border border-white/10 px-4 py-3 text-[14px] font-mono placeholder-white/40 outline-none focus:border-[#e8b84a]/50 mb-2" />
+          className="w-full rounded-2xl bg-white/[0.09] border border-white/10 px-4 py-3 text-[14px] font-mono placeholder-white/60 outline-none focus:border-[#e8b84a]/50 mb-2" />
         <input value={sendAmount} onChange={(e) => setSendAmount(e.target.value)} placeholder={`Amount (${sendChain === "solana" ? "SOL" : "ETH"})`} type="number"
-          className="w-full rounded-2xl bg-white/[0.04] border border-white/10 px-4 py-3 text-[14px] placeholder-white/40 outline-none focus:border-[#e8b84a]/50 mb-3" />
+          className="w-full rounded-2xl bg-white/[0.09] border border-white/10 px-4 py-3 text-[14px] placeholder-white/60 outline-none focus:border-[#e8b84a]/50 mb-3" />
         <button onClick={handleSend} disabled={sending || !sendTo || !sendAmount}
           className="w-full rounded-full py-3 font-bold text-[14px] text-black disabled:opacity-40"
           style={{ background: `linear-gradient(135deg, ${GOLD}, #d4a017)` }}>
@@ -325,13 +325,13 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
             {sendResult}
           </p>
         )}
-        <p className="mt-2 text-[11px] text-white/40 text-center">Signing happens on-device. Keys never leave.</p>
+        <p className="mt-2 text-[11px] text-white/65 text-center">Signing happens on-device. Keys never leave.</p>
       </div>
 
       {/* Claim fees */}
       <div className="mt-2.5 rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-4">
         <p className="text-[14px] font-bold mb-1">Claim creator fees</p>
-        <p className="text-[12px] text-white/50 mb-3">Collect fees from your launched tokens.</p>
+        <p className="text-[12px] text-white/75 mb-3">Collect fees from your launched tokens.</p>
         <div className="grid grid-cols-2 gap-2">
           <ClaimFeeButton label="◎ Pump.fun" launchpad="pump" />
           <ClaimFeeButton label="⬡ Pons" launchpad="pons" />
@@ -349,16 +349,16 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
                   {t.image_url ? <img src={t.image_url} className="h-full w-full object-cover" /> : t.symbol.charAt(0)}
                 </div>
                 <span className="flex-1 text-[14px] font-medium truncate">{t.name}</span>
-                <span className="text-[12px] text-white/50">${t.symbol}</span>
+                <span className="text-[12px] text-white/75">${t.symbol}</span>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-[13px] text-white/40 text-center py-4">No tokens yet</p>
+          <p className="text-[13px] text-white/65 text-center py-4">No tokens yet</p>
         )}
       </div>
 
-      <p className="mt-4 mb-2 text-[11px] text-white/35 text-center leading-relaxed">
+      <p className="mt-4 mb-2 text-[11px] text-white/60 text-center leading-relaxed">
         🔒 Your keys are generated and stored only on this device.<br />OrbitX never sees or stores them.
       </p>
     </div>
@@ -388,18 +388,18 @@ function HolderMap({ mint }: { mint: string }) {
     })();
   }, [mint]);
 
-  if (loading) return <p className="text-[12px] text-white/40 text-center py-3">Loading holders…</p>;
+  if (loading) return <p className="text-[12px] text-white/65 text-center py-3">Loading holders…</p>;
   if (!holders.length) return null;
 
   const maxPct = Math.max(...holders.map(h => h.pct), 1);
 
   return (
-    <div className="rounded-2xl bg-white/[0.04] p-4">
+    <div className="rounded-2xl bg-white/[0.09] p-4">
       <p className="text-[13px] font-bold mb-3">🗺️ Holder Map</p>
       <div className="space-y-2">
         {holders.slice(0, 8).map((h, i) => (
           <div key={h.address} className="flex items-center gap-2">
-            <span className="text-[11px] text-white/40 w-6 font-mono">#{i + 1}</span>
+            <span className="text-[11px] text-white/65 w-6 font-mono">#{i + 1}</span>
             <div className="flex-1">
               <div className="flex justify-between text-[11px] mb-1">
                 <span className="font-mono text-white/60">{h.address.slice(0, 6)}…{h.address.slice(-4)}</span>
@@ -509,10 +509,32 @@ export default function LaunchpadPage() {
 
   useEffect(() => {
     (async () => {
-      let query = supabase.from("launchpad_tokens").select("*").order("created_at", { ascending: false }).limit(50);
-      if (filter !== "all") query = query.eq("status", filter);
-      const { data } = await query;
-      setTokens((data || []) as LaunchToken[]);
+      try {
+        let query = supabase.from("launchpad_tokens").select("*").order("created_at", { ascending: false }).limit(50);
+        if (filter !== "all") query = query.eq("status", filter);
+        const { data, error } = await query;
+        if (!error && data?.length) {
+          setTokens(data as LaunchToken[]);
+          setLoading(false);
+          return;
+        }
+      } catch {}
+      // Fallback: use MCP API (works even if direct Supabase query fails)
+      try {
+        const res = await fetch("/api/orbitx-hub/mcp-launchpad", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0", id: 1, method: "tools/call",
+            params: { name: "launchpad_tokens", arguments: { limit: 50 } },
+          }),
+        });
+        const json = await res.json();
+        const result = json.result?.structuredContent || {};
+        if (result.tokens?.length) {
+          setTokens(result.tokens as LaunchToken[]);
+        }
+      } catch {}
       setLoading(false);
     })();
   }, [filter]);
@@ -623,7 +645,7 @@ export default function LaunchpadPage() {
   };
 
   const inputCls =
-    "w-full rounded-2xl bg-white/[0.04] border border-white/10 px-4 py-3 text-[15px] text-white placeholder-white/40 outline-none focus:border-[#e8b84a]/50 transition-colors";
+    "w-full rounded-2xl bg-white/[0.09] border border-white/10 px-4 py-3 text-[15px] text-white placeholder-white/60 outline-none focus:border-[#e8b84a]/50 transition-colors";
 
   return (
     <div className="min-h-screen bg-[#050508] text-white flex flex-col" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif" }}>
@@ -657,7 +679,7 @@ export default function LaunchpadPage() {
                     )}
                   </div>
                   {notifs.length === 0 ? (
-                    <p className="p-6 text-center text-[13px] text-white/40">No notifications yet.<br />You'll get alerts for graduations, snipers, and launches.</p>
+                    <p className="p-6 text-center text-[13px] text-white/65">No notifications yet.<br />You'll get alerts for graduations, snipers, and launches.</p>
                   ) : notifs.map((n) => (
                     <div key={n.id} className="p-3.5 border-b border-white/[0.05] flex gap-3" style={{ opacity: n.read ? 0.55 : 1 }}>
                       <div className="h-8 w-8 rounded-full flex items-center justify-center text-[14px] shrink-0"
@@ -666,8 +688,8 @@ export default function LaunchpadPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-semibold">{n.title}</p>
-                        <p className="text-[12px] text-white/55 mt-0.5">{n.body}</p>
-                        <p className="text-[10px] text-white/35 mt-1">{new Date(n.timestamp).toLocaleString()}</p>
+                        <p className="text-[12px] text-white/85 mt-0.5">{n.body}</p>
+                        <p className="text-[10px] text-white/60 mt-1">{new Date(n.timestamp).toLocaleString()}</p>
                       </div>
                       {!n.read && <span className="h-2 w-2 rounded-full mt-1.5 shrink-0" style={{ background: GOLD }} />}
                     </div>
@@ -705,8 +727,8 @@ export default function LaunchpadPage() {
                 Create Token
               </button>
               <div className="mt-4 flex gap-5 text-[13px]">
-                <span><span className="font-bold text-white">{tokens.length}</span> <span className="text-white/50">Live</span></span>
-                <span><span className="font-bold text-white">{tokens.filter(t => t.status === "graduated").length}</span> <span className="text-white/50">Graduated</span></span>
+                <span><span className="font-bold text-white">{tokens.length}</span> <span className="text-white/75">Live</span></span>
+                <span><span className="font-bold text-white">{tokens.filter(t => t.status === "graduated").length}</span> <span className="text-white/75">Graduated</span></span>
               </div>
             </div>
 
@@ -726,7 +748,7 @@ export default function LaunchpadPage() {
             {/* Token list */}
             <div className="mt-3 space-y-2.5">
               {loading ? (
-                <p className="text-white/50 text-[14px] py-10 text-center">Loading…</p>
+                <p className="text-white/75 text-[14px] py-10 text-center">Loading…</p>
               ) : tokens.length === 0 ? (
                 <div className="rounded-[20px] border border-dashed border-white/10 p-10 text-center">
                   <p className="text-[14px] font-semibold text-white/70">No tokens yet</p>
@@ -745,9 +767,9 @@ export default function LaunchpadPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-1.5">
                       <span className="text-[15px] font-semibold truncate">{t.name}</span>
-                      <span className="text-[12px] text-white/45 font-medium">${t.symbol}</span>
+                      <span className="text-[12px] text-white/70 font-medium">${t.symbol}</span>
                     </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-[12px] text-white/45">
+                    <div className="mt-0.5 flex items-center gap-2 text-[12px] text-white/70">
                       <span>MCap <span className="text-white/75 font-semibold">{fmtUsd(t.market_cap_usd)}</span></span>
                       <span className="px-1.5 py-px rounded-md bg-white/[0.07] uppercase text-[10px] font-semibold">{t.launchpad}</span>
                     </div>
@@ -779,34 +801,34 @@ export default function LaunchpadPage() {
                     </div>
                     <div className="flex-1">
                       <p className="text-[17px] font-bold">{selectedToken.name}</p>
-                      <p className="text-[13px] text-white/50">${selectedToken.symbol} · {selectedToken.launchpad}</p>
+                      <p className="text-[13px] text-white/75">${selectedToken.symbol} · {selectedToken.launchpad}</p>
                     </div>
                     <button onClick={() => setSelectedToken(null)} className="p-2 rounded-full bg-white/10 text-white/70">✕</button>
                   </div>
                   {detailData ? (
                     <div className="mt-4 space-y-3">
                       <div className="grid grid-cols-2 gap-2">
-                        <div className="rounded-2xl bg-white/[0.04] p-3">
-                          <p className="text-[11px] text-white/50 uppercase">Price</p>
+                        <div className="rounded-2xl bg-white/[0.09] p-3">
+                          <p className="text-[11px] text-white/75 uppercase">Price</p>
                           <p className="text-[16px] font-bold">${detailData.price_usd?.toFixed(6) || "—"}</p>
                         </div>
-                        <div className="rounded-2xl bg-white/[0.04] p-3">
-                          <p className="text-[11px] text-white/50 uppercase">MCap</p>
+                        <div className="rounded-2xl bg-white/[0.09] p-3">
+                          <p className="text-[11px] text-white/75 uppercase">MCap</p>
                           <p className="text-[16px] font-bold">{fmtUsd(detailData.market_cap)}</p>
                         </div>
-                        <div className="rounded-2xl bg-white/[0.04] p-3">
-                          <p className="text-[11px] text-white/50 uppercase">24h</p>
+                        <div className="rounded-2xl bg-white/[0.09] p-3">
+                          <p className="text-[11px] text-white/75 uppercase">24h</p>
                           <p className="text-[16px] font-bold" style={{ color: (detailData.change_24h || 0) >= 0 ? "#4ade80" : "#f87171" }}>
                             {(detailData.change_24h || 0).toFixed(1)}%
                           </p>
                         </div>
-                        <div className="rounded-2xl bg-white/[0.04] p-3">
-                          <p className="text-[11px] text-white/50 uppercase">Liquidity</p>
+                        <div className="rounded-2xl bg-white/[0.09] p-3">
+                          <p className="text-[11px] text-white/75 uppercase">Liquidity</p>
                           <p className="text-[16px] font-bold">{fmtUsd(detailData.liquidity_usd)}</p>
                         </div>
                       </div>
                       {detailData.bonding_curve && (
-                        <div className="rounded-2xl bg-white/[0.04] p-4">
+                        <div className="rounded-2xl bg-white/[0.09] p-4">
                           <p className="text-[12px] text-white/60 mb-2">Bonding curve {detailData.bonding_curve.graduation_pct?.toFixed(0)}%</p>
                           <div className="h-2 rounded-full bg-white/[0.07] overflow-hidden">
                             <div className="h-full rounded-full" style={{ width: `${Math.min(100, detailData.bonding_curve.graduation_pct || 0)}%`, background: GOLD }} />
@@ -825,7 +847,7 @@ export default function LaunchpadPage() {
                       <HolderMap mint={selectedToken.mint} />
                     </div>
                   ) : (
-                    <p className="text-center text-white/50 py-8 text-[14px]">Loading…</p>
+                    <p className="text-center text-white/75 py-8 text-[14px]">Loading…</p>
                   )}
                 </div>
               </div>
@@ -836,32 +858,32 @@ export default function LaunchpadPage() {
                 <p className="text-[14px] font-bold">🎯 Sniper Radar</p>
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${GOLD}1e`, color: GOLD }}>LIVE</span>
               </div>
-              <p className="text-[12px] text-white/50">Snipers getting cooked by the tax in real-time.</p>
+              <p className="text-[12px] text-white/75">Snipers getting cooked by the tax in real-time.</p>
               <div id="sniper-feed" className="mt-3 space-y-2">
-                <p className="text-[12px] text-white/40 text-center py-4">No sniper activity yet — launch a token to activate the radar.</p>
+                <p className="text-[12px] text-white/65 text-center py-4">No sniper activity yet — launch a token to activate the radar.</p>
               </div>
             </div>
 
             {/* MCP Guide */}
             <div className="mt-3 rounded-[20px] bg-[#0c0c12] border border-white/[0.07] p-4">
               <p className="text-[14px] font-bold mb-1">🤖 Launch via AI</p>
-              <p className="text-[12px] text-white/50 mb-3">Connect Grok, Claude, ChatGPT, or Muse to launch tokens with your voice.</p>
+              <p className="text-[12px] text-white/75 mb-3">Connect Grok, Claude, ChatGPT, or Muse to launch tokens with your voice.</p>
 
               <div className="space-y-2.5 text-[13px]">
-                <div className="rounded-2xl bg-white/[0.03] p-3">
+                <div className="rounded-2xl bg-white/[0.07] p-3">
                   <p className="font-bold text-white/85">1. Get your auth code</p>
-                  <p className="text-white/55 mt-0.5">Go to <Link to="/supercomputer?tab=launchpad" className="font-semibold" style={{ color: GOLD }}>Connection Settings</Link> and copy your code.</p>
+                  <p className="text-white/85 mt-0.5">Go to <Link to="/supercomputer?tab=launchpad" className="font-semibold" style={{ color: GOLD }}>Connection Settings</Link> and copy your code.</p>
                 </div>
-                <div className="rounded-2xl bg-white/[0.03] p-3">
+                <div className="rounded-2xl bg-white/[0.07] p-3">
                   <p className="font-bold text-white/85">2. Add the MCP server</p>
-                  <p className="text-white/55 mt-0.5">Paste this URL into your AI's MCP settings:</p>
+                  <p className="text-white/85 mt-0.5">Paste this URL into your AI's MCP settings:</p>
                   <code className="mt-1.5 block rounded-xl bg-black/50 px-3 py-2 text-[11px] break-all font-mono" style={{ color: GOLD }}>
                     https://www.orbitx.world/api/mcp-launchpad
                   </code>
                 </div>
-                <div className="rounded-2xl bg-white/[0.03] p-3">
+                <div className="rounded-2xl bg-white/[0.07] p-3">
                   <p className="font-bold text-white/85">3. Say it</p>
-                  <p className="text-white/55 mt-0.5 italic">"Launch a meme coin called MoonDog on pump.fun"</p>
+                  <p className="text-white/85 mt-0.5 italic">"Launch a meme coin called MoonDog on pump.fun"</p>
                 </div>
               </div>
 
@@ -878,10 +900,10 @@ export default function LaunchpadPage() {
               </div>
 
               <div className="mt-3 pt-3 border-t border-white/[0.06] flex justify-center gap-4 text-[12px]">
-                <a href="#" className="text-white/45 hover:text-white/70">Terms</a>
-                <a href="#" className="text-white/45 hover:text-white/70">Whitepaper</a>
-                <a href="https://x.com/orbitx_wrld" target="_blank" rel="noreferrer" className="text-white/45 hover:text-white/70">X</a>
-                <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="text-white/45 hover:text-white/70">Telegram</a>
+                <a href="#" className="text-white/70 hover:text-white/70">Terms</a>
+                <a href="#" className="text-white/70 hover:text-white/70">Whitepaper</a>
+                <a href="https://x.com/orbitx_wrld" target="_blank" rel="noreferrer" className="text-white/70 hover:text-white/70">X</a>
+                <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="text-white/70 hover:text-white/70">Telegram</a>
               </div>
             </div>
           </>
@@ -902,7 +924,7 @@ export default function LaunchpadPage() {
                       ? { border: `1.5px solid ${GOLD}`, background: `${GOLD}0f` }
                       : { border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}>
                     <p className="font-bold uppercase text-[13px]">{lp}</p>
-                    <p className="text-[11px] text-white/50 mt-0.5">{lp === "pump" ? "Solana" : lp === "stonk" ? "Stocks" : "Robinhood"}</p>
+                    <p className="text-[11px] text-white/75 mt-0.5">{lp === "pump" ? "Solana" : lp === "stonk" ? "Stocks" : "Robinhood"}</p>
                   </button>
                 ))}
               </div>
@@ -912,10 +934,10 @@ export default function LaunchpadPage() {
                 className="w-full rounded-2xl p-3.5 flex items-center justify-between transition-all"
                 style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}>
                 <div className="text-left">
-                  <p className="text-[11px] text-white/50 uppercase font-semibold">Trading pair</p>
+                  <p className="text-[11px] text-white/75 uppercase font-semibold">Trading pair</p>
                   <p className="text-[15px] font-bold" style={{ color: GOLD }}>{getPairName(pair)}</p>
                 </div>
-                <span className="text-white/40">›</span>
+                <span className="text-white/65">›</span>
               </button>
 
               {showPairPicker && (
@@ -927,7 +949,7 @@ export default function LaunchpadPage() {
                     <p className="text-[17px] font-bold mb-4">Select pair</p>
                     {PAIR_GROUPS.map((g) => (
                       <div key={g.label} className="mb-4">
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-white/40 mb-2">{g.label}</p>
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-white/65 mb-2">{g.label}</p>
                         <div className="grid grid-cols-2 gap-2">
                           {g.pairs.map((p) => (
                             <button key={p.key} onClick={() => { setPair(p.key); setShowPairPicker(false); }}
@@ -955,7 +977,7 @@ export default function LaunchpadPage() {
                 style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}>
                 <div className="text-left">
                   <p className="text-[14px] font-bold">⚡ Jito Bundle</p>
-                  <p className="text-[12px] text-white/50">Atomic launch — anti-sniper</p>
+                  <p className="text-[12px] text-white/75">Atomic launch — anti-sniper</p>
                 </div>
                 <div className="w-11 h-6 rounded-full p-0.5 transition-colors" style={{ background: showJito ? GOLD : "rgba(255,255,255,0.15)" }}>
                   <div className="h-5 w-5 rounded-full bg-white transition-transform" style={{ transform: showJito ? "translateX(20px)" : "translateX(0)" }} />
@@ -968,7 +990,7 @@ export default function LaunchpadPage() {
                 {launching ? "Launching…" : `Launch on ${launchpad}`}
               </button>
 
-              <div className="rounded-2xl bg-white/[0.03] border border-white/[0.07] p-3 text-[12px] text-white/60">
+              <div className="rounded-2xl bg-white/[0.07] border border-white/[0.07] p-3 text-[12px] text-white/60">
                 <span className="font-semibold text-white/80">⛽ Gas</span> — ~$1 per launch. Keep $4 in your desk for multiple.
               </div>
 
@@ -990,7 +1012,7 @@ export default function LaunchpadPage() {
             <h1 className="text-[24px] font-bold tracking-tight">Trade</h1>
             <p className="mt-1 text-[13px] text-white/60">Desk wallet signs. Same as MCP.</p>
             <div className="mt-4 rounded-[28px] bg-[#0c0c12] border border-white/[0.07] p-5 space-y-3.5">
-              <div className="grid grid-cols-2 gap-2 p-1 rounded-full bg-white/[0.04]">
+              <div className="grid grid-cols-2 gap-2 p-1 rounded-full bg-white/[0.09]">
                 {(["buy", "sell"] as const).map((s) => (
                   <button key={s} onClick={() => setTradeSide(s)}
                     className="rounded-full py-2.5 font-bold uppercase text-[13px] transition-all"
@@ -1039,7 +1061,7 @@ export default function LaunchpadPage() {
                   {tradeResult}
                 </p>
               )}
-              <p className="text-[12px] text-white/45 text-center">Jupiter routing · desk wallet signs</p>
+              <p className="text-[12px] text-white/70 text-center">Jupiter routing · desk wallet signs</p>
             </div>
           </div>
         )}
