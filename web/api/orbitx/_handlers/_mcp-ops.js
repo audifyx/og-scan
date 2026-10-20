@@ -117,6 +117,16 @@ async function preparePumpClaimLocal(publicKey, quoteMint) {
     const [eventAuthority] = PublicKey.findProgramAddressSync([seed(PUMP_EVENT_AUTHORITY_SEED)], programId);
     const creatorAta = getAssociatedTokenAddressSync(qMint, creator, true, TOKEN_PROGRAM_ID);
     const vaultAta = getAssociatedTokenAddressSync(qMint, vault, true, TOKEN_PROGRAM_ID);
+    // Only add the quote-claim instruction if the vault's token account exists.
+    // A missing vault ATA means no quote fees accrued — including the instruction
+    // makes the whole tx fail with InvalidAccountData.
+    let vaultAtaExists = false;
+    try {
+      const conn = new web3.Connection(PUBLIC_SOLANA_RPC, "confirmed");
+      const info = await conn.getAccountInfo(vaultAta);
+      vaultAtaExists = !!info;
+    } catch {}
+    if (vaultAtaExists) {
     tx.add(new TransactionInstruction({
       programId,
       keys: [
@@ -133,6 +143,7 @@ async function preparePumpClaimLocal(publicKey, quoteMint) {
       ],
       data: Uint8Array.from(COLLECT_CREATOR_FEE_V2_DISCRIMINATOR),
     }));
+    }
   }
   return {
     ok: true,
