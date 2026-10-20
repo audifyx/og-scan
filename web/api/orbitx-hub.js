@@ -6197,52 +6197,50 @@ async function handleLaunchpadMcp(req, res) {
   const body = await readBody(req);
   const { jsonrpc, id, method, params } = body || {};
 
-  // Auth resolution -- uses the SHARED validators (same as main Agent MCP):
-  //  1. Bearer token (API key oxk_ / OAuth oxo_/oxc_) via resolveAuth()
-  //  2. link-auth authCode (params, params.arguments, or params._meta) via resolveAgentLinkAuth()
-  //  3. Bound MCP session via mcp-session-id header
-  // Credentials are never logged or echoed in errors.
+  // Extract auth from bearer token or authCode
   let auth = null;
-  const rawAuthCode = params?.authCode || params?.arguments?.authCode || params?._meta?.authCode || null;
-  if (rawAuthCode) auth = { authCode: String(rawAuthCode) };
-
-  // 1. Bearer / API-key / OAuth session via shared validator
   try {
-    const bearerAuth = await resolveAuth(req);
-    if (bearerAuth?.userId) {
-      auth = {
-        ...(auth || {}),
-        userId: bearerAuth.userId,
-        agentId: bearerAuth.agentId || null,
-        walletAddress: bearerAuth.walletAddress || null,
-        source: bearerAuth.source || "bearer",
-      };
-    }
+    const authHeader = req.headers?.authorization || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    if (token) auth = { token };
+    const rawAuthCode = params?.authCode || params?.arguments?.authCode;
+    if (rawAuthCode) auth = { ...(auth || {}), authCode: rawAuthCode };
   } catch {}
 
-  // 2 + 3. Link-auth code and/or bound session via shared validator
-  if (!auth?.userId) {
+  // Resolve authCode to userId via the shared agent link-auth flow
+  // (same mcp_link_sessions table the main Agent MCP uses)
+  // Accepts BOTH main MCP codes and launchpad-scoped codes — one auth connects both
+  if (auth?.authCode && !auth?.userId) {
     try {
       const link = await resolveAgentLinkAuth({
-        authCode: rawAuthCode || "",
+        authCode: auth.authCode,
         mcpSessionId: req.headers?.["mcp-session-id"] || "",
       });
       if (link?.userId) {
-        auth = { ...(auth || {}), userId: link.userId, agentId: link.agentId || null, walletAddress: link.walletAddress || null, source: link.source || "link_auth" };
+        auth = { ...auth, userId: link.userId, username: link.username || null, walletAddress: link.walletAddress || null };
+      } else {
+        // Fallback: accept ANY valid non-expired code from the shared table
+        const { sb } = await getSupabase();
+        if (sb) {
+          const rows = await sb(`mcp_link_sessions?code=eq.${encodeURIComponent(auth.authCode)}&select=*&limit=1`);
+          const row = Array.isArray(rows) ? rows[0] : null;
+          if (row?.user_id && new Date(row.expires_at).getTime() >= Date.now()) {
+            auth = { ...auth, userId: row.user_id, username: null, walletAddress: row.wallet_address || null };
+          }
+        }
       }
     } catch {}
   }
 
-  // Fallback: launchpad-scoped codes stored with scope='launchpad' (no mcp_kind)
-  if (!auth?.userId && rawAuthCode) {
+  // Also resolve by session ID if no authCode was provided (ChatGPT session flow)
+  if (!auth?.userId && req.headers?.["mcp-session-id"]) {
     try {
-      const { sb } = await getSupabase();
-      if (sb) {
-        const rows = await sb(`mcp_link_sessions?code=eq.${encodeURIComponent(rawAuthCode)}&select=*&limit=1`);
-        const row = Array.isArray(rows) ? rows[0] : null;
-        if (row?.user_id && new Date(row.expires_at).getTime() >= Date.now()) {
-          auth = { ...(auth || {}), userId: row.user_id, walletAddress: row.wallet_address || null, source: "launchpad_code" };
-        }
+      const link = await resolveAgentLinkAuth({
+        authCode: "",
+        mcpSessionId: req.headers["mcp-session-id"],
+      });
+      if (link?.userId) {
+        auth = { ...(auth || {}), userId: link.userId, username: link.username || null, walletAddress: link.walletAddress || null };
       }
     } catch {}
   }

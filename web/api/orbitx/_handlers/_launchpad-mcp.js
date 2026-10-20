@@ -30,7 +30,6 @@ export const LAUNCHPAD_TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        authCode: { type: "string", description: "Your OrbitX auth code (same as main MCP). Get one at https://www.orbitx.world/agent" },
         name: { type: "string", description: "Token name (must be unique)" },
         symbol: { type: "string", description: "Token symbol (must be unique)" },
         description: { type: "string", description: "Token description" },
@@ -93,7 +92,6 @@ export const LAUNCHPAD_TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        authCode: { type: "string", description: "Your OrbitX auth code (same as main MCP). Get one at https://www.orbitx.world/agent" },
         mint: { type: "string", description: "Token mint" },
         amount: { type: "number", description: "Amount in SOL/ETH to spend" },
         slippage_bps: { type: "number", description: "Slippage in bps (default 500)" },
@@ -108,7 +106,6 @@ export const LAUNCHPAD_TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        authCode: { type: "string", description: "Your OrbitX auth code (same as main MCP). Get one at https://www.orbitx.world/agent" },
         mint: { type: "string", description: "Token mint" },
         amount_tokens: { type: "number", description: "Tokens to sell (or 'all')" },
         slippage_bps: { type: "number", description: "Slippage in bps (default 500)" },
@@ -122,7 +119,6 @@ export const LAUNCHPAD_TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        authCode: { type: "string", description: "Your OrbitX auth code (same as main MCP). Get one at https://www.orbitx.world/agent" },
         mint: { type: "string", description: "Token mint" },
         launchpad: { type: "string", enum: ["pump", "stonk", "pons"], description: "Launchpad" },
       },
@@ -135,7 +131,6 @@ export const LAUNCHPAD_TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        authCode: { type: "string", description: "Your OrbitX auth code (same as main MCP). Get one at https://www.orbitx.world/agent" },
         chain: { type: "string", enum: ["solana", "robinhood", "all"], description: "Filter by chain" },
       },
     },
@@ -144,8 +139,7 @@ export const LAUNCHPAD_TOOLS = [
     name: "launchpad_wallets",
     description: "Check all your launchpad wallets — Solana desk + Robinhood Chain.",
     _meta: { ui: { resourceUri: "ui://orbitx-launchpad/wallet-dashboard" } },
-    inputSchema: { type: "object", properties: {
-        authCode: { type: "string", description: "Your OrbitX auth code (same as main MCP). Get one at https://www.orbitx.world/agent" },} },
+    inputSchema: { type: "object", properties: {} },
   },
   {
     name: "launchpad_graduations",
@@ -156,25 +150,6 @@ export const LAUNCHPAD_TOOLS = [
         launchpad: { type: "string", enum: ["pump", "stonk", "pons", "all"], description: "Filter" },
         limit: { type: "number", description: "Max results (default 10)" },
       },
-    },
-  },
-  {
-    name: "launchpad_dry_run",
-    description: "Validate a launch WITHOUT spending funds — checks name/ticker uniqueness, pair support, vanity mint, required params, and estimated costs. Use this before launchpad_launch.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        authCode: { type: "string", description: "Your OrbitX auth code (same as main MCP)" },
-        name: { type: "string", description: "Token name" },
-        symbol: { type: "string", description: "Token symbol/ticker" },
-        description: { type: "string", description: "Token description" },
-        launchpad: { type: "string", enum: ["pump", "stonk", "pons"], description: "Launchpad (default pump)" },
-        pair: { type: "string", description: "Trading pair (default sol; usdc supported on pump)" },
-        style: { type: "string", enum: ["standard", "custom_pair", "jito_bundle", "memecoin_quote"], description: "Launch style (default standard)" },
-        dev_buy_sol: { type: "number", description: "Dev buy amount in SOL (default 0)" },
-        vanity: { type: "boolean", description: "Vanity mint ending in 'obx' (default true, Solana only)" },
-      },
-      required: ["name", "symbol"],
     },
   },
   {
@@ -340,91 +315,6 @@ export async function handleLaunchpadTool(name, args, ctx) {
       ok: true,
       graduations: grads || [],
       count: (grads || []).length,
-    };
-  }
-
-  if (name === "launchpad_dry_run") {
-    // Non-financial validation — verifies everything about a launch without submitting a transaction.
-    const { name: tokenName, symbol } = args;
-    const checks = [];
-    const errors = [];
-
-    // 1. Required params
-    if (!tokenName) errors.push("name is required");
-    if (!symbol) errors.push("symbol is required");
-    checks.push({ check: "required_params", pass: !!(tokenName && symbol) });
-
-    // 2. Name/symbol uniqueness (case-insensitive)
-    let nameUnique = true, symbolUnique = true;
-    try {
-      if (tokenName && symbol) {
-        const existing = await sbQuery("launchpad_tokens", "GET", null,
-          `?select=name,symbol&or=(name.ilike.${encodeURIComponent(tokenName)},symbol.ilike.${encodeURIComponent(symbol)})&limit=5`);
-        if (existing?.length) {
-          nameUnique = !existing.some(t => t.name?.toLowerCase() === tokenName.toLowerCase());
-          symbolUnique = !existing.some(t => t.symbol?.toLowerCase() === symbol.toLowerCase());
-          if (!nameUnique) errors.push(`Name "${tokenName}" is already taken`);
-          if (!symbolUnique) errors.push(`Symbol "${symbol}" is already taken`);
-        }
-      }
-    } catch {}
-    checks.push({ check: "name_unique", pass: nameUnique });
-    checks.push({ check: "symbol_unique", pass: symbolUnique });
-
-    // 3. Launchpad + pair support
-    const launchpadId = (args.launchpad || "pump").toLowerCase();
-    const pair = (args.pair || "sol").toLowerCase();
-    const validLaunchpads = ["pump", "stonk", "pons"];
-    const launchpadValid = validLaunchpads.includes(launchpadId);
-    if (!launchpadValid) errors.push(`Unknown launchpad: ${launchpadId}. Use: pump, stonk, pons`);
-    checks.push({ check: "launchpad_valid", pass: launchpadValid });
-
-    // Pair support matrix
-    const pairSupport = {
-      pump: ["sol", "usdc", "nvda", "tsla", "ba", "baba", "dell", "openai", "anthropic", "anduril", "neuralink", "figure", "kalshi", "polymarket", "oura", "wbtc", "weth", "gold", "silver"],
-      stonk: ["spyx", "nvdax", "sol", "usdc"],
-      pons: ["eth", "usdc"],
-    };
-    const pairValid = (pairSupport[launchpadId] || []).includes(pair);
-    if (!pairValid) errors.push(`Pair "${pair}" not supported on ${launchpadId}. Supported: ${(pairSupport[launchpadId] || []).join(", ")}`);
-    checks.push({ check: "pair_supported", pass: pairValid, pair, launchpad: launchpadId });
-
-    // 4. Vanity mint (Solana only)
-    const vanity = args.vanity !== false;
-    const vanityOk = launchpadId === "pump" ? true : !vanity; // vanity only on Solana/pump
-    if (launchpadId !== "pump" && vanity) errors.push("Vanity mint (obx) is only available on Solana/pump.fun");
-    checks.push({ check: "vanity_mint", pass: vanityOk, suffix: vanity && launchpadId === "pump" ? "obx" : null });
-
-    // 5. Style validation
-    const style = args.style || "standard";
-    const validStyles = ["standard", "custom_pair", "jito_bundle", "memecoin_quote"];
-    const styleValid = validStyles.includes(style);
-    if (!styleValid) errors.push(`Unknown style: ${style}`);
-    checks.push({ check: "style_valid", pass: styleValid, style });
-
-    // 6. Estimated costs (no funds spent)
-    const devBuy = Number(args.dev_buy_sol || 0);
-    const gasEstimateUsd = launchpadId === "pons" ? 0.50 : 1.00; // ~$1 SOL, ~$0.50 RH
-    const estimatedCostUsd = gasEstimateUsd + devBuy * 150; // rough SOL price
-    checks.push({
-      check: "estimated_cost",
-      pass: true,
-      gas_usd: gasEstimateUsd,
-      dev_buy_sol: devBuy,
-      total_usd: Number(estimatedCostUsd.toFixed(2)),
-      note: "Estimate only — no funds spent in dry run",
-    });
-
-    const allPass = errors.length === 0;
-    return {
-      ok: allPass,
-      dry_run: true,
-      message: allPass
-        ? `Dry run passed for "${tokenName}" (${symbol}) on ${launchpadId}/${pair}. Ready to launch.`
-        : `Dry run found ${errors.length} issue(s).`,
-      errors,
-      checks,
-      params: { name: tokenName, symbol, launchpad: launchpadId, pair, style, dev_buy_sol: devBuy, vanity },
     };
   }
 
