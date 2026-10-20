@@ -493,12 +493,17 @@ export async function handleLaunchpadTool(name, args, ctx) {
 
       // Route to the correct launchpad
       const { routeLaunch } = await import("./_launchpads.js");
+      // Map pair string → quote mint address (pump: sol = native, usdc = USDC mint)
+      const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+      const quoteMint = pair === "usdc" ? USDC_MINT : (args.quote_mint || null);
       const launchResult = await routeLaunch(launchpadId, {
         name: tokenName,
         symbol: symbol.toUpperCase(),
         uri,
         mintKeypair,
+        quoteMint,
         quote: pair,
+        devBuySol: args.dev_buy_sol || 0,
         devBuy: args.dev_buy_sol || 0,
         jito: useJito,
         jitoTip: args.jito_tip || 0.01,
