@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OrbitX Launchpad — Tokens</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+  :root {
+    --bg: #0a0a0a;
+    --card: #121215;
+    --card-hover: #17171c;
+    --border: rgba(255, 255, 255, 0.07);
+    --border-hover: rgba(59, 130, 246, 0.35);
+    --blue: #3b82f6;
+    --purple: #a855f7;
+    --green: #22c55e;
+    --red: #ef4444;
+    --text: #ffffff;
+    --text-dim: rgba(255, 255, 255, 0.55);
+    --text-faint: rgba(255, 255, 255, 0.32);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100%;
+  }
+
+  body {
+    padding: 20px 16px 28px;
+  }
+
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--blue), var(--purple));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 900;
+    box-shadow: 0 4px 24px rgba(59, 130, 246, 0.35);
+    flex-shrink: 0;
+  }
+
+  .header-text h1 {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .header-text p {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+    animation: pulse 2s infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+    70% { box-shadow: 0 0 0 7px rgba(34, 197, 94, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+  }
+
+  /* ── Grid ── */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  @media (min-width: 560px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 16px;
+    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-hover);
+    background: var(--card-hover);
+  }
+
+  .card-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .token-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #1e3a8a, #6b21a8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 900;
+    color: rgba(255, 255, 255, 0.75);
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .token-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .token-name-wrap {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .token-name {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .token-symbol {
+    display: inline-block;
+    margin-top: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #93c5fd;
+    background: rgba(59, 130, 246, 0.14);
+    border: 1px solid rgba(59, 130, 246, 0.22);
+    border-radius: 999px;
+    padding: 2px 8px;
+  }
+
+  .change-badge {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+
+  .change-badge.up {
+    color: var(--green);
+    background: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+  }
+
+  .change-badge.down {
+    color: var(--red);
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+  }
+
+  .change-badge.flat {
+    color: var(--text-dim);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border);
+  }
+
+  /* ── Stats row ── */
+  .stats {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .price-block .label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+    margin-bottom: 3px;
+  }
+
+  .price-block .price {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mcap-block {
+    text-align: right;
+  }
+
+  .mcap-block .label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+    margin-bottom: 3px;
+  }
+
+  .mcap-block .mcap {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sparkline {
+    width: 96px;
+    height: 34px;
+    flex-shrink: 0;
+  }
+
+  .sparkline svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+  }
+
+  /* ── Buy button ── */
+  .buy-btn {
+    width: 100%;
+    border: none;
+    cursor: pointer;
+    border-radius: 13px;
+    padding: 11px 16px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    color: #fff;
+    background: linear-gradient(135deg, var(--blue), var(--purple));
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+    box-shadow: 0 4px 18px rgba(59, 130, 246, 0.28);
+  }
+
+  .buy-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.1);
+    box-shadow: 0 6px 24px rgba(59, 130, 246, 0.4);
+  }
+
+  .buy-btn:active {
+    transform: translateY(0);
+    filter: brightness(0.95);
+  }
+
+  .buy-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+    transform: none;
+  }
+
+  /* ── States ── */
+  .state {
+    text-align: center;
+    padding: 56px 24px;
+    color: var(--text-dim);
+  }
+
+  .state .icon {
+    font-size: 44px;
+    margin-bottom: 14px;
+    display: block;
+  }
+
+  .state h2 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .state p {
+    font-size: 13px;
+    line-height: 1.55;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+
+  .spinner {
+    width: 38px;
+    height: 38px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    border: 3px solid rgba(59, 130, 246, 0.2);
+    border-top-color: var(--blue);
+    animation: spin 0.9s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-faint);
+  }
+
+  .footer strong {
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #1a1a1f;
+    border: 1px solid var(--border-hover);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 11px 20px;
+    border-radius: 999px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 100;
+    max-width: calc(100vw - 48px);
+    text-align: center;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">🚀</div>
+      <div class="header-text">
+        <h1>OrbitX Launchpad</h1>
+        <p><span class="live-dot"></span><span id="subtitle">Loading tokens…</span></p>
+      </div>
+    </div>
+
+    <div id="content">
+      <div class="state" id="loading-state">
+        <div class="spinner"></div>
+        <h2>Loading tokens</h2>
+        <p>Fetching the latest launches from the OrbitX Launchpad…</p>
+      </div>
+    </div>
+
+    <div class="footer">
+      Powered by <strong>OrbitX Launchpad MCP</strong> · Trades execute via your AI
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var content = document.getElementById('content');
+  var subtitle = document.getElementById('subtitle');
+  var toast = document.getElementById('toast');
+  var msgId = 1;
+  var pendingCalls = {};
+  var tokensCache = [];
+
+  /* ── Bridge ── */
+  function send(method, params) {
+    var id = msgId++;
+    return new Promise(function (resolve) {
+      pendingCalls[id] = resolve;
+      window.parent.postMessage(
+        { jsonrpc: '2.0', id: id, method: method, params: params || {} },
+        '*'
+      );
+      // Safety timeout so we never hang forever
+      setTimeout(function () {
+        if (pendingCalls[id]) {
+          delete pendingCalls[id];
+          resolve(null);
+        }
+      }, 15000);
+    });
+  }
+
+  window.addEventListener('message', function (event) {
+    var msg = event.data;
+    if (!msg || typeof msg !== 'object') return;
+
+    // Response to one of our requests
+    if (msg.id && pendingCalls[msg.id]) {
+      var resolve = pendingCalls[msg.id];
+      delete pendingCalls[msg.id];
+      resolve(msg.result !== undefined ? msg.result : msg);
+      return;
+    }
+
+    // Push-style data delivery
+    if (msg.method === 'ui/data' && msg.params) {
+      onData(msg.params);
+    }
+  });
+
+  /* ── Toast ── */
+  var toastTimer = null;
+  function showToast(text) {
+    toast.textContent = text;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      toast.classList.remove('show');
+    }, 2600);
+  }
+
+  /* ── Formatters ── */
+  function fmtUsd(n) {
+    if (n == null || isNaN(n)) return '—';
+    if (n >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
+    if (n >= 1) return '$' + n.toFixed(2);
+    if (n > 0) return '$' + n.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
+    return '$0.00';
+  }
+
+  function fmtMcap(n) {
+    if (n == null || isNaN(n)) return '—';
+    if (n >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
+    return '$' + Math.round(n).toLocaleString('en-US');
+  }
+
+  function fmtChange(pct) {
+    if (pct == null || isNaN(pct)) return { text: '—', cls: 'flat', arrow: '' };
+    var arrow = pct > 0 ? '▲ ' : pct < 0 ? '▼ ' : '';
+    return {
+      text: arrow + Math.abs(pct).toFixed(1) + '%',
+      cls: pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat'
+    };
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /* ── Sparkline ── */
+  function sparklineSvg(history, changePct) {
+    var w = 96, h = 34, pad = 3;
+    var color = '#8b93a3'; // neutral default
+    if (changePct > 0) color = '#22c55e';
+    else if (changePct < 0) color = '#ef4444';
+
+    var points;
+    if (Array.isArray(history) && history.length >= 2) {
+      var vals = history.filter(function (v) { return typeof v === 'number' && isFinite(v); });
+      if (vals.length >= 2) {
+        var min = Math.min.apply(null, vals);
+        var max = Math.max.apply(null, vals);
+        var range = (max - min) || 1;
+        points = vals.map(function (v, i) {
+          var x = pad + (i / (vals.length - 1)) * (w - pad * 2);
+          var y = pad + (1 - (v - min) / range) * (h - pad * 2);
+          return [x.toFixed(1), y.toFixed(1)];
+        });
+      }
+    }
+
+    // Placeholder: gentle flat-ish wave when no history
+    if (!points) {
+      var mid = h / 2;
+      points = [];
+      var n = 14;
+      for (var i = 0; i < n; i++) {
+        var x = pad + (i / (n - 1)) * (w - pad * 2);
+        var y = mid + Math.sin(i * 1.1) * 3.5;
+        points.push([x.toFixed(1), y.toFixed(1)]);
+      }
+    }
+
+    var line = points.map(function (p) { return p.join(','); }).join(' ');
+    var areaId = 'sg' + Math.random().toString(36).slice(2, 9);
+    var area = line + ' ' + (w - pad) + ',' + h + ' ' + pad + ',' + h;
+
+    return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+      '<defs><linearGradient id="' + areaId + '" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.28"/>' +
+      '<stop offset="100%" stop-color="' + color + '" stop-opacity="0"/>' +
+      '</linearGradient></defs>' +
+      '<polygon points="' + area + '" fill="url(#' + areaId + ')"/>' +
+      '<polyline points="' + line + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '</svg>';
+  }
+
+  /* ── Render ── */
+  function renderTokens(tokens) {
+    tokensCache = tokens || [];
+
+    if (!tokensCache.length) {
+      subtitle.textContent = 'No launches yet';
+      content.innerHTML =
+        '<div class="state">' +
+          '<span class="icon">🌑</span>' +
+          '<h2>No tokens yet</h2>' +
+          '<p>Nothing has launched on the OrbitX Launchpad yet. Ask your AI to launch the first one — it takes seconds.</p>' +
+        '</div>';
+      return;
+    }
+
+    subtitle.innerHTML = '<span class="live-dot"></span>' + tokensCache.length + ' token' + (tokensCache.length === 1 ? '' : 's') + ' live';
+
+    var html = '<div class="grid">';
+    tokensCache.forEach(function (t, idx) {
+      var change = fmtChange(t.price_change_24h);
+      var initial = esc((t.symbol || '?').charAt(0).toUpperCase());
+      var iconHtml = t.image_url
+        ? '<img src="' + esc(t.image_url) + '" alt="' + esc(t.symbol) + '" loading="lazy" onerror="this.remove()">'
+        : initial;
+
+      html +=
+        '<div class="card">' +
+          '<div class="card-top">' +
+            '<div class="token-icon">' + iconHtml + '</div>' +
+            '<div class="token-name-wrap">' +
+              '<div class="token-name">' + esc(t.name || 'Unknown') + '</div>' +
+              '<span class="token-symbol">$' + esc(t.symbol || '?') + '</span>' +
+            '</div>' +
+            '<span class="change-badge ' + change.cls + '">' + esc(change.text) + '</span>' +
+          '</div>' +
+          '<div class="stats">' +
+            '<div class="price-block">' +
+              '<div class="label">Price</div>' +
+              '<div class="price">' + fmtUsd(t.price_usd) + '</div>' +
+            '</div>' +
+            '<div class="sparkline">' + sparklineSvg(t.price_history, t.price_change_24h) + '</div>' +
+            '<div class="mcap-block">' +
+              '<div class="label">MCap</div>' +
+              '<div class="mcap">' + fmtMcap(t.market_cap_usd) + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<button class="buy-btn" data-idx="' + idx + '">Buy $' + esc(t.symbol || '?') + '</button>' +
+        '</div>';
+    });
+    html += '</div>';
+
+    content.innerHTML = html;
+
+    // Wire up buy buttons
+    var btns = content.querySelectorAll('.buy-btn');
+    btns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var t = tokensCache[parseInt(btn.getAttribute('data-idx'), 10)];
+        if (t) onBuy(t, btn);
+      });
+    });
+  }
+
+  /* ── Buy flow ── */
+  function onBuy(token, btn) {
+    btn.disabled = true;
+    var original = btn.textContent;
+    btn.textContent = 'Opening…';
+
+    send('ui/tool-call', {
+      tool: 'launchpad_buy',
+      arguments: { mint: token.mint }
+    }).then(function () {
+      showToast('Buy request sent for $' + (token.symbol || '?') + ' — check the chat for confirmation.');
+    }).catch(function () {
+      showToast('Could not reach the host. Try asking in chat instead.');
+    }).then(function () {
+      btn.disabled = false;
+      btn.textContent = original;
+    });
+  }
+
+  /* ── Data entry ── */
+  function onData(params) {
+    var tokens = params.tokens || params.data || [];
+    if (!Array.isArray(tokens)) tokens = [];
+    renderTokens(tokens);
+  }
+
+  /* ── Boot ── */
+  function boot() {
+    send('ui/request-data', {}).then(function (result) {
+      if (result) {
+        var tokens = result.tokens || result.data || [];
+        if (Array.isArray(tokens) && tokens.length) {
+          onData({ tokens: tokens });
+          return;
+        }
+        // Some hosts return the payload nested under result.params
+        if (result.params && Array.isArray(result.params.tokens)) {
+          onData({ tokens: result.params.tokens });
+          return;
+        }
+      }
+      // No inline result — wait for a pushed ui/data message.
+      // If nothing arrives, show a gentle hint after a beat.
+      setTimeout(function () {
+        if (!tokensCache.length && document.getElementById('loading-state')) {
+          subtitle.textContent = 'Waiting for data…';
+        }
+      }, 4000);
+    });
+  }
+
+  // Fallback: if the host never speaks MCP Apps, show demo-free empty state
+  // rather than spinning forever (host may render this UI without a bridge).
+  setTimeout(function () {
+    if (document.getElementById('loading-state') && !tokensCache.length) {
+      // Keep loading — a real host will push ui/data shortly.
+    }
+  }, 12000);
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+</body>
+</html>

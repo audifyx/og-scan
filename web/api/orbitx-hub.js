@@ -6253,6 +6253,73 @@ async function handleLaunchpadMcp(req, res) {
     });
   }
 
+  // MCP Apps UI resources (SEP-1865) — interactive UIs for ChatGPT/Claude
+  if (method === "resources/list") {
+    return json(res, {
+      jsonrpc: "2.0",
+      id,
+      result: {
+        resources: [
+          {
+            uri: "ui://orbitx-launchpad/token-cards",
+            name: "Token Cards",
+            description: "Interactive token cards with prices, sparklines, and buy buttons",
+            mimeType: "text/html;profile=mcp-app",
+          },
+          {
+            uri: "ui://orbitx-launchpad/trade-confirm",
+            name: "Trade Confirmation",
+            description: "Buy/sell confirmation panel with order details and sniper tax warning",
+            mimeType: "text/html;profile=mcp-app",
+          },
+          {
+            uri: "ui://orbitx-launchpad/wallet-dashboard",
+            name: "Wallet Dashboard",
+            description: "Visual wallet portfolio with holdings and allocation",
+            mimeType: "text/html;profile=mcp-app",
+          },
+        ],
+      },
+    });
+  }
+
+  if (method === "resources/read") {
+    const uri = params?.uri || "";
+    const { readFile } = await import("node:fs/promises");
+    const { join, dirname } = await import("node:path");
+    const { fileURLToPath } = await import("node:url");
+    const uiMap = {
+      "ui://orbitx-launchpad/token-cards": "_mcp-ui/token-cards.html",
+      "ui://orbitx-launchpad/trade-confirm": "_mcp-ui/trade-confirm.html",
+      "ui://orbitx-launchpad/wallet-dashboard": "_mcp-ui/wallet-dashboard.html",
+    };
+    const file = uiMap[uri];
+    if (!file) {
+      return json(res, {
+        jsonrpc: "2.0",
+        id,
+        error: { code: -32002, message: `Resource not found: ${uri}` },
+      });
+    }
+    try {
+      const here = dirname(fileURLToPath(import.meta.url));
+      const html = await readFile(join(here, "orbitx/_handlers", file), "utf-8");
+      return json(res, {
+        jsonrpc: "2.0",
+        id,
+        result: {
+          contents: [{ uri, mimeType: "text/html;profile=mcp-app", text: html }],
+        },
+      });
+    } catch (e) {
+      return json(res, {
+        jsonrpc: "2.0",
+        id,
+        error: { code: -32003, message: `Failed to read UI resource: ${e.message}` },
+      });
+    }
+  }
+
   if (method === "tools/call") {
     const name = params?.name;
     const args = params?.arguments || {};

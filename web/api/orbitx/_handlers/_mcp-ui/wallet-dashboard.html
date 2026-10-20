@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OrbitX Launchpad Wallet</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #0a0a0a;
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 20px 16px 28px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo {
+    width: 36px; height: 36px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #3b82f6, #a855f7);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 4px 18px rgba(139, 92, 246, .35);
+  }
+  .brand h1 { font-size: 15px; font-weight: 800; letter-spacing: .2px; }
+  .brand p { font-size: 11px; color: rgba(255,255,255,.45); margin-top: 2px; }
+  .live {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 10px; font-weight: 700; letter-spacing: 1.2px;
+    color: #34d399; text-transform: uppercase;
+  }
+  .live .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 0 0 rgba(52,211,153,.6);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(52,211,153,.55); }
+    70% { box-shadow: 0 0 0 8px rgba(52,211,153,0); }
+    100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); }
+  }
+
+  /* Hero balance card */
+  .hero {
+    border-radius: 20px;
+    padding: 24px 20px;
+    background:
+      radial-gradient(120% 140% at 0% 0%, rgba(59,130,246,.28) 0%, transparent 55%),
+      radial-gradient(120% 140% at 100% 100%, rgba(168,85,247,.24) 0%, transparent 55%),
+      rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.09);
+    margin-bottom: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero .label {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.6px;
+    color: rgba(255,255,255,.45); text-transform: uppercase;
+  }
+  .hero .total {
+    font-size: 40px; font-weight: 900; letter-spacing: -1px;
+    margin: 8px 0 4px;
+    background: linear-gradient(90deg, #fff, #c4b5fd);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero .sub {
+    font-size: 12px; color: rgba(255,255,255,.5);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sol-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(59,130,246,.16);
+    border: 1px solid rgba(59,130,246,.35);
+    color: #93c5fd;
+    font-size: 11px; font-weight: 700;
+    border-radius: 999px; padding: 3px 10px;
+  }
+
+  /* Allocation bar */
+  .alloc-card {
+    border-radius: 20px;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.08);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .alloc-card h2 {
+    font-size: 12px; font-weight: 700; letter-spacing: 1.2px;
+    color: rgba(255,255,255,.5); text-transform: uppercase; margin-bottom: 12px;
+  }
+  .alloc-bar {
+    display: flex; height: 12px; border-radius: 999px; overflow: hidden;
+    background: rgba(255,255,255,.06); gap: 2px;
+  }
+  .alloc-seg { height: 100%; min-width: 4px; border-radius: 999px; transition: width .6s ease; }
+  .alloc-legend {
+    display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 12px;
+  }
+  .alloc-legend .item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: rgba(255,255,255,.6);
+  }
+  .alloc-legend .sw { width: 9px; height: 9px; border-radius: 3px; }
+  .alloc-legend .pct { font-weight: 800; color: #fff; }
+
+  /* Token rows */
+  .holdings h2 {
+    font-size: 12px; font-weight: 700; letter-spacing: 1.2px;
+    color: rgba(255,255,255,.5); text-transform: uppercase; margin: 18px 0 10px;
+  }
+  .token {
+    display: flex; align-items: center; gap: 12px;
+    border-radius: 16px;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.08);
+    padding: 12px;
+    margin-bottom: 8px;
+    transition: border-color .2s, background .2s;
+  }
+  .token:hover { border-color: rgba(59,130,246,.4); background: rgba(255,255,255,.05); }
+  .token .icon {
+    width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+    background: linear-gradient(135deg, #1e3a8a, #6d28d9);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 18px; color: rgba(255,255,255,.75);
+    overflow: hidden;
+  }
+  .token .icon img { width: 100%; height: 100%; object-fit: cover; }
+  .token .meta { flex: 1; min-width: 0; }
+  .token .meta .name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .token .meta .sym {
+    display: inline-block; margin-top: 3px;
+    font-size: 10px; font-weight: 700;
+    background: rgba(59,130,246,.18); color: #93c5fd;
+    border-radius: 999px; padding: 2px 8px;
+  }
+  .token .vals { text-align: right; flex-shrink: 0; }
+  .token .vals .usd { font-size: 14px; font-weight: 800; }
+  .token .vals .amt { font-size: 11px; color: rgba(255,255,255,.45); margin-top: 3px; }
+  .sell-btn {
+    flex-shrink: 0;
+    font-size: 11px; font-weight: 800;
+    color: #fca5a5;
+    background: rgba(239,68,68,.1);
+    border: 1px solid rgba(239,68,68,.3);
+    border-radius: 10px; padding: 8px 12px;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .sell-btn:hover { background: rgba(239,68,68,.22); }
+  .sell-btn:active { transform: scale(.96); }
+
+  /* Actions */
+  .actions { display: flex; gap: 10px; margin-top: 18px; }
+  .btn {
+    flex: 1; border: none; cursor: pointer;
+    font-size: 14px; font-weight: 800;
+    border-radius: 16px; padding: 15px 12px;
+    transition: transform .15s, box-shadow .2s, opacity .2s;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn-launch {
+    color: #fff;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    box-shadow: 0 6px 24px rgba(168,85,247,.4);
+  }
+  .btn-launch:hover { box-shadow: 0 8px 30px rgba(168,85,247,.55); }
+  .btn-refresh {
+    color: rgba(255,255,255,.75);
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.12);
+    flex: 0 0 56px;
+  }
+  .btn-refresh:hover { background: rgba(255,255,255,.1); }
+  .btn-refresh.spinning { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* States */
+  .loading, .empty {
+    text-align: center; padding: 48px 20px;
+    border-radius: 20px;
+    background: rgba(255,255,255,.02);
+    border: 1px dashed rgba(255,255,255,.12);
+    margin-top: 14px;
+  }
+  .loading .spinner {
+    width: 34px; height: 34px; margin: 0 auto 14px;
+    border: 3px solid rgba(255,255,255,.12);
+    border-top-color: #a855f7;
+    border-radius: 50%;
+    animation: spin .9s linear infinite;
+  }
+  .loading p, .empty p { font-size: 13px; color: rgba(255,255,255,.5); }
+  .empty .rocket { font-size: 40px; margin-bottom: 12px; }
+  .empty h3 { font-size: 16px; font-weight: 800; margin-bottom: 6px; }
+  .empty .btn-launch { margin-top: 16px; flex: none; padding: 13px 28px; }
+
+  .error {
+    border-radius: 16px; padding: 14px 16px; margin-top: 14px;
+    background: rgba(239,68,68,.08);
+    border: 1px solid rgba(239,68,68,.3);
+    color: #fca5a5; font-size: 13px; text-align: center;
+  }
+  .hidden { display: none !important; }
+  .foot {
+    margin-top: 18px; text-align: center;
+    font-size: 10px; color: rgba(255,255,255,.3); letter-spacing: .4px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="brand">
+      <div class="logo">🚀</div>
+      <div>
+        <h1>Launchpad Wallet</h1>
+        <p>OrbitX desk wallet · via MCP</p>
+      </div>
+    </div>
+    <div class="live"><span class="dot"></span>Live</div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading" class="loading">
+    <div class="spinner"></div>
+    <p>Loading wallet…</p>
+  </div>
+
+  <!-- Error -->
+  <div id="error" class="error hidden"></div>
+
+  <!-- Dashboard -->
+  <div id="dash" class="hidden">
+    <div class="hero">
+      <div class="label">Total Balance</div>
+      <div class="total" id="total">$0.00</div>
+      <div class="sub">
+        <span class="sol-badge">◎ <span id="solBal">0</span> SOL</span>
+        <span id="tokCount"></span>
+      </div>
+    </div>
+
+    <div class="alloc-card" id="allocCard">
+      <h2>Allocation</h2>
+      <div class="alloc-bar" id="allocBar"></div>
+      <div class="alloc-legend" id="allocLegend"></div>
+    </div>
+
+    <div class="holdings">
+      <h2>Holdings</h2>
+      <div id="tokenList"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-launch" id="launchBtn">🚀 Launch a Token</button>
+      <button class="btn btn-refresh" id="refreshBtn" title="Refresh">↻</button>
+    </div>
+  </div>
+
+  <!-- Empty -->
+  <div id="empty" class="hidden">
+    <div class="empty">
+      <div class="rocket">🚀</div>
+      <h3>No holdings yet</h3>
+      <p>Launch your first token to get started.</p>
+      <button class="btn btn-launch" id="launchBtn2">Launch a Token</button>
+    </div>
+  </div>
+
+  <div class="foot">Powered by OrbitX Launchpad MCP</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var msgId = 0;
+  function nextId() { return ++msgId; }
+
+  var PALETTE = ["#3b82f6", "#a855f7", "#22d3ee", "#f59e0b", "#ec4899", "#34d399", "#f97316", "#8b5cf6"];
+
+  var el = {
+    loading: document.getElementById("loading"),
+    error: document.getElementById("error"),
+    dash: document.getElementById("dash"),
+    empty: document.getElementById("empty"),
+    total: document.getElementById("total"),
+    solBal: document.getElementById("solBal"),
+    tokCount: document.getElementById("tokCount"),
+    allocCard: document.getElementById("allocCard"),
+    allocBar: document.getElementById("allocBar"),
+    allocLegend: document.getElementById("allocLegend"),
+    tokenList: document.getElementById("tokenList"),
+    launchBtn: document.getElementById("launchBtn"),
+    launchBtn2: document.getElementById("launchBtn2"),
+    refreshBtn: document.getElementById("refreshBtn")
+  };
+
+  /* ---------- MCP Apps bridge ---------- */
+
+  function requestData() {
+    window.parent.postMessage(
+      { jsonrpc: "2.0", id: nextId(), method: "ui/request-data" },
+      "*"
+    );
+  }
+
+  function toolCall(tool, args) {
+    window.parent.postMessage(
+      { jsonrpc: "2.0", id: nextId(), method: "ui/tool-call", params: { tool: tool, arguments: args || {} } },
+      "*"
+    );
+  }
+
+  window.addEventListener("message", function (ev) {
+    var msg = ev.data;
+    if (!msg || typeof msg !== "object") return;
+
+    // MCP Apps data response
+    if (msg.method === "ui/data" || (msg.result && msg.id)) {
+      var data = msg.method === "ui/data" ? (msg.params || {}) : (msg.result || {});
+      // Unwrap common envelopes
+      if (data && data.data && typeof data.data === "object" && !Array.isArray(data.data)) data = data.data;
+      if (data && data.structuredContent) data = data.structuredContent;
+      render(data);
+      return;
+    }
+
+    // JSON-RPC error
+    if (msg.error) {
+      showError("Wallet unavailable: " + (msg.error.message || "unknown error"));
+    }
+  });
+
+  /* ---------- Formatting ---------- */
+
+  function fmtUsd(n) {
+    n = Number(n) || 0;
+    if (n >= 1e9) return "$" + (n / 1e9).toFixed(2) + "B";
+    if (n >= 1e6) return "$" + (n / 1e6).toFixed(2) + "M";
+    if (n >= 1e3) return "$" + (n / 1e3).toFixed(2) + "K";
+    return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function fmtNum(n) {
+    n = Number(n) || 0;
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
+    return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  /* ---------- Render ---------- */
+
+  function showError(text) {
+    el.loading.classList.add("hidden");
+    el.error.textContent = text;
+    el.error.classList.remove("hidden");
+  }
+
+  function normalize(data) {
+    data = data || {};
+    var tokens = data.tokens || data.holdings || [];
+    if (!Array.isArray(tokens)) tokens = [];
+    return {
+      total_usd: Number(data.total_usd ?? data.totalUsd ?? data.balance_usd ?? 0),
+      sol_balance: Number(data.sol_balance ?? data.solBalance ?? data.sol ?? 0),
+      tokens: tokens.map(function (t) {
+        return {
+          mint: t.mint || t.address || "",
+          name: t.name || "Unknown",
+          symbol: t.symbol || "?",
+          image_url: t.image_url || t.imageUrl || t.logo || "",
+          amount: Number(t.amount ?? t.balance ?? 0),
+          price_usd: Number(t.price_usd ?? t.priceUsd ?? t.price ?? 0),
+          value_usd: Number(t.value_usd ?? t.valueUsd ?? (Number(t.amount || 0) * Number(t.price_usd || t.price || 0)))
+        };
+      })
+    };
+  }
+
+  function render(raw) {
+    var d = normalize(raw);
+    el.loading.classList.add("hidden");
+    el.error.classList.add("hidden");
+
+    var hasHoldings = d.tokens.length > 0 || d.total_usd > 0 || d.sol_balance > 0;
+
+    if (!hasHoldings) {
+      el.dash.classList.add("hidden");
+      el.empty.classList.remove("hidden");
+      return;
+    }
+
+    el.empty.classList.add("hidden");
+    el.dash.classList.remove("hidden");
+
+    el.total.textContent = fmtUsd(d.total_usd);
+    el.solBal.textContent = fmtNum(d.sol_balance);
+    el.tokCount.textContent = d.tokens.length
+      ? d.tokens.length + (d.tokens.length === 1 ? " token" : " tokens")
+      : "";
+
+    renderAllocation(d);
+    renderTokens(d);
+  }
+
+  function renderAllocation(d) {
+    // Build segments: SOL + each token, by USD value
+    var items = [];
+    var solUsd = d.sol_balance * (d.sol_price_usd || 0);
+    var entries = d.tokens.map(function (t) { return { label: "$" + t.symbol, value: t.value_usd }; });
+    // If we don't know SOL price, treat SOL as its own slice only if it has value info
+    if (solUsd > 0) entries.unshift({ label: "SOL", value: solUsd });
+
+    var total = entries.reduce(function (s, e) { return s + e.value; }, 0);
+    if (!total || !entries.length) {
+      // Fallback: equal slices so the bar still looks alive
+      entries = d.tokens.map(function (t) { return { label: "$" + t.symbol, value: 1 }; });
+      total = entries.length;
+    }
+    if (!entries.length) { el.allocCard.classList.add("hidden"); return; }
+    el.allocCard.classList.remove("hidden");
+
+    entries.sort(function (a, b) { return b.value - a.value; });
+    var top = entries.slice(0, 6);
+    var rest = entries.slice(6);
+    if (rest.length) {
+      top.push({ label: "Other", value: rest.reduce(function (s, e) { return s + e.value; }, 0) });
+    }
+
+    el.allocBar.innerHTML = "";
+    el.allocLegend.innerHTML = "";
+    top.forEach(function (e, i) {
+      var pct = total > 0 ? (e.value / total) * 100 : 0;
+      var color = PALETTE[i % PALETTE.length];
+
+      var seg = document.createElement("div");
+      seg.className = "alloc-seg";
+      seg.style.width = Math.max(pct, 3) + "%";
+      seg.style.background = color;
+      seg.title = e.label + " — " + pct.toFixed(1) + "%";
+      el.allocBar.appendChild(seg);
+
+      var li = document.createElement("div");
+      li.className = "item";
+      li.innerHTML = '<span class="sw" style="background:' + color + '"></span>' +
+        esc(e.label) + ' <span class="pct">' + pct.toFixed(0) + "%</span>";
+      el.allocLegend.appendChild(li);
+    });
+  }
+
+  function renderTokens(d) {
+    var sorted = d.tokens.slice().sort(function (a, b) { return b.value_usd - a.value_usd; });
+    el.tokenList.innerHTML = "";
+
+    if (!sorted.length) {
+      var note = document.createElement("p");
+      note.style.cssText = "font-size:12px;color:rgba(255,255,255,.4);text-align:center;padding:8px 0;";
+      note.textContent = "SOL only — no token holdings yet.";
+      el.tokenList.appendChild(note);
+      return;
+    }
+
+    sorted.forEach(function (t) {
+      var row = document.createElement("div");
+      row.className = "token";
+
+      var iconHtml = t.image_url
+        ? '<img src="' + esc(t.image_url) + '" alt="' + esc(t.symbol) + '" loading="lazy" onerror="this.remove()" />'
+        : esc(String(t.symbol || "?").charAt(0).toUpperCase());
+
+      row.innerHTML =
+        '<div class="icon">' + iconHtml + '</div>' +
+        '<div class="meta">' +
+          '<div class="name">' + esc(t.name) + '</div>' +
+          '<span class="sym">$' + esc(t.symbol) + '</span>' +
+        '</div>' +
+        '<div class="vals">' +
+          '<div class="usd">' + fmtUsd(t.value_usd) + '</div>' +
+          '<div class="amt">' + fmtNum(t.amount) + " " + esc(t.symbol) + '</div>' +
+        '</div>';
+
+      var sell = document.createElement("button");
+      sell.className = "sell-btn";
+      sell.textContent = "Sell";
+      sell.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        toolCall("launchpad_sell", { mint: t.mint });
+      });
+      row.appendChild(sell);
+
+      el.tokenList.appendChild(row);
+    });
+  }
+
+  /* ---------- Actions ---------- */
+
+  el.launchBtn.addEventListener("click", function () {
+    toolCall("launchpad_launch", {});
+  });
+  el.launchBtn2.addEventListener("click", function () {
+    toolCall("launchpad_launch", {});
+  });
+  el.refreshBtn.addEventListener("click", function () {
+    el.refreshBtn.classList.add("spinning");
+    el.error.classList.add("hidden");
+    requestData();
+    setTimeout(function () { el.refreshBtn.classList.remove("spinning"); }, 1200);
+  });
+
+  /* ---------- Boot ---------- */
+
+  // Ask the host for wallet data. If the host doesn't implement
+  // ui/request-data, fall back to a demo render after a timeout so the
+  // iframe never sits blank during development.
+  requestData();
+  setTimeout(function () {
+    if (!el.loading.classList.contains("hidden") && el.dash.classList.contains("hidden")) {
+      // Still loading after 6s — keep waiting, host may be slow.
+      // (No demo data injected: never fake a wallet.)
+    }
+  }, 6000);
+})();
+</script>
+</body>
+</html>

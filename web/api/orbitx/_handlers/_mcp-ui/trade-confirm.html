@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OrbitX Launchpad — Confirm Trade</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --card: #141417;
+    --card-border: rgba(255, 255, 255, 0.08);
+    --text: #f4f4f5;
+    --muted: rgba(255, 255, 255, 0.45);
+    --faint: rgba(255, 255, 255, 0.28);
+    --green: #22c55e;
+    --green-dark: #16a34a;
+    --green-glow: rgba(34, 197, 94, 0.25);
+    --red: #ef4444;
+    --red-dark: #dc2626;
+    --red-glow: rgba(239, 68, 68, 0.25);
+    --amber: #f59e0b;
+    --amber-bg: rgba(245, 158, 11, 0.08);
+    --amber-border: rgba(245, 158, 11, 0.25);
+    --blue: #3b82f6;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, Roboto, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .card {
+    width: 100%;
+    max-width: 420px;
+    background: linear-gradient(180deg, #16161a 0%, var(--card) 100%);
+    border: 1px solid var(--card-border);
+    border-radius: 24px;
+    padding: 28px 24px 24px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+    animation: rise 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 18px;
+  }
+  .eyebrow .logo {
+    width: 22px; height: 22px; border-radius: 7px;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 900;
+  }
+  .eyebrow span {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .token-head { text-align: center; margin-bottom: 20px; }
+  .token-logo {
+    width: 72px; height: 72px; border-radius: 20px;
+    margin: 0 auto 12px;
+    background: linear-gradient(135deg, #1e3a8a, #6d28d9);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 900; color: rgba(255,255,255,0.75);
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+  }
+  .token-logo img { width: 100%; height: 100%; object-fit: cover; }
+  .token-name { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
+  .token-symbol {
+    display: inline-block; margin-top: 6px;
+    font-size: 11px; font-weight: 800;
+    background: rgba(59, 130, 246, 0.15);
+    color: #93c5fd;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid rgba(59, 130, 246, 0.25);
+  }
+  .side-pill {
+    display: inline-block; margin-left: 6px;
+    font-size: 11px; font-weight: 800;
+    padding: 4px 10px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .side-pill.buy { background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+  .side-pill.sell { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+  .rows {
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: var(--radius);
+    padding: 6px 16px;
+    margin-bottom: 14px;
+  }
+  .row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 11px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 14px;
+  }
+  .row:last-child { border-bottom: none; }
+  .row .label { color: var(--muted); font-weight: 500; }
+  .row .value { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .row .value.warn { color: var(--amber); }
+  .tax-warning {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: var(--amber-bg);
+    border: 1px solid var(--amber-border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 18px;
+    font-size: 13px; line-height: 1.5;
+    color: #fcd34d;
+  }
+  .tax-warning .icon { font-size: 16px; line-height: 1.4; }
+  .actions { display: flex; gap: 10px; }
+  .btn {
+    flex: 1; border: none; cursor: pointer;
+    font-size: 15px; font-weight: 800;
+    padding: 15px 0; border-radius: var(--radius);
+    transition: transform 0.08s ease, filter 0.15s ease, box-shadow 0.15s ease;
+    letter-spacing: 0.01em;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-confirm.buy {
+    background: linear-gradient(180deg, var(--green), var(--green-dark));
+    color: #04120a;
+    box-shadow: 0 8px 28px var(--green-glow);
+  }
+  .btn-confirm.sell {
+    background: linear-gradient(180deg, var(--red), var(--red-dark));
+    color: #fff;
+    box-shadow: 0 8px 28px var(--red-glow);
+  }
+  .btn-confirm:hover { filter: brightness(1.08); }
+  .btn-confirm:disabled {
+    opacity: 0.55; cursor: wait; filter: none; box-shadow: none;
+  }
+  .btn-cancel {
+    flex: 0 0 110px;
+    background: rgba(255,255,255,0.06);
+    color: var(--muted);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .btn-cancel:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+  .fineprint {
+    margin-top: 14px; text-align: center;
+    font-size: 11px; color: var(--faint); line-height: 1.5;
+  }
+  /* Loading skeleton */
+  .skeleton { display: flex; flex-direction: column; gap: 12px; }
+  .sk {
+    border-radius: 12px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.04) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
+  }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  /* Result states */
+  .result { text-align: center; padding: 12px 0 4px; }
+  .result .big-icon {
+    width: 64px; height: 64px; border-radius: 50%;
+    margin: 0 auto 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px;
+  }
+  .result.success .big-icon { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.35); }
+  .result.error .big-icon { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.35); }
+  .result h2 { font-size: 19px; font-weight: 800; margin-bottom: 8px; }
+  .result p { font-size: 13px; color: var(--muted); line-height: 1.55; word-break: break-all; }
+  .result .sig {
+    margin-top: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; color: var(--faint);
+    background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 10px 12px; word-break: break-all;
+  }
+  .result a {
+    display: inline-block; margin-top: 14px;
+    color: #93c5fd; font-size: 13px; font-weight: 700; text-decoration: none;
+    border: 1px solid rgba(59,130,246,0.3); background: rgba(59,130,246,0.1);
+    padding: 10px 18px; border-radius: 12px;
+  }
+  .result a:hover { background: rgba(59,130,246,0.18); }
+  .spinner {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid rgba(0,0,0,0.25); border-top-color: currentColor;
+    display: inline-block; vertical-align: -3px; margin-right: 8px;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <div class="card" id="card">
+    <!-- Loading -->
+    <div id="view-loading" class="skeleton">
+      <div class="sk" style="height:22px;width:45%;margin:0 auto;"></div>
+      <div class="sk" style="height:72px;width:72px;border-radius:20px;margin:6px auto;"></div>
+      <div class="sk" style="height:20px;width:60%;margin:0 auto;"></div>
+      <div class="sk" style="height:150px;"></div>
+      <div class="sk" style="height:52px;"></div>
+    </div>
+
+    <!-- Confirm -->
+    <div id="view-confirm" class="hidden">
+      <div class="eyebrow">
+        <div class="logo">🚀</div>
+        <span>OrbitX Launchpad</span>
+      </div>
+      <div class="token-head">
+        <div class="token-logo" id="token-logo">?</div>
+        <div class="token-name" id="token-name">—</div>
+        <div style="margin-top:8px;">
+          <span class="token-symbol" id="token-symbol">$—</span>
+          <span class="side-pill buy" id="side-pill">BUY</span>
+        </div>
+      </div>
+      <div class="rows" id="rows"></div>
+      <div class="tax-warning hidden" id="tax-warning">
+        <span class="icon">⚠️</span>
+        <span id="tax-warning-text"></span>
+      </div>
+      <div class="actions">
+        <button class="btn btn-cancel" id="btn-cancel">Cancel</button>
+        <button class="btn btn-confirm buy" id="btn-confirm">Confirm Buy</button>
+      </div>
+      <div class="fineprint">
+        Executed via your OrbitX desk wallet.<br/>On-chain — this cannot be undone.
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div id="view-result" class="hidden">
+      <div class="result" id="result-box">
+        <div class="big-icon" id="result-icon">✓</div>
+        <h2 id="result-title">Done</h2>
+        <p id="result-desc"></p>
+        <div class="sig hidden" id="result-sig"></div>
+        <div id="result-link-wrap" class="hidden">
+          <a id="result-link" href="#" target="_blank" rel="noopener">View on Solscan ↗</a>
+        </div>
+        <div style="margin-top:16px;">
+          <button class="btn btn-cancel" id="btn-done" style="flex:1;">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var state = {
+    side: "buy",
+    mint: null,
+    token: { name: "Unknown Token", symbol: "?", image_url: null },
+    amount_sol: null,
+    amount_tokens: null,
+    estimated_tokens: null,
+    estimated_sol: null,
+    price_impact_pct: null,
+    sniper_tax_pct: 0,
+    sniper_tax_window: null,
+    confirming: false,
+    msgId: 100,
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function show(viewId) {
+    ["view-loading", "view-confirm", "view-result"].forEach(function (id) {
+      $(id).classList.toggle("hidden", id !== viewId);
+    });
+  }
+
+  function post(method, params) {
+    state.msgId += 1;
+    window.parent.postMessage(
+      { jsonrpc: "2.0", id: state.msgId, method: method, params: params || {} },
+      "*"
+    );
+  }
+
+  function fmtNum(n) {
+    if (n == null || isNaN(n)) return "—";
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+    return Number(n).toLocaleString("en-US", { maximumFractionDigits: 4 });
+  }
+
+  function fmtSol(n) {
+    if (n == null || isNaN(n)) return "—";
+    return Number(n).toFixed(4).replace(/\.?0+$/, "") + " SOL";
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function renderConfirm(d) {
+    state.side = d.side === "sell" ? "sell" : "buy";
+    state.mint = d.mint || null;
+    if (d.token) {
+      state.token.name = d.token.name || "Unknown Token";
+      state.token.symbol = d.token.symbol || "?";
+      state.token.image_url = d.token.image_url || null;
+    }
+    state.amount_sol = d.amount_sol != null ? d.amount_sol : null;
+    state.amount_tokens = d.amount_tokens != null ? d.amount_tokens : null;
+    state.estimated_tokens = d.estimated_tokens != null ? d.estimated_tokens : null;
+    state.estimated_sol = d.estimated_sol != null ? d.estimated_sol : null;
+    state.price_impact_pct = d.price_impact_pct != null ? d.price_impact_pct : null;
+    state.sniper_tax_pct = d.sniper_tax_pct != null ? Number(d.sniper_tax_pct) : 0;
+    state.sniper_tax_window = d.sniper_tax_window || null;
+
+    var isBuy = state.side === "buy";
+
+    // Header
+    var logo = $("token-logo");
+    if (state.token.image_url) {
+      logo.innerHTML = "";
+      var img = document.createElement("img");
+      img.src = state.token.image_url;
+      img.alt = state.token.symbol;
+      img.onerror = function () {
+        logo.innerHTML = esc(state.token.symbol.charAt(0).toUpperCase());
+      };
+      logo.appendChild(img);
+    } else {
+      logo.textContent = state.token.symbol.charAt(0).toUpperCase();
+    }
+    $("token-name").textContent = state.token.name;
+    $("token-symbol").textContent = "$" + state.token.symbol;
+
+    var pill = $("side-pill");
+    pill.textContent = isBuy ? "BUY" : "SELL";
+    pill.className = "side-pill " + (isBuy ? "buy" : "sell");
+
+    // Rows
+    var rows = [];
+    if (isBuy) {
+      rows.push({ label: "You spend", value: fmtSol(state.amount_sol) });
+      if (state.estimated_tokens != null)
+        rows.push({ label: "Est. tokens received", value: fmtNum(state.estimated_tokens) + " " + state.token.symbol });
+    } else {
+      var amtLabel = state.amount_tokens === "all" ? "ALL" : fmtNum(state.amount_tokens);
+      rows.push({ label: "You sell", value: amtLabel + " " + state.token.symbol });
+      if (state.estimated_sol != null)
+        rows.push({ label: "Est. SOL received", value: fmtSol(state.estimated_sol) });
+    }
+    if (state.price_impact_pct != null) {
+      var pi = Number(state.price_impact_pct);
+      rows.push({
+        label: "Price impact",
+        value: pi.toFixed(2) + "%",
+        warn: pi >= 5,
+      });
+    }
+    if (state.sniper_tax_pct > 0) {
+      rows.push({ label: "Sniper tax", value: state.sniper_tax_pct + "%", warn: true });
+    }
+
+    $("rows").innerHTML = rows.map(function (r) {
+      return '<div class="row"><span class="label">' + esc(r.label) + '</span>' +
+        '<span class="value' + (r.warn ? " warn" : "") + '">' + esc(r.value) + "</span></div>";
+    }).join("");
+
+    // Sniper tax warning
+    var tw = $("tax-warning");
+    if (state.sniper_tax_pct > 0) {
+      var win = state.sniper_tax_window ? " for the first " + esc(state.sniper_tax_window) : "";
+      $("tax-warning-text").textContent =
+        "Heads up: a " + state.sniper_tax_pct + "% sniper tax applies" + win +
+        ". Early buys pay extra to protect the launch.";
+      tw.classList.remove("hidden");
+    } else {
+      tw.classList.add("hidden");
+    }
+
+    // Buttons
+    var btn = $("btn-confirm");
+    btn.textContent = isBuy ? "Confirm Buy" : "Confirm Sell";
+    btn.className = "btn btn-confirm " + (isBuy ? "buy" : "sell");
+    btn.disabled = false;
+    state.confirming = false;
+
+    show("view-confirm");
+  }
+
+  function doConfirm() {
+    if (state.confirming) return;
+    if (!state.mint) {
+      showError("Missing token mint — cannot submit this trade.");
+      return;
+    }
+    state.confirming = true;
+    var btn = $("btn-confirm");
+    btn.disabled = true;
+    var isBuy = state.side === "buy";
+    btn.innerHTML = '<span class="spinner"></span>Sending…';
+
+    var tool = isBuy ? "launchpad_buy" : "launchpad_sell";
+    var args = { mint: state.mint, confirmed: true };
+    if (isBuy) {
+      args.amount = state.amount_sol;
+    } else {
+      args.amount_tokens = state.amount_tokens;
+    }
+    post("ui/tool-call", { tool: tool, arguments: args });
+  }
+
+  function doCancel() {
+    post("ui/close");
+  }
+
+  function showSuccess(result) {
+    var r = result || {};
+    var sig = r.signature || r.tx_signature || r.tx || null;
+    var isBuy = state.side === "buy";
+    var box = $("result-box");
+    box.className = "result success";
+    $("result-icon").textContent = "✓";
+    $("result-title").textContent = isBuy ? "Bought!" : "Sold!";
+    var desc;
+    if (isBuy) {
+      desc = "You bought " + esc(state.token.symbol) + " for " + esc(fmtSol(state.amount_sol)) + ".";
+    } else {
+      var amt = state.amount_tokens === "all" ? "all" : fmtNum(state.amount_tokens);
+      desc = "You sold " + esc(amt) + " " + esc(state.token.symbol) + ".";
+    }
+    $("result-desc").textContent = desc;
+    if (sig) {
+      var sigEl = $("result-sig");
+      sigEl.textContent = sig;
+      sigEl.classList.remove("hidden");
+      var link = $("result-link");
+      link.href = "https://solscan.io/tx/" + encodeURIComponent(sig);
+      $("result-link-wrap").classList.remove("hidden");
+    } else {
+      $("result-sig").classList.add("hidden");
+      $("result-link-wrap").classList.add("hidden");
+    }
+    show("view-result");
+  }
+
+  function showError(message) {
+    var box = $("result-box");
+    box.className = "result error";
+    $("result-icon").textContent = "✕";
+    $("result-title").textContent = "Trade failed";
+    $("result-desc").textContent = message || "Something went wrong. No funds moved.";
+    $("result-sig").classList.add("hidden");
+    $("result-link-wrap").classList.add("hidden");
+    show("view-result");
+  }
+
+  // Bridge: incoming messages from host
+  window.addEventListener("message", function (ev) {
+    var msg = ev.data;
+    if (!msg || typeof msg !== "object") return;
+
+    if (msg.method === "ui/data" && msg.params) {
+      renderConfirm(msg.params);
+      return;
+    }
+
+    if (msg.method === "ui/tool-result") {
+      var res = msg.params || {};
+      // Hosts may wrap: { result: {...} } or { error: {...} } or raw
+      if (res.error) {
+        var em = res.error.message || res.error.data || "Trade rejected by the server.";
+        showError(String(em));
+      } else {
+        var payload = res.result != null ? res.result : res;
+        if (payload && payload.ok === false) {
+          showError(payload.message || payload.error || "Trade failed.");
+        } else {
+          showSuccess(payload);
+        }
+      }
+      return;
+    }
+  });
+
+  $("btn-confirm").addEventListener("click", doConfirm);
+  $("btn-cancel").addEventListener("click", doCancel);
+  $("btn-done").addEventListener("click", doCancel);
+
+  // Ask host for the trade details on load
+  show("view-loading");
+  // Small delay so the host iframe handshake settles in sandboxed clients
+  setTimeout(function () {
+    post("ui/request-data");
+  }, 150);
+
+  // Safety: if no data arrives within 8s, show a friendly error
+  setTimeout(function () {
+    if (!$("view-loading").classList.contains("hidden")) {
+      showError("Couldn't load trade details from the chat. Close this and try again.");
+    }
+  }, 8000);
+})();
+</script>
+</body>
+</html>

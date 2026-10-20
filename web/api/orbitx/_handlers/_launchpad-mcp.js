@@ -52,6 +52,7 @@ export const LAUNCHPAD_TOOLS = [
   {
     name: "launchpad_tokens",
     description: "List tokens launched via OrbitX. Filter by launchpad, chain, status. Includes bonding curve progress and graduation status.",
+    _meta: { ui: { resourceUri: "ui://orbitx-launchpad/token-cards" } },
     inputSchema: {
       type: "object",
       properties: {
@@ -75,6 +76,7 @@ export const LAUNCHPAD_TOOLS = [
   {
     name: "launchpad_token",
     description: "Get full token data aggregated from DexScreener, CoinGecko, and pump.fun — price, bonding curve, graduation status.",
+    _meta: { ui: { resourceUri: "ui://orbitx-launchpad/token-cards" } },
     inputSchema: {
       type: "object",
       properties: {
@@ -86,6 +88,7 @@ export const LAUNCHPAD_TOOLS = [
   {
     name: "launchpad_buy",
     description: "Buy a token via the fastest route (Lightning API). Uses desk wallet.",
+    _meta: { ui: { resourceUri: "ui://orbitx-launchpad/trade-confirm" } },
     inputSchema: {
       type: "object",
       properties: {
@@ -99,6 +102,7 @@ export const LAUNCHPAD_TOOLS = [
   {
     name: "launchpad_sell",
     description: "Sell a token via the fastest route. Uses desk wallet.",
+    _meta: { ui: { resourceUri: "ui://orbitx-launchpad/trade-confirm" } },
     inputSchema: {
       type: "object",
       properties: {
@@ -134,6 +138,7 @@ export const LAUNCHPAD_TOOLS = [
   {
     name: "launchpad_wallets",
     description: "Check all your launchpad wallets — Solana desk + Robinhood Chain.",
+    _meta: { ui: { resourceUri: "ui://orbitx-launchpad/wallet-dashboard" } },
     inputSchema: { type: "object", properties: {} },
   },
   {
