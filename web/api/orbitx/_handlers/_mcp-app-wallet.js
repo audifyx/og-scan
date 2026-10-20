@@ -906,8 +906,8 @@ export async function appSendSol(auth, args = {}) {
   if (!Number.isFinite(balanceLamports)) {
     return { ok: false, error: "balance_unavailable", message: "Could not read wallet balance — try again." };
   }
-  // Keep ~0.01 SOL for fees
-  if (balanceLamports < lamports + 10000000) {
+  // Keep a minimal fee buffer (~0.0001 SOL covers a basic transfer fee)
+  if (balanceLamports < lamports + 100000) {
     return { ok: false, error: "insufficient_balance", message: `Insufficient SOL. Balance: ${(balanceLamports / 1e9).toFixed(4)} SOL, need ${amountSol} + fees.` };
   }
   try {
