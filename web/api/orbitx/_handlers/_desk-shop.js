@@ -217,6 +217,69 @@ export async function prepareDeskShopBuy({ wallet, skuId, mint }) {
   };
 }
 
+/**
+ * Verify a claimed shop purchase ON-CHAIN (security fix 2026-10-21).
+ * confirmDeskShopBuy used to trust the request body — any fake signature
+ * string "unlocked" any SKU. Now the transaction itself must prove:
+ * it landed successfully, the claiming wallet signed it, the wallet
+ * actually spent ~the SKU's SOL amount, $ORBITX actually arrived, and
+ * the burn actually happened in the same tx. One signature redeems once.
+ */
+async function verifyShopPurchaseTx({ signature, wallet, item, solUsd }) {
+  const existing = await sb(
+    `orbitx_shop_orders?signature=eq.${encodeURIComponent(signature)}&select=id&limit=1`,
+  ).catch(() => null);
+  if (Array.isArray(existing) && existing.length) {
+    return { ok: false, error: "signature_already_used", message: "That transaction was already redeemed for an order." };
+  }
+  let tx;
+  try {
+    tx = await rpc("getTransaction", [
+      signature,
+      { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" },
+    ]);
+  } catch {
+    return { ok: false, error: "verification_unavailable", message: "Couldn't verify that transaction on-chain yet — wait a few seconds and confirm again." };
+  }
+  if (!tx) {
+    return { ok: false, error: "tx_not_found", message: "That transaction isn't on-chain yet — wait for it to confirm, then confirm the purchase again." };
+  }
+  if (tx.meta?.err) {
+    return { ok: false, error: "tx_failed", message: "That transaction failed on-chain." };
+  }
+  const keys = tx.transaction?.message?.accountKeys || [];
+  const signer = keys.find((k) => k.signer)?.pubkey || keys[0]?.pubkey;
+  if (signer !== wallet) {
+    return { ok: false, error: "signer_mismatch", message: "That transaction wasn't signed by the claiming wallet." };
+  }
+  const wIdx = keys.findIndex((k) => k.pubkey === wallet);
+  const pre = tx.meta?.preBalances || [];
+  const post = tx.meta?.postBalances || [];
+  const solSpent = wIdx >= 0 ? (pre[wIdx] - post[wIdx]) / 1e9 : 0;
+  const expectedSol = usdToShopSol(item.usd, solUsd);
+  if (!(solSpent >= expectedSol * 0.8)) {
+    return { ok: false, error: "amount_too_small", message: `That transaction spent ${solSpent.toFixed(4)} SOL — a ${item.name} purchase needs about ${expectedSol.toFixed(4)} SOL of $ORBITX bought in one transaction.` };
+  }
+  const tokBal = (arr, owner) =>
+    (arr || [])
+      .filter((b) => b.mint === ORBITX_MINT && (!owner || b.owner === owner))
+      .reduce((s, b) => s + Number(b.uiTokenAmount?.amount || 0), 0);
+  const preTok = tx.meta?.preTokenBalances || [];
+  const postTok = tx.meta?.postTokenBalances || [];
+  const walletGainRaw = tokBal(postTok, wallet) - tokBal(preTok, wallet);
+  if (!(walletGainRaw > 0)) {
+    return { ok: false, error: "no_orbitx_received", message: "That transaction didn't deliver $ORBITX to the claiming wallet." };
+  }
+  // Burned tokens vanish from every account: the net ORBITX delta across
+  // all accounts is negative by exactly the burned amount.
+  const netDeltaRaw = tokBal(postTok, null) - tokBal(preTok, null);
+  const burnedRaw = netDeltaRaw < 0 ? -netDeltaRaw : 0;
+  if (!(burnedRaw >= walletGainRaw * 4)) {
+    return { ok: false, error: "burn_not_found", message: "That transaction didn't burn $ORBITX the way a shop purchase must (90% burn in the same transaction)." };
+  }
+  return { ok: true, solSpent, orbitxBurned: burnedRaw / 1e6 };
+}
+
 export async function confirmDeskShopBuy(body) {
   const item = getShopSku(body.sku);
   if (!item) {
@@ -228,9 +291,14 @@ export async function confirmDeskShopBuy(body) {
     return { ok: false, error: "signature_required", message: "Sign the Jupiter buy-and-burn, then send the signature." };
   }
 
-  const solUsd = Number(body.solUsd) || (await fetchSolUsdPrice()) || 0;
-  const sol = Number(body.sol) || usdToShopSol(item.usd, solUsd);
-  const orbitxBurned = Number(body.orbitxBurned);
+  const solUsd = (await fetchSolUsdPrice()) || 0;
+  if (!solUsd) {
+    return { ok: false, error: "verification_unavailable", message: "Price feed is unavailable — try confirming again in a moment." };
+  }
+  const verdict = await verifyShopPurchaseTx({ signature, wallet, item, solUsd });
+  if (!verdict.ok) return verdict;
+  const sol = verdict.solSpent;
+  const orbitxBurned = verdict.orbitxBurned;
   const mint = item.needsMint ? String(body.mint || "").trim() : "";
   const name = String(body.name || "").trim();
   const ticker = String(body.ticker || "").trim().toUpperCase();

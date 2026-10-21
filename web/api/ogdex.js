@@ -142,7 +142,8 @@ function handleDeskUnlock(req, res) {
 async function handleOwnerApi(req, res) {
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Cache-Control", "no-store");
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Origin", "https://www.orbitx.world");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
   if (req.method === "GET") {
     res.statusCode = 200;
@@ -156,6 +157,28 @@ async function handleOwnerApi(req, res) {
   if (!/^Bearer\s+\S+/i.test(auth)) {
     res.statusCode = 401;
     return res.end(JSON.stringify({ ok: false, error: "Sign in as the owner account" }));
+  }
+  // Owner-only (security fix 2026-10-21): the Bearer token must be a REAL
+  // Supabase session for the owner account. Previously any non-empty
+  // Bearer string passed this gate and the handler read with the
+  // service-role key — full data dump for anyone. Verify or reject.
+  {
+    const token = auth.replace(/^Bearer\s+/i, "");
+    const sbUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || "https://ibojtmeqgzabgeiwbvhf.supabase.co";
+    const anon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY || "";
+    let email = null;
+    try {
+      const vr = await fetch(`${sbUrl}/auth/v1/user`, { headers: { Authorization: `Bearer ${token}`, apikey: anon } });
+      if (vr.ok) {
+        const u = await vr.json().catch(() => null);
+        email = u?.email || null;
+      }
+    } catch {}
+    const OWNER_EMAILS = new Set(["audifyx@gmail.com"]);
+    if (!email || !OWNER_EMAILS.has(String(email).toLowerCase())) {
+      res.statusCode = 403;
+      return res.end(JSON.stringify({ ok: false, error: "Owner account required" }));
+    }
   }
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
