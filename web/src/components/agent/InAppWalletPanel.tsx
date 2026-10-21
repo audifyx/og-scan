@@ -103,7 +103,7 @@ export function InAppWalletPanel() {
     finally { setBusy(false); }
   };
 
-  const setPin = () => {
+  const doSetPin = () => {
     if (pin !== pinConfirm) { setErr("PINs don't match."); return; }
     if (!window.confirm("Set this PIN? From now on ONLY this PIN can open your wallet — OrbitX servers can't. If you forget it, the wallet can never be opened again. Export your key first if you haven't.")) return;
     void pinAction({ action: "set_pin", pin }, "PIN set. Your wallet is now locked — unlock to trade.");
@@ -149,7 +149,7 @@ export function InAppWalletPanel() {
                 <input type="password" autoComplete="new-password" placeholder="New PIN (6+ characters)" value={pin} onChange={(e) => setPin(e.target.value)} style={pinInputStyle} />
                 <input type="password" autoComplete="new-password" placeholder="Confirm PIN" value={pinConfirm} onChange={(e) => setPinConfirm(e.target.value)} style={pinInputStyle} />
                 <div className="supercomputer-welcome__actions" style={{ marginTop: 10 }}>
-                  <button type="button" className="supercomputer-button supercomputer-button--primary" onClick={setPin} disabled={busy || pin.length < 6}><Lock size={16} /> Set PIN & lock wallet</button>
+                  <button type="button" className="supercomputer-button supercomputer-button--primary" onClick={doSetPin} disabled={busy || pin.length < 6}><Lock size={16} /> Set PIN & lock wallet</button>
                 </div>
               </>
             ) : !unlocked ? (
