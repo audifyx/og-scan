@@ -78,35 +78,13 @@ export function deleteLocalWallets() {
 }
 
 /**
- * Import a Solana wallet from a base58 secret key (Phantom format)
- * or JSON byte array (CLI format). Preserves the original address.
+ * NOTE: There is deliberately NO wallet import. A wallet is created on
+ * one device, lives only on that device (localStorage), and never syncs.
+ * A new device gets a prompt to create a NEW wallet — it will be a
+ * completely different wallet from any other device's.
  */
-export function importSolanaWallet(secretKeyInput: string): LocalWallets["solana"] {
-  const input = secretKeyInput.trim();
-  let secretKeyBytes: Uint8Array;
-  try {
-    if (input.startsWith("[")) {
-      const arr = JSON.parse(input);
-      secretKeyBytes = new Uint8Array(arr);
-    } else {
-      secretKeyBytes = bs58.decode(input);
-    }
-  } catch {
-    throw new Error("Invalid key format. Paste a base58 key (Phantom) or JSON array (CLI).");
-  }
-  const kp = secretKeyBytes.length === 64
-    ? Keypair.fromSecretKey(secretKeyBytes)
-    : secretKeyBytes.length === 32
-      ? Keypair.fromSeed(secretKeyBytes)
-      : (() => { throw new Error(`Invalid key length: ${secretKeyBytes.length} bytes. Expected 32 (seed) or 64 (secret key).`); })();
-  return {
-    publicKey: kp.publicKey.toBase58(),
-    secretKey: bs58.encode(kp.secretKey),
-    secretKeyJson: JSON.stringify(Array.from(kp.secretKey)),
-  };
-}
 
-export function useLocalWallets() {
+export function useLocalWallets(opts?: { autoCreate?: boolean }) {
   const [wallets, setWallets] = useState<LocalWallets | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -131,11 +109,18 @@ export function useLocalWallets() {
         }
       }
     } catch {}
-    if (!w) {
+    if (!w && opts?.autoCreate !== false) {
       w = createLocalWallets();
     }
     setWallets(w);
     setReady(true);
+  }, []);
+
+  /** Create a fresh wallet on THIS device (used by the new-device prompt). */
+  const create = useCallback(() => {
+    const w = createLocalWallets();
+    setWallets(w);
+    return w;
   }, []);
 
   const regenerate = useCallback(() => {
@@ -150,5 +135,5 @@ export function useLocalWallets() {
     setWallets(null);
   }, []);
 
-  return { wallets, ready, regenerate, remove };
+  return { wallets, ready, create, regenerate, remove };
 }

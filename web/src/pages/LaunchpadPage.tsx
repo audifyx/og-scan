@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-import { useLocalWallets, importSolanaWallet, saveLocalWallets } from "@/lib/localWallets";
+import { useLocalWallets } from "@/lib/localWallets";
 import { usePadNotifications, requestNotifPermission, addNotification } from "@/lib/padNotifications";
 
 type PadTab = "board" | "launch" | "trade" | "wallet";
@@ -79,9 +79,10 @@ function ClaimFeeButton({ label, launchpad }: { label: string; launchpad: string
   );
 }
 
-function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
+function WalletTab({ wallets, walletsReady, onCreateWallet, pnlData, tokens, fmtUsd }: {
   wallets: { solana: { publicKey: string; secretKey: string; secretKeyJson: string } | null; evm: { address: string; privateKey: string } | null } | null;
   walletsReady: boolean;
+  onCreateWallet: () => void;
   pnlData: any;
   tokens: LaunchToken[];
   fmtUsd: (n: number | null) => string;
@@ -94,9 +95,6 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
   const [solBalance, setSolBalance] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<string | null>(null);
-  const [showImport, setShowImport] = useState(false);
-  const [importKey, setImportKey] = useState("");
-  const [importError, setImportError] = useState<string | null>(null);
 
   // Fetch SOL balance
   useEffect(() => {
@@ -158,7 +156,7 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
     return (
       <div className="mt-4">
         <h1 className="text-[24px] font-bold tracking-tight">Wallet</h1>
-        <p className="mt-4 text-[14px] text-white/75 text-center py-10">Generating your wallets…</p>
+        <p className="mt-4 text-[14px] text-white/75 text-center py-10">Loading…</p>
       </div>
     );
   }
@@ -167,7 +165,25 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
     return (
       <div className="mt-4">
         <h1 className="text-[24px] font-bold tracking-tight">Wallet</h1>
-        <p className="mt-4 text-[14px] text-white/75 text-center py-10">No wallets found on this device.</p>
+        <div className="mt-4 rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-5 text-center">
+          <div className="text-[28px]">🔐</div>
+          <p className="mt-2 text-[16px] font-bold">No wallet on this device yet</p>
+          <p className="mt-2 text-[13px] leading-relaxed text-white/75">
+            OrbitX wallets are created on one device and live only on that device — keys are
+            generated here, stored here, and never uploaded or synced. Creating a wallet on
+            this device makes a <span className="text-white font-semibold">new wallet</span>,
+            completely different from any wallet on your other devices.
+          </p>
+          <button onClick={onCreateWallet}
+            className="mt-4 w-full rounded-full py-3 text-[14px] font-bold text-black"
+            style={{ background: `linear-gradient(135deg, ${GOLD}, #d4a017)` }}>
+            Create wallet on this device
+          </button>
+          <p className="mt-3 text-[11px] leading-relaxed text-white/50">
+            Wallets can't be imported. To move funds, export the key on the device that
+            created the wallet and send the funds to this device's address.
+          </p>
+        </div>
       </div>
     );
   }
@@ -216,35 +232,6 @@ function WalletTab({ wallets, walletsReady, pnlData, tokens, fmtUsd }: {
           <button onClick={() => setShowExport(showExport === "solana" ? null : "solana")}
             className="rounded-full py-2 text-[13px] font-bold bg-white/[0.07] text-white/80">Export</button>
         </div>
-        <button onClick={() => setShowImport(!showImport)}
-          className="mt-2 w-full text-[12px] font-semibold text-white/70 hover:text-white/70">
-          {showImport ? "Cancel import" : "Import existing wallet"}
-        </button>
-        {showImport && (
-          <div className="mt-2 rounded-xl bg-white/[0.07] border border-white/10 p-3">
-            <p className="text-[12px] font-bold text-white/70 mb-2">Paste your private key (base58 or JSON):</p>
-            <textarea value={importKey} onChange={(e) => { setImportKey(e.target.value); setImportError(null); }}
-              placeholder="5K..." rows={3}
-              className="w-full rounded-xl bg-black/60 border border-white/10 px-3 py-2 font-mono text-[11px] text-white/80 placeholder-white/30 outline-none focus:border-[#e8b84a]/50" />
-            {importError && <p className="mt-1.5 text-[12px] text-red-400">{importError}</p>}
-            <button onClick={() => {
-              try {
-                const imported = importSolanaWallet(importKey);
-                const updated = { ...wallets, solana: imported, createdAt: wallets?.createdAt || new Date().toISOString(), evm: wallets?.evm || null };
-                saveLocalWallets(updated);
-                setImportKey("");
-                setShowImport(false);
-                window.location.reload();
-              } catch (e) {
-                setImportError(e instanceof Error ? e.message : "Import failed");
-              }
-            }}
-              className="mt-2 w-full rounded-full py-2.5 text-[13px] font-bold text-black"
-              style={{ background: `linear-gradient(135deg, ${GOLD}, #d4a017)` }}>
-              Import wallet
-            </button>
-          </div>
-        )}
         {showExport === "solana" && (
           <div className="mt-2.5 rounded-xl bg-red-500/[0.07] border border-red-500/20 p-3">
             <p className="text-[11px] font-bold text-red-400 uppercase mb-1.5">⚠️ Private key — keep secret</p>
@@ -460,7 +447,7 @@ const TABS: { id: PadTab; label: string; icon: JSX.Element }[] = [
 
 export default function LaunchpadPage() {
   const { user } = useAuth();
-  const { wallets, ready: walletsReady } = useLocalWallets();
+  const { wallets, ready: walletsReady, create: createWallets } = useLocalWallets({ autoCreate: false });
   const { notifs, unread, markRead } = usePadNotifications();
   const [tab, setTab] = useState<PadTab>("board");
   const [showNotifs, setShowNotifs] = useState(false);
@@ -1068,7 +1055,7 @@ export default function LaunchpadPage() {
 
         {/* WALLET — full local wallet */}
         {tab === "wallet" && (
-          <WalletTab wallets={wallets} walletsReady={walletsReady} pnlData={pnlData} tokens={tokens} fmtUsd={fmtUsd} />
+          <WalletTab wallets={wallets} walletsReady={walletsReady} onCreateWallet={createWallets} pnlData={pnlData} tokens={tokens} fmtUsd={fmtUsd} />
         )}
       </main>
 

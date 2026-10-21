@@ -1,11 +1,12 @@
 /**
  * MCP trading wallet — backend signs. No Phantom popup. No sign link.
- * Key is AES-GCM encrypted in agent_delegated_wallets. User can export anytime.
+ * Key is AES-GCM encrypted in agent_delegated_wallets.
+ * Private keys are NEVER returned through MCP. Export is platform-only:
+ * the signed-in OrbitX app (delegated-wallet endpoint, session auth).
  */
 import {
   getUserWallet,
   createUserWallet,
-  exportUserWalletSecret,
   revokeUserWallet,
   signUserSwap,
   signAndSendUserTx,
@@ -224,21 +225,19 @@ export async function appWalletCreate(auth) {
     owner: "user",
     notOrbitXTreasury: true,
     fund: "This pubkey is YOURS. Fund YOUR SOL or USDC. Not the OrbitX owner wallet.",
-    exportHint: "Say export wallet for YOUR private key.",
+    exportHint: "Private keys can only be exported inside the OrbitX platform while signed in — never through MCP.",
   };
 }
 
 export async function appWalletExport(auth) {
   const gate = needAuth(auth);
   if (!gate.userId) return gate;
-  const row = await walletRow(gate.userId);
-  if (!row) return { ok: false, error: "no_wallet" };
-  const secret = await exportUserWalletSecret(row);
+  // Hard rule (2026-10-21): MCP never returns private keys. Export happens
+  // only in the OrbitX platform, behind the user's signed-in session.
   return {
-    ok: true,
-    publicKey: row.public_key,
-    secretKeyBase58: secret,
-    warning: "Private key. Anyone with it can empty the wallet.",
+    ok: false,
+    error: "export_platform_only",
+    message: "Private keys are never given out through MCP. To export this wallet's key, open OrbitX while signed in and use Wallet → Export there.",
   };
 }
 
@@ -1362,7 +1361,7 @@ const authCode = { type: "string" };
 export const APP_WALLET_CORE_TOOLS = [
   { name: "orbitx_app_wallet", description: "In-app trading wallet. Backend signs. No popup.", inputSchema: { type: "object", properties: { authCode } } },
   { name: "orbitx_app_wallet_create", description: "Create trading wallet. Backend keeps encrypted key and signs in background.", inputSchema: { type: "object", properties: { authCode } } },
-  { name: "orbitx_app_wallet_export", description: "Export private key to the user. Only when they ask.", inputSchema: { type: "object", properties: { authCode } } },
+  { name: "orbitx_app_wallet_export", description: "Private keys are NEVER exported through MCP. Calling this returns instructions to export inside the OrbitX platform (signed-in app only).", inputSchema: { type: "object", properties: { authCode } } },
   { name: "orbitx_app_wallet_revoke", description: "Revoke backend signing for this wallet.", inputSchema: { type: "object", properties: { authCode } } },
   {
     name: "orbitx_app_buy",
