@@ -1,4 +1,15 @@
-import { getUserWallet, createUserWallet, revokeUserWallet, exportUserWalletSecret } from "./orbitx/_handlers/_user-trading-wallet.js";
+import {
+  getUserWallet,
+  createUserWallet,
+  revokeUserWallet,
+  exportUserWalletSecret,
+  getWalletLockState,
+  setWalletPin,
+  unlockWallet,
+  lockWallet,
+  changeWalletPin,
+  removeWalletPin,
+} from "./orbitx/_handlers/_user-trading-wallet.js";
 
 async function userFromRequest(req) {
   const auth = req.headers.authorization || "";
@@ -9,6 +20,18 @@ async function userFromRequest(req) {
   return response.ok ? response.json() : null;
 }
 
+function statusForError(error) {
+  switch (error?.code) {
+    case "wrong_pin": return 401;
+    case "pin_locked_out": return 429;
+    case "wallet_locked": return 423;
+    case "weak_pin": return 400;
+    case "no_wallet": return 404;
+    case "no_pin_set": return 400;
+    default: return 400;
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST" && req.method !== "GET") return res.status(405).json({ error: "method_not_allowed" });
@@ -17,21 +40,51 @@ export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
       const row = await getUserWallet(user.id);
-      return res.status(200).json(row ? { publicKey: row.public_key, owner: "user" } : null);
+      if (!row) return res.status(200).json(null);
+      const lock = await getWalletLockState(user.id);
+      return res.status(200).json({
+        publicKey: row.public_key,
+        owner: "user",
+        pinSet: lock.pinSet,
+        unlocked: lock.unlocked,
+        unlockUntil: lock.unlockUntil,
+      });
     }
-    if (req.body?.action === "revoke") {
+    const action = req.body?.action;
+    if (action === "revoke") {
       await revokeUserWallet(user.id);
       return res.status(200).json({ ok: true });
     }
-    if (req.body?.action === "export") {
+    if (action === "export") {
       const row = await getUserWallet(user.id);
       if (!row) return res.status(404).json({ error: "no_wallet" });
+      // PIN-locked wallets must be unlocked before export, even in the platform.
       const secretKeyBase58 = await exportUserWalletSecret(row);
       return res.status(200).json({ ok: true, publicKey: row.public_key, secretKeyBase58 });
+    }
+    if (action === "set_pin") {
+      const result = await setWalletPin(user.id, req.body?.pin);
+      return res.status(200).json(result);
+    }
+    if (action === "unlock") {
+      const result = await unlockWallet(user.id, req.body?.pin);
+      return res.status(200).json(result);
+    }
+    if (action === "lock") {
+      const result = await lockWallet(user.id);
+      return res.status(200).json(result);
+    }
+    if (action === "change_pin") {
+      const result = await changeWalletPin(user.id, req.body?.currentPin, req.body?.newPin);
+      return res.status(200).json(result);
+    }
+    if (action === "remove_pin") {
+      const result = await removeWalletPin(user.id, req.body?.pin);
+      return res.status(200).json(result);
     }
     const created = await createUserWallet(user.id);
     return res.status(created.existing ? 200 : 201).json({ publicKey: created.publicKey, owner: "user", existing: created.existing });
   } catch (error) {
-    return res.status(400).json({ error: error?.message || "user_wallet_failed" });
+    return res.status(statusForError(error)).json({ error: error?.code || "user_wallet_failed", message: error?.message || "user_wallet_failed" });
   }
 }

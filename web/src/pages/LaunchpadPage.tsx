@@ -79,14 +79,26 @@ function ClaimFeeButton({ label, launchpad }: { label: string; launchpad: string
   );
 }
 
-function WalletTab({ wallets, walletsReady, onCreateWallet, pnlData, tokens, fmtUsd }: {
+function WalletTab({ wallets, walletsReady, walletsLocked, hasPin, needsPinSetup, onCreateWallet, onUnlockWallet, onLockWallet, onProtectWallet, pnlData, tokens, fmtUsd }: {
   wallets: { solana: { publicKey: string; secretKey: string; secretKeyJson: string } | null; evm: { address: string; privateKey: string } | null } | null;
   walletsReady: boolean;
-  onCreateWallet: () => void;
+  walletsLocked: boolean;
+  hasPin: boolean;
+  needsPinSetup: boolean;
+  onCreateWallet: (pin: string) => void;
+  onUnlockWallet: (pin: string) => Promise<boolean>;
+  onLockWallet: () => void;
+  onProtectWallet: (pin: string) => Promise<boolean>;
   pnlData: any;
   tokens: LaunchToken[];
   fmtUsd: (n: number | null) => string;
 }) {
+  const [pinInput, setPinInput] = useState("");
+  const [createPin, setCreatePin] = useState("");
+  const [createPin2, setCreatePin2] = useState("");
+  const [protectPin, setProtectPin] = useState("");
+  const [protectPin2, setProtectPin2] = useState("");
+  const [pinError, setPinError] = useState<string | null>(null);
   const [showExport, setShowExport] = useState<"solana" | "evm" | null>(null);
   const [sendTo, setSendTo] = useState("");
   const [sendAmount, setSendAmount] = useState("");
@@ -161,6 +173,34 @@ function WalletTab({ wallets, walletsReady, onCreateWallet, pnlData, tokens, fmt
     );
   }
 
+  if (walletsLocked) {
+    return (
+      <div className="mt-4">
+        <h1 className="text-[24px] font-bold tracking-tight">Wallet</h1>
+        <div className="mt-4 rounded-[20px] bg-[#0f0f14] border border-white/[0.06] p-5 text-center">
+          <div className="text-[28px]">🔒</div>
+          <p className="mt-2 text-[16px] font-bold">Wallet locked</p>
+          <p className="mt-2 text-[13px] leading-relaxed text-white/75">
+            This wallet is encrypted with your PIN on this device. Enter it to unlock for this session.
+          </p>
+          <input type="password" autoComplete="current-password" value={pinInput}
+            onChange={(e) => { setPinInput(e.target.value); setPinError(null); }}
+            placeholder="Wallet PIN"
+            className="mt-4 w-full rounded-xl bg-black/60 border border-white/10 px-3 py-3 text-center text-[15px] text-white placeholder-white/30 outline-none focus:border-[#e8b84a]/50" />
+          {pinError && <p className="mt-2 text-[12px] text-red-400">{pinError}</p>}
+          <button onClick={async () => {
+              const ok = await onUnlockWallet(pinInput);
+              if (ok) { setPinInput(""); } else { setPinError("Wrong PIN — try again."); }
+            }}
+            className="mt-3 w-full rounded-full py-3 text-[14px] font-bold text-black"
+            style={{ background: `linear-gradient(135deg, ${GOLD}, #d4a017)` }}>
+            Unlock wallet
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!wallets?.solana) {
     return (
       <div className="mt-4">
@@ -174,8 +214,25 @@ function WalletTab({ wallets, walletsReady, onCreateWallet, pnlData, tokens, fmt
             this device makes a <span className="text-white font-semibold">new wallet</span>,
             completely different from any wallet on your other devices.
           </p>
-          <button onClick={onCreateWallet}
-            className="mt-4 w-full rounded-full py-3 text-[14px] font-bold text-black"
+          <p className="mt-3 text-[13px] leading-relaxed text-white/75">
+            Set a PIN to encrypt it on this device. <span className="text-white font-semibold">If you forget the PIN, the wallet is gone</span> — there's no server copy.
+          </p>
+          <input type="password" autoComplete="new-password" value={createPin}
+            onChange={(e) => { setCreatePin(e.target.value); setPinError(null); }}
+            placeholder="Create a PIN (6+ characters)"
+            className="mt-4 w-full rounded-xl bg-black/60 border border-white/10 px-3 py-3 text-center text-[15px] text-white placeholder-white/30 outline-none focus:border-[#e8b84a]/50" />
+          <input type="password" autoComplete="new-password" value={createPin2}
+            onChange={(e) => { setCreatePin2(e.target.value); setPinError(null); }}
+            placeholder="Confirm PIN"
+            className="mt-2 w-full rounded-xl bg-black/60 border border-white/10 px-3 py-3 text-center text-[15px] text-white placeholder-white/30 outline-none focus:border-[#e8b84a]/50" />
+          {pinError && <p className="mt-2 text-[12px] text-red-400">{pinError}</p>}
+          <button onClick={() => {
+              if (createPin.length < 6) { setPinError("PIN needs at least 6 characters."); return; }
+              if (createPin !== createPin2) { setPinError("PINs don't match."); return; }
+              onCreateWallet(createPin);
+              setCreatePin(""); setCreatePin2("");
+            }}
+            className="mt-3 w-full rounded-full py-3 text-[14px] font-bold text-black"
             style={{ background: `linear-gradient(135deg, ${GOLD}, #d4a017)` }}>
             Create wallet on this device
           </button>
@@ -190,8 +247,48 @@ function WalletTab({ wallets, walletsReady, onCreateWallet, pnlData, tokens, fmt
 
   return (
     <div className="mt-4">
-      <h1 className="text-[24px] font-bold tracking-tight">Wallet</h1>
-      <p className="mt-1 text-[13px] text-white/60">🔒 Keys stay on this device. Never uploaded.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[24px] font-bold tracking-tight">Wallet</h1>
+          <p className="mt-1 text-[13px] text-white/60">🔒 Keys stay on this device. Never uploaded.</p>
+        </div>
+        {hasPin && (
+          <button onClick={onLockWallet}
+            className="shrink-0 rounded-full border border-white/15 bg-white/[0.04] px-3.5 py-2 text-[12px] font-bold text-white/85">
+            Lock wallet
+          </button>
+        )}
+      </div>
+
+      {needsPinSetup && (
+        <div className="mt-4 rounded-[20px] bg-[#0f0f14] border border-[#e8b84a]/25 p-4">
+          <p className="text-[14px] font-bold text-[#e8b84a]">⚠️ This wallet isn't PIN-protected yet</p>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-white/75">
+            Encrypt it on this device with a PIN. After that, the key only exists as ciphertext on this
+            device and unlocks per session. <span className="text-white font-semibold">Forgotten PIN = wallet gone</span> — export your key first.
+          </p>
+          <input type="password" autoComplete="new-password" value={protectPin}
+            onChange={(e) => { setProtectPin(e.target.value); setPinError(null); }}
+            placeholder="Create a PIN (6+ characters)"
+            className="mt-3 w-full rounded-xl bg-black/60 border border-white/10 px-3 py-2.5 text-[14px] text-white placeholder-white/30 outline-none focus:border-[#e8b84a]/50" />
+          <input type="password" autoComplete="new-password" value={protectPin2}
+            onChange={(e) => { setProtectPin2(e.target.value); setPinError(null); }}
+            placeholder="Confirm PIN"
+            className="mt-2 w-full rounded-xl bg-black/60 border border-white/10 px-3 py-2.5 text-[14px] text-white placeholder-white/30 outline-none focus:border-[#e8b84a]/50" />
+          {pinError && <p className="mt-2 text-[12px] text-red-400">{pinError}</p>}
+          <button onClick={async () => {
+              if (protectPin.length < 6) { setPinError("PIN needs at least 6 characters."); return; }
+              if (protectPin !== protectPin2) { setPinError("PINs don't match."); return; }
+              const ok = await onProtectWallet(protectPin);
+              if (!ok) setPinError("Couldn't encrypt the wallet — try again.");
+              else { setProtectPin(""); setProtectPin2(""); }
+            }}
+            className="mt-3 w-full rounded-full py-2.5 text-[13.5px] font-bold text-black"
+            style={{ background: `linear-gradient(135deg, ${GOLD}, #d4a017)` }}>
+            Encrypt with PIN
+          </button>
+        </div>
+      )}
 
       {/* PnL */}
       {pnlData && (
@@ -447,7 +544,7 @@ const TABS: { id: PadTab; label: string; icon: JSX.Element }[] = [
 
 export default function LaunchpadPage() {
   const { user } = useAuth();
-  const { wallets, ready: walletsReady, create: createWallets } = useLocalWallets({ autoCreate: false });
+  const { wallets, ready: walletsReady, locked: walletsLocked, hasPin, needsPinSetup, create: createWallets, unlock: unlockWallets, lock: lockWallets, protect: protectWallets } = useLocalWallets({ autoCreate: false });
   const { notifs, unread, markRead } = usePadNotifications();
   const [tab, setTab] = useState<PadTab>("board");
   const [showNotifs, setShowNotifs] = useState(false);
@@ -1055,7 +1152,7 @@ export default function LaunchpadPage() {
 
         {/* WALLET — full local wallet */}
         {tab === "wallet" && (
-          <WalletTab wallets={wallets} walletsReady={walletsReady} onCreateWallet={createWallets} pnlData={pnlData} tokens={tokens} fmtUsd={fmtUsd} />
+          <WalletTab wallets={wallets} walletsReady={walletsReady} walletsLocked={walletsLocked} hasPin={hasPin} needsPinSetup={needsPinSetup} onCreateWallet={createWallets} onUnlockWallet={unlockWallets} onLockWallet={lockWallets} onProtectWallet={protectWallets} pnlData={pnlData} tokens={tokens} fmtUsd={fmtUsd} />
         )}
       </main>
 

@@ -19,6 +19,7 @@ import {
   isSigningAuth,
   TICK_AUTH_SOURCE,
   getTxConfirmationStatus,
+  getWalletLockState,
 } from "./_user-trading-wallet.js";
 import { appLaunch, appClaimFees, appBurn, appRentRefund, appUnwrapWsol, appNftMint, appNftBuy, appNftList, appNftTransfer, appNftApproveDelegate, APP_DESK_OPS_TOOLS } from "./_mcp-app-desk-ops.js";
 // NOTE: strategy feature modules (_mcp-copy, _mcp-trailing, _mcp-sniper,
@@ -193,9 +194,13 @@ export async function appWalletStatus(auth) {
   const px = await solUsd();
   const solUsdVal = funds.sol * px;
   const totalUsd = solUsdVal + funds.usdc;
+  const lock = await getWalletLockState(gate.userId).catch(() => null);
   return {
     ok: true,
     exists: true,
+    pinSet: !!lock?.pinSet,
+    unlocked: lock ? !!lock.unlocked : true,
+    unlockUntil: lock?.unlockUntil || null,
     signedOn: "backend",
     clickToSign: false,
     publicKey: row.public_key,

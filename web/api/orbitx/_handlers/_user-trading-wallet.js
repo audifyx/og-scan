@@ -146,12 +146,229 @@ export async function getUserWallet(userId) {
   let row = Array.isArray(q1) ? q1[0] : null;
   if (!row) {
     const q2 = await db(
-      `wallet_secrets?user_id=eq.${encodeURIComponent(userId)}&select=id,user_id,address,ciphertext,chain,created_at&order=created_at.desc&limit=1`,
+      `wallet_secrets?user_id=eq.${encodeURIComponent(userId)}&chain=neq.solana-session&chain=neq.solana-guard&select=id,user_id,address,ciphertext,chain,created_at&order=created_at.desc&limit=1`,
     ).catch(() => []);
     row = Array.isArray(q2) ? q2[0] : null;
   }
   if (!row) return null;
   return { ...row, public_key: row.address || row.public_key };
+}
+
+/* ------------------------------------------------------------------ */
+/* Wallet PIN lock + unlock sessions (2026-10-21).                     */
+/*                                                                     */
+/* A user may set a wallet PIN in the platform. Setting it re-wraps    */
+/* the desk secret under a scrypt(PIN) key and REPLACES the server-     */
+/* sealed ciphertext — from then on the server alone cannot decrypt    */
+/* or sign. Unlocking (platform, session-auth, PIN) unwraps the        */
+/* secret in memory and stores a server-sealed SESSION copy in a       */
+/* side row (chain='solana-session'); signing resolves through that    */
+/* copy for 6 hours, then it is wiped and the wallet locks again.      */
+/* Failed PIN attempts are counted in a guard row (chain=              */
+/* 'solana-guard'): 5 failures -> 15-minute lockout. No new tables,    */
+/* no schema changes — side rows live in wallet_secrets like the       */
+/* main row and are excluded from wallet lookups by chain.             */
+/* ------------------------------------------------------------------ */
+export const WALLET_UNLOCK_MS = 6 * 60 * 60 * 1000;
+const PIN_PREFIX = "PIN1:";
+const CHAIN_SESSION = "solana-session";
+const CHAIN_GUARD = "solana-guard";
+const PIN_MAX_FAILS = 5;
+const PIN_LOCKOUT_MS = 15 * 60 * 1000;
+
+export class WalletLockedError extends Error {
+  constructor(message) {
+    super(message || "wallet_locked: this wallet is PIN-locked. Unlock it in the OrbitX app (Wallet → Unlock with your PIN) — unlock lasts 6 hours, then it locks again.");
+    this.code = "wallet_locked";
+  }
+}
+function codedError(code, message) {
+  const e = new Error(message || code);
+  e.code = code;
+  return e;
+}
+
+export function isPinWrapped(ciphertext) {
+  return typeof ciphertext === "string" && ciphertext.startsWith(PIN_PREFIX);
+}
+
+function pinKek(pin, salt) {
+  return crypto.scryptSync(String(pin), salt, 32, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
+}
+
+export function wrapSecretWithPin(packedPlain, pin) {
+  const salt = crypto.randomBytes(16);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", pinKek(pin, salt), iv);
+  const enc = Buffer.concat([cipher.update(packedPlain, "utf8"), cipher.final()]);
+  const env = {
+    v: 1,
+    salt: salt.toString("base64"),
+    iv: iv.toString("base64"),
+    tag: cipher.getAuthTag().toString("base64"),
+    ct: enc.toString("base64"),
+  };
+  return PIN_PREFIX + Buffer.from(JSON.stringify(env), "utf8").toString("base64");
+}
+
+export function unwrapSecretWithPin(blob, pin) {
+  const env = JSON.parse(Buffer.from(String(blob).slice(PIN_PREFIX.length), "base64").toString("utf8"));
+  const decipher = crypto.createDecipheriv("aes-256-gcm", pinKek(pin, Buffer.from(env.salt, "base64")), Buffer.from(env.iv, "base64"));
+  decipher.setAuthTag(Buffer.from(env.tag, "base64"));
+  return Buffer.concat([decipher.update(Buffer.from(env.ct, "base64")), decipher.final()]).toString("utf8");
+}
+
+async function getChainRow(userId, chain) {
+  const rows = await db(
+    `wallet_secrets?user_id=eq.${encodeURIComponent(userId)}&chain=eq.${chain}&select=id,user_id,address,ciphertext,created_at&order=created_at.desc&limit=1`,
+  ).catch(() => []);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+async function deleteChainRows(userId, chain) {
+  await db(`wallet_secrets?user_id=eq.${encodeURIComponent(userId)}&chain=eq.${chain}`, {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" },
+  });
+}
+
+async function readGuard(userId) {
+  const row = await getChainRow(userId, CHAIN_GUARD);
+  if (!row) return { fails: 0, until: 0 };
+  try {
+    const g = JSON.parse(openSecret(row.ciphertext));
+    return { fails: Number(g.fails) || 0, until: Number(g.until) || 0 };
+  } catch {
+    return { fails: 0, until: 0 };
+  }
+}
+
+async function writeGuard(userId, address, guard) {
+  const blob = sealSecret(JSON.stringify(guard));
+  const existing = await getChainRow(userId, CHAIN_GUARD);
+  if (existing) {
+    await db(`wallet_secrets?id=eq.${existing.id}`, { method: "PATCH", body: JSON.stringify({ ciphertext: blob }) });
+  } else {
+    await db("wallet_secrets", { method: "POST", body: JSON.stringify({ user_id: userId, chain: CHAIN_GUARD, address, ciphertext: blob }) });
+  }
+}
+
+function assertPinStrength(pin) {
+  if (typeof pin !== "string" || pin.length < 6 || pin.length > 64) {
+    throw codedError("weak_pin", "PIN must be 6–64 characters.");
+  }
+}
+
+/** Resolve the packed plaintext secret for a wallet row, honoring PIN lock. */
+export async function resolvePackedSecret(row) {
+  if (!isPinWrapped(row.ciphertext)) return openSecret(row.ciphertext);
+  const userId = row.user_id;
+  if (!userId) throw new WalletLockedError();
+  const session = await getChainRow(userId, CHAIN_SESSION);
+  if (session) {
+    const until = new Date(session.created_at).getTime() + WALLET_UNLOCK_MS;
+    if (until > Date.now()) return openSecret(session.ciphertext);
+    await deleteChainRows(userId, CHAIN_SESSION).catch(() => {});
+  }
+  throw new WalletLockedError();
+}
+
+export async function getWalletLockState(userId) {
+  const row = await getUserWallet(userId);
+  if (!row) return { exists: false, pinSet: false, unlocked: false, unlockUntil: null };
+  if (!isPinWrapped(row.ciphertext)) return { exists: true, pinSet: false, unlocked: true, unlockUntil: null };
+  const session = await getChainRow(userId, CHAIN_SESSION);
+  const until = session ? new Date(session.created_at).getTime() + WALLET_UNLOCK_MS : 0;
+  const unlocked = !!session && until > Date.now();
+  return { exists: true, pinSet: true, unlocked, unlockUntil: unlocked ? new Date(until).toISOString() : null };
+}
+
+export async function setWalletPin(userId, pin) {
+  assertPinStrength(pin);
+  const row = await getUserWallet(userId);
+  if (!row) throw codedError("no_wallet", "No wallet to protect.");
+  const packed = await resolvePackedSecret(row); // legacy: server-sealed; PIN'd: needs live session
+  await db(`wallet_secrets?id=eq.${row.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ ciphertext: wrapSecretWithPin(packed, pin) }),
+  });
+  await deleteChainRows(userId, CHAIN_SESSION).catch(() => {}); // setting a PIN locks immediately
+  await deleteChainRows(userId, CHAIN_GUARD).catch(() => {});
+  return { ok: true, pinSet: true, unlocked: false };
+}
+
+export async function unlockWallet(userId, pin) {
+  const row = await getUserWallet(userId);
+  if (!row) throw codedError("no_wallet", "No wallet to unlock.");
+  if (!isPinWrapped(row.ciphertext)) return { ok: true, pinSet: false, unlocked: true, unlockUntil: null };
+  const guard = await readGuard(userId);
+  if (guard.until > Date.now()) {
+    throw codedError("pin_locked_out", `Too many wrong PIN attempts. Try again in ${Math.ceil((guard.until - Date.now()) / 60000)} minutes.`);
+  }
+  let packed;
+  try {
+    packed = unwrapSecretWithPin(row.ciphertext, pin);
+  } catch {
+    const fails = guard.fails + 1;
+    const next = { fails, until: 0 };
+    if (fails >= PIN_MAX_FAILS) {
+      next.fails = 0;
+      next.until = Date.now() + PIN_LOCKOUT_MS;
+    }
+    await writeGuard(userId, row.address, next).catch(() => {});
+    throw codedError("wrong_pin", next.until ? "Wrong PIN. Too many attempts — locked out for 15 minutes." : `Wrong PIN. ${PIN_MAX_FAILS - fails} attempt(s) left before a 15-minute lockout.`);
+  }
+  await writeGuard(userId, row.address, { fails: 0, until: 0 }).catch(() => {});
+  await deleteChainRows(userId, CHAIN_SESSION).catch(() => {});
+  const rows = await db("wallet_secrets", {
+    method: "POST",
+    body: JSON.stringify({ user_id: userId, chain: CHAIN_SESSION, address: row.address, ciphertext: sealSecret(packed) }),
+  });
+  const created = rows?.[0]?.created_at || new Date().toISOString();
+  return { ok: true, pinSet: true, unlocked: true, unlockUntil: new Date(new Date(created).getTime() + WALLET_UNLOCK_MS).toISOString() };
+}
+
+export async function lockWallet(userId) {
+  await deleteChainRows(userId, CHAIN_SESSION);
+  return { ok: true, unlocked: false };
+}
+
+export async function changeWalletPin(userId, currentPin, newPin) {
+  assertPinStrength(newPin);
+  const row = await getUserWallet(userId);
+  if (!row) throw codedError("no_wallet", "No wallet.");
+  if (!isPinWrapped(row.ciphertext)) throw codedError("no_pin_set", "No PIN is set on this wallet.");
+  let packed;
+  try {
+    packed = unwrapSecretWithPin(row.ciphertext, currentPin);
+  } catch {
+    throw codedError("wrong_pin", "Current PIN is wrong.");
+  }
+  await db(`wallet_secrets?id=eq.${row.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ ciphertext: wrapSecretWithPin(packed, newPin) }),
+  });
+  await deleteChainRows(userId, CHAIN_SESSION).catch(() => {}); // changing the PIN locks immediately
+  return { ok: true, pinSet: true, unlocked: false };
+}
+
+export async function removeWalletPin(userId, pin) {
+  const row = await getUserWallet(userId);
+  if (!row) throw codedError("no_wallet", "No wallet.");
+  if (!isPinWrapped(row.ciphertext)) return { ok: true, pinSet: false, unlocked: true };
+  let packed;
+  try {
+    packed = unwrapSecretWithPin(row.ciphertext, pin);
+  } catch {
+    throw codedError("wrong_pin", "PIN is wrong.");
+  }
+  await db(`wallet_secrets?id=eq.${row.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ ciphertext: sealSecret(packed) }),
+  });
+  await deleteChainRows(userId, CHAIN_SESSION).catch(() => {});
+  await deleteChainRows(userId, CHAIN_GUARD).catch(() => {});
+  return { ok: true, pinSet: false, unlocked: true };
 }
 
 
@@ -274,14 +491,15 @@ export async function createUserWallet(userId) {
 }
 
 export async function revokeUserWallet(userId) {
-  await db(`wallet_secrets?user_id=eq.${encodeURIComponent(userId)}&chain=eq.solana`, {
+  // Revoke wipes every row for the user: main wallet + session + guard.
+  await db(`wallet_secrets?user_id=eq.${encodeURIComponent(userId)}`, {
     method: "DELETE",
     headers: { Prefer: "return=minimal" },
   });
 }
 
 export async function exportUserWalletSecret(row) {
-  const packed = openSecret(row.ciphertext);
+  const packed = await resolvePackedSecret(row);
   const opened = unpackDeskSecret(packed);
   return opened.secret;
 }
@@ -289,7 +507,7 @@ export async function exportUserWalletSecret(row) {
 async function loadKeypair(row) {
   const { Keypair } = await import("@solana/web3.js");
   const bs58 = (await import("bs58")).default || (await import("bs58"));
-  const packed = openSecret(row.ciphertext);
+  const packed = await resolvePackedSecret(row);
   const opened = unpackDeskSecret(packed);
   return Keypair.fromSecretKey(bs58.decode(opened.secret));
 }
