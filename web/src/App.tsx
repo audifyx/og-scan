@@ -22,6 +22,7 @@ import BetaHome from "./pages/BetaHome";
 import Index from "./pages/Index";
 import Splash from "./pages/Splash";
 import Hub from "./pages/Hub";
+import HubOS from "./pages/HubOS";
 import KOLTracker from "./pages/KOLTracker";
 import PnlTracker from "./pages/PnlTracker";
 import NotFound from "./pages/NotFound";
@@ -631,7 +632,7 @@ const App = () => (
             <Route path="/hq/*" element={<Navigate to="/orbitx-social" replace />} />
 
             {/* ── Protected: App shell ── */}
-            <Route path="/app" element={<Hub />} />
+            <Route path="/app" element={<HubOS />} />
             <Route path="/koltelebot" element={<OwnerPreviewRoute><ProtectedRoute><KOLTracker /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="/kol-tracker" element={<OwnerPreviewRoute><ProtectedRoute><KOLTracker /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="/app/kol-tracker" element={<OwnerPreviewRoute><ProtectedRoute><KOLTracker /></ProtectedRoute></OwnerPreviewRoute>} />
