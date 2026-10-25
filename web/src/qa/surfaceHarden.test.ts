@@ -18,11 +18,11 @@ describe("surface harden + leak scan", () => {
     expect(app).toContain("OwnerPreviewRoute");
     expect(app).toContain("<Route path=\"/terminal\" element={<OwnerPreviewRoute>");
     expect(app).toContain("<Route path=\"/vamp\" element={<OwnerPreviewRoute>");
-    expect(app).toContain("<Route path=\"/supercomputer\" element={<McpSuperComputer />} />");
+    expect(app).toContain("<Route path=\"/supercomputer\" element={<Suspense fallback={<RouteFallback label=\"Supercomputer\" />}><McpSuperComputer /></Suspense>} />");
     expect(app).not.toContain("<Route path=\"/x\" element={<OwnerPreviewRoute>");
     expect(app).toContain("<Route path=\"/:toolSlug\" element={<OwnerPreviewRoute>");
     expect(app).toContain("to=\"/orbitx-social\"");
-    expect(app).toContain("<Route path=\"/support\" element={<SupportCenter />} />");
+    expect(app).toContain("<Route path=\"/support\" element={<Suspense fallback={<RouteFallback label=\"Support\" />}><SupportCenter /></Suspense>} />");
     expect(app).toContain("<Route path=\"/on-chain\" element={<OnChainWorld />} />");
     expect(app).toContain("<Route path=\"/education\" element={<Education />} />");
     expect(app).not.toContain("<Route path=\"/education\" element={<OwnerPreviewRoute>");

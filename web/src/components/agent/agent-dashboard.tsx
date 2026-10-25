@@ -364,7 +364,7 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
       statusWarn={!hasKey || !linkedWallet}
       onRefresh={refresh}
       embedded={embedded}
-      siblingHref="/supercomputer?tab=channels"
+      siblingHref="/supercomputer?tab=connect&section=x"
       siblingLabel="X channel"
       siblingIcon="𝕏"
     >

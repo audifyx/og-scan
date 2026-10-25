@@ -24,12 +24,24 @@ import {
   OS_WALLPAPERS,
   clearIconPositions,
   loadIconPositions,
+  loadOsFolders,
   loadOsSettings,
   saveIconPositions,
+  saveOsFolders,
   saveOsSettings,
   type IconPos,
   type OsSettings,
 } from "./osStore";
+import {
+  addToFolder,
+  createFolder,
+  folderedKeys,
+  removeFromFolder,
+  renameFolder,
+  ungroupFolder,
+  type OsFolder,
+} from "./osFolders";
+import { AppMark } from "./AppMark";
 import "./os.css";
 
 export interface TrendingRow {
@@ -92,9 +104,16 @@ export default function Desktop(props: DesktopProps) {
   const [appsQ, setAppsQ] = useState("");
   const [settingsNav, setSettingsNav] = useState<"system" | "personalization" | "account" | "wallet" | "about">("system");
   const [iconPos, setIconPos] = useState<Record<string, IconPos>>(loadIconPositions);
+  const [folders, setFolders] = useState<OsFolder[]>(loadOsFolders);
+  const [openFolderId, setOpenFolderId] = useState<string | null>(null);
   const [settings, setSettings] = useState<OsSettings>(loadOsSettings);
   const [activeWin, setActiveWin] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const iconEls = useRef(new Map<string, HTMLElement>());
+
+  useEffect(() => {
+    saveOsFolders(folders);
+  }, [folders]);
   const dragRef = useRef<Drag>(null);
   const now = useClock();
 
@@ -189,20 +208,69 @@ export default function Desktop(props: DesktopProps) {
     }
   };
 
-  const onRootUp = () => {
+  const findDropTarget = (x: number, y: number, draggedKey: string): string | null => {
+    for (const [key, el] of iconEls.current) {
+      if (key === draggedKey) continue;
+      const r = el.getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return key;
+    }
+    return null;
+  };
+
+  const onRootUp = (e: React.PointerEvent) => {
     const d = dragRef.current;
     dragRef.current = null;
-    if (d?.type === "icon") {
-      if (d.moved) {
-        setIconPos((prev) => {
-          saveIconPositions(prev);
-          return prev;
-        });
+    if (d?.type !== "icon") return;
+    if (!d.moved) {
+      // Click: folders open their panel, apps open a window.
+      if (d.key.startsWith("folder:")) {
+        setOpenFolderId(d.key.slice("folder:".length));
       } else {
         const app = appByKey.get(d.key);
         if (app) openApp(app);
       }
+      return;
     }
+    if (d.key.startsWith("folder:")) {
+      // Folder icons only move; they never merge into other folders.
+      setIconPos((prev) => {
+        saveIconPositions(prev);
+        return prev;
+      });
+      return;
+    }
+    // iOS-style drop: app onto a folder adds it; app onto an app creates one.
+    const target = findDropTarget(e.clientX, e.clientY, d.key);
+    if (target) {
+      if (target.startsWith("folder:")) {
+        const fid = target.slice("folder:".length);
+        setFolders((prev) => addToFolder(prev, fid, d.key));
+        setIconPos((prev) => {
+          const next = { ...prev };
+          delete next[d.key];
+          saveIconPositions(next);
+          return next;
+        });
+        return;
+      }
+      if (appByKey.get(target)) {
+        const id = `folder-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+        setFolders((prev) => createFolder(prev, id, target, d.key));
+        setIconPos((prev) => {
+          const next = { ...prev };
+          delete next[d.key];
+          delete next[target];
+          saveIconPositions(next);
+          return next;
+        });
+        setOpenFolderId(id);
+        return;
+      }
+    }
+    setIconPos((prev) => {
+      saveIconPositions(prev);
+      return prev;
+    });
   };
 
   const startApps = useMemo(() => {
@@ -224,12 +292,6 @@ export default function Desktop(props: DesktopProps) {
     return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
   })();
 
-  const renderMark = (app: PlatformApp, cls: string) => (
-    <span className={cls} style={{ background: app.iconBg }}>
-      {app.glyph}
-    </span>
-  );
-
   const iconButton = (app: PlatformApp, placed: boolean) => {
     const pos = iconPos[app.key];
     return (
@@ -237,15 +299,50 @@ export default function Desktop(props: DesktopProps) {
         key={app.key}
         type="button"
         className="oxos-icon"
+        ref={(el) => {
+          if (el) iconEls.current.set(app.key, el);
+          else iconEls.current.delete(app.key);
+        }}
         style={placed && pos ? { left: `${pos.x}%`, top: `${pos.y}%` } : undefined}
         onPointerDown={(e) => {
           dragRef.current = { type: "icon", key: app.key, startX: e.clientX, startY: e.clientY, moved: false };
         }}
         onContextMenu={(e) => e.preventDefault()}
-        title={`${app.name} — drag to move, click to open`}
+        title={`${app.name} — drag to move, click to open, drop onto another app to folder them`}
       >
-        {renderMark(app, "oxos-icon__mark")}
+        {<AppMark app={app} className="oxos-icon__mark" />}
         <span className="oxos-icon__label">{app.name}</span>
+      </button>
+    );
+  };
+
+  const folderButton = (f: OsFolder, placed: boolean) => {
+    const pos = iconPos[`folder:${f.id}`];
+    const members = f.appKeys.map((k) => appByKey.get(k)).filter(Boolean) as PlatformApp[];
+    return (
+      <button
+        key={f.id}
+        type="button"
+        className="oxos-icon oxos-folder"
+        ref={(el) => {
+          if (el) iconEls.current.set(`folder:${f.id}`, el);
+          else iconEls.current.delete(`folder:${f.id}`);
+        }}
+        style={placed && pos ? { left: `${pos.x}%`, top: `${pos.y}%` } : undefined}
+        onPointerDown={(e) => {
+          dragRef.current = { type: "icon", key: `folder:${f.id}`, startX: e.clientX, startY: e.clientY, moved: false };
+        }}
+        onContextMenu={(e) => e.preventDefault()}
+        title={`${f.name} — drag to move, click to open, drop apps onto it to add them`}
+      >
+        <span className="oxos-folder__grid">
+          {members.slice(0, 4).map((m) => (
+            <span key={m.key} className="oxos-folder__mini" style={{ background: m.iconBg }}>
+              {m.glyph}
+            </span>
+          ))}
+        </span>
+        <span className="oxos-icon__label">{f.name}</span>
       </button>
     );
   };
@@ -264,7 +361,7 @@ export default function Desktop(props: DesktopProps) {
           <div className="oxos-appgrid">
             {appsWinList.map((a) => (
               <button key={a.key} type="button" className="oxos-appcell" onClick={() => openApp(a)}>
-                {renderMark(a, "oxos-appcell__mark")}
+                {<AppMark app={a} className="oxos-appcell__mark" />}
                 <span className="oxos-appcell__name">{a.name}</span>
                 <span className="oxos-appcell__cap">{a.caption}</span>
               </button>
@@ -490,8 +587,12 @@ export default function Desktop(props: DesktopProps) {
     );
   };
 
-  const unplaced = desktopApps.filter((a) => !iconPos[a.key]);
-  const placed = desktopApps.filter((a) => iconPos[a.key]);
+  const foldered = useMemo(() => folderedKeys(folders), [folders]);
+  const visibleDesktopApps = desktopApps.filter((a) => !foldered.has(a.key));
+  const unplaced = visibleDesktopApps.filter((a) => !iconPos[a.key]);
+  const placed = visibleDesktopApps.filter((a) => iconPos[a.key]);
+  const unplacedFolders = folders.filter((f) => !iconPos[`folder:${f.id}`]);
+  const placedFolders = folders.filter((f) => iconPos[`folder:${f.id}`]);
 
   return (
     <div
@@ -515,9 +616,83 @@ export default function Desktop(props: DesktopProps) {
 
       {/* Desktop icons: free-placed ones float, the rest sit in a centered grid */}
       <div className="oxos-icons" onPointerDown={() => setActiveWin(null)}>
-        <div className="oxos-icon-grid">{unplaced.map((a) => iconButton(a, false))}</div>
+        <div className="oxos-icon-grid">
+          {unplaced.map((a) => iconButton(a, false))}
+          {unplacedFolders.map((f) => folderButton(f, false))}
+        </div>
         {placed.map((a) => iconButton(a, true))}
+        {placedFolders.map((f) => folderButton(f, true))}
       </div>
+
+      {/* Folder panel — iOS-style folder view */}
+      {openFolderId &&
+        (() => {
+          const folder = folders.find((f) => f.id === openFolderId);
+          if (!folder) return null;
+          const members = folder.appKeys.map((k) => appByKey.get(k)).filter(Boolean) as PlatformApp[];
+          return (
+            <div className="oxos-folderpanel">
+              <div className="oxos-folderpanel__backdrop" onClick={() => setOpenFolderId(null)} />
+              <div className="oxos-folderpanel__card">
+                <div className="oxos-folderpanel__head">
+                  <input
+                    key={folder.id}
+                    className="oxos-folderpanel__name"
+                    defaultValue={folder.name}
+                    aria-label="Folder name"
+                    onBlur={(e) => setFolders((prev) => renameFolder(prev, folder.id, e.target.value))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                    }}
+                  />
+                  <button type="button" className="oxos-folderpanel__close" onClick={() => setOpenFolderId(null)}>
+                    ✕
+                  </button>
+                </div>
+                <div className="oxos-folderpanel__grid">
+                  {members.map((m) => (
+                    <div key={m.key} className="oxos-folderpanel__cell">
+                      <button
+                        type="button"
+                        className="oxos-folderpanel__app"
+                        onClick={() => {
+                          setOpenFolderId(null);
+                          openApp(m);
+                        }}
+                      >
+                        {<AppMark app={m} className="oxos-folderpanel__mark" />}
+                        <span>{m.name}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="oxos-folderpanel__remove"
+                        title={`Remove ${m.name} from folder`}
+                        onClick={() => setFolders((prev) => removeFromFolder(prev, folder.id, m.key))}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="oxos-folderpanel__foot">
+                  <button
+                    type="button"
+                    className="oxos-btn oxos-btn--ghost"
+                    onClick={() => {
+                      setFolders((prev) => ungroupFolder(prev, folder.id).folders);
+                      setOpenFolderId(null);
+                    }}
+                  >
+                    Ungroup
+                  </button>
+                  <button type="button" className="oxos-btn" onClick={() => setOpenFolderId(null)}>
+                    Done
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
       {/* Windows */}
       {ws.windows.map((w) => {
@@ -545,7 +720,7 @@ export default function Desktop(props: DesktopProps) {
                 dragRef.current = { type: "win", id: w.id, startX: e.clientX, startY: e.clientY, origX: w.x, origY: w.y };
               }}
             >
-              {app && renderMark(app, "oxos-window__mark")}
+              {app && <AppMark app={app} className="oxos-window__mark" />}
               <span className="oxos-window__title">{w.title}</span>
               {app && !app.external && (
                 <button
@@ -619,7 +794,7 @@ export default function Desktop(props: DesktopProps) {
           <div className="oxos-start__pinned">
             {gates.map((a) => (
               <button key={a.key} type="button" className="oxos-start__pin" onClick={() => openApp(a)}>
-                {renderMark(a, "oxos-start__pinmark")}
+                {<AppMark app={a} className="oxos-start__pinmark" />}
                 <span>{a.name}</span>
               </button>
             ))}
@@ -628,7 +803,7 @@ export default function Desktop(props: DesktopProps) {
           <div className="oxos-start__list">
             {startApps.map((a) => (
               <button key={a.key} type="button" className="oxos-start__row" onClick={() => openApp(a)}>
-                {renderMark(a, "oxos-start__rowmark")}
+                {<AppMark app={a} className="oxos-start__rowmark" />}
                 <span className="oxos-start__rowmeta">
                   <span>{a.name}</span>
                   <span>{a.caption}</span>
@@ -663,7 +838,7 @@ export default function Desktop(props: DesktopProps) {
         <span className="oxos-taskbar__sep" />
         {gates.map((a) => (
           <button key={a.key} type="button" className="oxos-taskbar__btn" title={a.name} onClick={() => openApp(a)}>
-            {renderMark(a, "oxos-taskbar__mark")}
+            {<AppMark app={a} className="oxos-taskbar__mark" />}
           </button>
         ))}
         <span className="oxos-taskbar__sep" />

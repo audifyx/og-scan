@@ -10,6 +10,8 @@ export type PlatformApp = {
   tone: string;
   iconBg: string;
   glyph: ReactNode;
+  /** Real icon image (public/icons/<key>.png). Falls back to gradient+glyph when absent or failed. */
+  iconSrc?: string;
   /** Include in the floating mini menu. Default true. */
   menu?: boolean;
   /** Pin as a command-deck gate on /app. */
@@ -203,22 +205,21 @@ export const PlatformGlyph = {
 };
 
 export const PLATFORM_APPS: PlatformApp[] = [
-  { key: "dex", name: "OrbitX DEX", caption: "Scanner & trade", href: "/ORBITX_DEX", tone: "#2F80FF", iconBg: "linear-gradient(145deg, #5BA8FF 0%, #1A6CFF 48%, #0037A3 100%)", glyph: PlatformGlyph.dex, dock: true },
-  { key: "trade", name: "Trade", caption: "Phantom buy & sell", href: "/trade", tone: "#AB9FF2", iconBg: "linear-gradient(145deg, #C9BFFF 0%, #AB9FF2 46%, #6B5FD4 100%)", glyph: PlatformGlyph.trade },
-  { key: "shop", name: "Shop", caption: "Credits + burn access", href: "/shop", tone: "#2DD4BF", iconBg: "linear-gradient(145deg, #5EEAD4 0%, #14B8A6 48%, #115E59 100%)", glyph: PlatformGlyph.shop, dock: true },
-  { key: "supercomputer", name: "Super Computer", caption: "One MCP · every channel", href: "/supercomputer", tone: "#5EEAD4", iconBg: "linear-gradient(145deg, #99F6E4 0%, #2DD4BF 48%, #0F766E 100%)", glyph: PlatformGlyph.ai, dock: true },
-  { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#A78BFA", iconBg: "linear-gradient(145deg, #C4B5FD 0%, #8B5CF6 48%, #5B21B6 100%)", glyph: PlatformGlyph.social },
-  { key: "city", name: "City", caption: "3D OrbitX city", href: "/Orbitxcity", tone: "#34D399", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #10B981 48%, #065F46 100%)", glyph: PlatformGlyph.city, dock: true },
-  { key: "nft", name: "NFT Market", caption: "Mint & trade", href: "/nft", tone: "#00FFA3", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #00C776 48%, #047857 100%)", glyph: PlatformGlyph.nft },
-  { key: "bagwork", name: "Bagwork", caption: "Earn USDC", href: "/bagwork", tone: "#F0C75E", iconBg: "linear-gradient(145deg, #FDE68A 0%, #F0C75E 48%, #B8860B 100%)", glyph: PlatformGlyph.bagwork },
-  { key: "education", name: "Education", caption: "Learn the ecosystem", href: "/education", tone: "#22D3EE", iconBg: "linear-gradient(145deg, #67E8F9 0%, #22D3EE 48%, #0E7490 100%)", glyph: PlatformGlyph.education, dock: true },
-  { key: "support", name: "Support", caption: "Live tickets & chat", href: "/support", tone: "#A78BFA", iconBg: "linear-gradient(145deg, #C4B5FD 0%, #8B5CF6 48%, #5B21B6 100%)", glyph: PlatformGlyph.support },
-  { key: "scanner", name: "Scanner", caption: "Forensic scan", href: "/orbitx-scanner", tone: "#14E0C8", iconBg: "linear-gradient(145deg, #5EEAD4 0%, #00C6B8 48%, #00766E 100%)", glyph: PlatformGlyph.scanner, visibility: "admin" },
-  { key: "vamp", name: "Anti-Vamp", caption: "Originality checks", href: "/vamp", tone: "#67E8F9", iconBg: "linear-gradient(145deg, #A5F3FC 0%, #67E8F9 48%, #0891B2 100%)", glyph: PlatformGlyph.vamp, menu: false, visibility: "admin" },
-  { key: "koltracker", name: "KOL Tracker", caption: "Wallet alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(145deg, #86EFAC 0%, #22C55E 48%, #065F46 100%)", glyph: PlatformGlyph.kol, menu: false, visibility: "admin" },
-  { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(145deg, #FDBA74 0%, #F97316 48%, #B45309 100%)", glyph: PlatformGlyph.pnl, menu: false, visibility: "admin" },
-  { key: "hq", name: "HQ", caption: "Social headquarters", href: "/hq", tone: "#F472B6", iconBg: "linear-gradient(145deg, #F9A8D4 0%, #EC4899 48%, #9D174D 100%)", glyph: PlatformGlyph.hq, visibility: "admin" },
-  { key: "gaming", name: "Degen Tower", caption: "Climb & win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(145deg, #FB7185 0%, #FF3EAA 48%, #B20067 100%)", glyph: PlatformGlyph.gaming, menu: false, visibility: "admin" },
+  { key: "dex", name: "OrbitX DEX", caption: "Scanner & trade", href: "/ORBITX_DEX", tone: "#2F80FF", iconBg: "linear-gradient(145deg, #5BA8FF 0%, #1A6CFF 48%, #0037A3 100%)", glyph: PlatformGlyph.dex, iconSrc: "/icons/dex.png", dock: true },
+  { key: "trade", name: "Trade", caption: "Phantom buy & sell", href: "/trade", tone: "#AB9FF2", iconBg: "linear-gradient(145deg, #C9BFFF 0%, #AB9FF2 46%, #6B5FD4 100%)", glyph: PlatformGlyph.trade, iconSrc: "/icons/trade.png" },
+  { key: "shop", name: "Shop", caption: "Credits + burn access", href: "/shop", tone: "#2DD4BF", iconBg: "linear-gradient(145deg, #5EEAD4 0%, #14B8A6 48%, #115E59 100%)", glyph: PlatformGlyph.shop, iconSrc: "/icons/shop.png", dock: true },
+  { key: "supercomputer", name: "Super Computer", caption: "One MCP · every channel", href: "/supercomputer", tone: "#5EEAD4", iconBg: "linear-gradient(145deg, #99F6E4 0%, #2DD4BF 48%, #0F766E 100%)", glyph: PlatformGlyph.ai, iconSrc: "/icons/supercomputer.png", dock: true },
+  { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#A78BFA", iconBg: "linear-gradient(145deg, #C4B5FD 0%, #8B5CF6 48%, #5B21B6 100%)", glyph: PlatformGlyph.social, iconSrc: "/icons/social.png" },
+  { key: "city", name: "City", caption: "3D OrbitX city", href: "/Orbitxcity", tone: "#34D399", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #10B981 48%, #065F46 100%)", glyph: PlatformGlyph.city, iconSrc: "/icons/city.png", dock: true, visibility: "admin" },
+  { key: "nft", name: "NFT Market", caption: "Mint & trade", href: "/nft", tone: "#00FFA3", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #00C776 48%, #047857 100%)", glyph: PlatformGlyph.nft, iconSrc: "/icons/nft.png" },
+  { key: "bagwork", name: "Bagwork", caption: "Earn USDC", href: "/bagwork", tone: "#F0C75E", iconBg: "linear-gradient(145deg, #FDE68A 0%, #F0C75E 48%, #B8860B 100%)", glyph: PlatformGlyph.bagwork, iconSrc: "/icons/bagwork.png", menu: false },
+  { key: "education", name: "Education", caption: "Learn the ecosystem", href: "/education", tone: "#22D3EE", iconBg: "linear-gradient(145deg, #67E8F9 0%, #22D3EE 48%, #0E7490 100%)", glyph: PlatformGlyph.education, iconSrc: "/icons/education.png", dock: true },
+  { key: "support", name: "Support", caption: "Live tickets & chat", href: "/support", tone: "#A78BFA", iconBg: "linear-gradient(145deg, #C4B5FD 0%, #8B5CF6 48%, #5B21B6 100%)", glyph: PlatformGlyph.support, iconSrc: "/icons/support.png" },
+  { key: "scanner", name: "Scanner", caption: "Forensic scan", href: "/orbitx-scanner", tone: "#14E0C8", iconBg: "linear-gradient(145deg, #5EEAD4 0%, #00C6B8 48%, #00766E 100%)", glyph: PlatformGlyph.scanner, iconSrc: "/icons/scanner.png", visibility: "admin" },
+  { key: "vamp", name: "Anti-Vamp", caption: "Originality checks", href: "/vamp", tone: "#67E8F9", iconBg: "linear-gradient(145deg, #A5F3FC 0%, #67E8F9 48%, #0891B2 100%)", glyph: PlatformGlyph.vamp, iconSrc: "/icons/vamp.png", menu: false, visibility: "admin" },
+  { key: "koltracker", name: "KOL Tracker", caption: "Wallet alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(145deg, #86EFAC 0%, #22C55E 48%, #065F46 100%)", glyph: PlatformGlyph.kol, iconSrc: "/icons/koltracker.png", menu: false, visibility: "admin" },
+  { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(145deg, #FDBA74 0%, #F97316 48%, #B45309 100%)", glyph: PlatformGlyph.pnl, iconSrc: "/icons/pnltracker.png", menu: false, visibility: "admin" },
+  { key: "gaming", name: "Degen Tower", caption: "Climb & win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(145deg, #FB7185 0%, #FF3EAA 48%, #B20067 100%)", glyph: PlatformGlyph.gaming, iconSrc: "/icons/gaming.png", menu: false, visibility: "admin" },
 ];
 
 export const PLATFORM_BY_KEY = Object.fromEntries(PLATFORM_APPS.map((a) => [a.key, a])) as Record<string, PlatformApp>;
@@ -230,7 +231,7 @@ export const PLATFORM_SECTIONS: PlatformSection[] = [
   { id: "trade", title: "Trade & Launch", subtitle: "DEX, scanner, launch", keys: ["dex", "trade", "scanner", "vamp"] },
   { id: "intel", title: "Intelligence", subtitle: "Trackers and alerts", keys: ["koltracker", "pnltracker"] },
   { id: "mcp", title: "AI Connectors", subtitle: "Super Computer, Telegram, and shop", keys: ["supercomputer", "shop"] },
-  { id: "social", title: "Social", subtitle: "Feed, HQ, and support", keys: ["social", "hq", "support"] },
+  { id: "social", title: "Social", subtitle: "Feed and support", keys: ["social", "support"] },
   { id: "play", title: "Play & Earn", subtitle: "NFTs and tasks", keys: ["nft", "bagwork"] },
 ];
 

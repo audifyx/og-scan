@@ -137,6 +137,16 @@ const SupportCenter = () => {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [lastMsg, setLastMsg] = useState<Record<string, { content: string; is_admin: boolean | null; created_at: string | null }>>({});
+  const [seenAt, setSeenAt] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem("ox-support-seen-v1") || "{}") as Record<string, string>; }
+    catch { return {}; }
+  });
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const skipScrollRef = useRef(false);
   const [subject, setSubject] = useState("");
   const [draftOpeningMessage, setDraftOpeningMessage] = useState("");
   const [draftMessage, setDraftMessage] = useState("");
@@ -152,45 +162,79 @@ const SupportCenter = () => {
   const displayHandle = profile?.username || profile?.display_name || user?.email?.split("@")[0] || "user";
 
   /* ─── Data loading ─── */
+  const fetchLastMessages = useCallback(async (ticketIds: string[]) => {
+    if (ticketIds.length === 0) return;
+    try {
+      const { data, error } = await supabase
+        .from("support_messages")
+        .select("ticket_id,content,is_admin,created_at")
+        .in("ticket_id", ticketIds)
+        .order("created_at", { ascending: false })
+        .limit(300);
+      if (error || !data) return;
+      const first: Record<string, { content: string; is_admin: boolean | null; created_at: string | null }> = {};
+      for (const row of data as { ticket_id: string; content: string; is_admin: boolean | null; created_at: string | null }[]) {
+        if (!first[row.ticket_id]) first[row.ticket_id] = row;
+      }
+      setLastMsg((prev) => ({ ...prev, ...first }));
+    } catch { /* best-effort preview */ }
+  }, []);
+
   const refreshTickets = useCallback(async (showSpinner = false) => {
     if (!user) return;
     if (showSpinner) setRefreshing(true);
     else setLoadingTickets(true);
     try {
-      let query = supabase.from("support_tickets").select("*").order("updated_at", { ascending: false });
+      let query = supabase.from("support_tickets")
+        .select("id,user_id,username,subject,status,updated_at,created_at")
+        .order("updated_at", { ascending: false })
+        .limit(50);
       if (!isSupportAgent) query = query.eq("user_id", user.id);
       const { data, error } = await query;
       if (error) throw error;
       const nextTickets = (data || []) as Ticket[];
       setTickets(nextTickets);
+      setLoadError(false);
+      void fetchLastMessages(nextTickets.map((t) => t.id));
       setActiveTicket((current) => {
         if (!current) return current;
         return nextTickets.find((t) => t.id === current.id) || current;
       });
-    } catch { toast.error("Could not load support tickets"); }
+    } catch { toast.error("Could not load support tickets"); setLoadError(true); }
     finally { setLoadingTickets(false); setRefreshing(false); }
-  }, [isSupportAgent, user]);
+  }, [fetchLastMessages, isSupportAgent, user]);
 
-  const fetchMessages = useCallback(async (ticketId: string) => {
-    setLoadingMessages(true);
+  const fetchMessages = useCallback(async (ticketId: string, before?: string) => {
+    if (before) setLoadingOlder(true);
+    else setLoadingMessages(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("support_messages")
-        .select("*")
+        .select("id,ticket_id,user_id,content,is_admin,created_at")
         .eq("ticket_id", ticketId)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (before) query = query.lt("created_at", before);
+      const { data, error } = await query;
       if (error) throw error;
-      setMessages((data || []) as SupportMessage[]);
+      const rows = ((data || []) as SupportMessage[]).reverse();
+      setHasMoreMessages((data || []).length === 50);
+      if (before) {
+        skipScrollRef.current = true;
+        setMessages((prev) => [...rows, ...prev]);
+      } else {
+        setMessages(rows);
+      }
     } catch { toast.error("Could not load chat history"); }
-    finally { setLoadingMessages(false); }
+    finally { setLoadingMessages(false); setLoadingOlder(false); }
   }, []);
 
   const fetchSupportAgents = useCallback(async () => {
     if (!user) return;
     try {
       const [off, aff] = await Promise.all([
-        supabase.from("profiles").select("user_id,username,display_name,avatar_url,verified,is_official_account,affiliate_org_id").eq("is_official_account", true),
-        supabase.from("profiles").select("user_id,username,display_name,avatar_url,verified,is_official_account,affiliate_org_id").not("affiliate_org_id", "is", null),
+        supabase.from("profiles").select("user_id,username,display_name,avatar_url,verified,is_official_account,affiliate_org_id").eq("is_official_account", true).limit(200),
+        supabase.from("profiles").select("user_id,username,display_name,avatar_url,verified,is_official_account,affiliate_org_id").not("affiliate_org_id", "is", null).limit(200),
       ]);
       const merged = new Map<string, SupportAgentProfile>();
       for (const row of [...((off.data || []) as SupportAgentProfile[]), ...((aff.data || []) as SupportAgentProfile[])]) merged.set(row.user_id, row);
@@ -201,11 +245,28 @@ const SupportCenter = () => {
 
   useEffect(() => { if (!user) return; refreshTickets(); fetchSupportAgents(); }, [fetchSupportAgents, refreshTickets, user]);
 
-  /* ─── Realtime: ticket updates ─── */
+  /* ─── Realtime: ticket updates (upsert payload, no full refetch) ─── */
   useEffect(() => {
     if (!user) return;
     const ch = supabase.channel("support-tickets-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "support_tickets" }, () => refreshTickets(true))
+      .on("postgres_changes", { event: "*", schema: "public", table: "support_tickets" }, (payload: any) => {
+        if (payload?.eventType === "DELETE") {
+          const id = payload.old?.id;
+          if (id) setTickets((prev) => prev.filter((t) => t.id !== id));
+          return;
+        }
+        const row = payload?.new as Ticket | undefined;
+        if (!row?.id) { void refreshTickets(true); return; }
+        setTickets((prev) => {
+          const next = prev.some((t) => t.id === row.id)
+            ? prev.map((t) => (t.id === row.id ? { ...t, ...row } : t))
+            : [row, ...prev];
+          return next
+            .sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")))
+            .slice(0, 50);
+        });
+        setActiveTicket((current) => (current?.id === row.id ? { ...current, ...row } : current));
+      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [refreshTickets, user]);
@@ -230,8 +291,11 @@ const SupportCenter = () => {
     return () => { ch.untrack?.(); supabase.removeChannel(ch); rosterChannelRef.current = null; };
   }, [displayHandle, isSupportAgent, profile, user]);
 
-  /* ─── Scroll to bottom ─── */
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  /* ─── Scroll to bottom (skipped when prepending older messages) ─── */
+  useEffect(() => {
+    if (skipScrollRef.current) { skipScrollRef.current = false; return; }
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const closeRoomChannel = useCallback(() => {
     if (typingTimeoutRef.current) { window.clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = null; }
@@ -250,12 +314,19 @@ const SupportCenter = () => {
     } catch { /* silent */ }
   }, [displayHandle, isSupportAgent, profile, user]);
 
-  /* ─── Realtime: messages + room presence ─── */
+  /* ─── Realtime: messages + room presence (append payload, no refetch) ─── */
   useEffect(() => {
     if (!user || !activeTicket) { closeRoomChannel(); return; }
     fetchMessages(activeTicket.id);
     const msgCh = supabase.channel(`support-messages-${activeTicket.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "support_messages", filter: `ticket_id=eq.${activeTicket.id}` }, () => { fetchMessages(activeTicket.id); refreshTickets(true); })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "support_messages", filter: `ticket_id=eq.${activeTicket.id}` }, (payload: any) => {
+        const row = payload?.new as SupportMessage | undefined;
+        if (!row?.id) return;
+        setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, row]));
+        setLastMsg((prev) => ({ ...prev, [row.ticket_id]: { content: row.content, is_admin: row.is_admin, created_at: row.created_at } }));
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "support_messages", filter: `ticket_id=eq.${activeTicket.id}` }, () => { fetchMessages(activeTicket.id); })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "support_messages", filter: `ticket_id=eq.${activeTicket.id}` }, () => { fetchMessages(activeTicket.id); })
       .subscribe();
     const roomCh = supabase.channel(`support-room-${activeTicket.id}`, { config: { presence: { key: user.id } } });
     roomCh.on("presence", { event: "sync" }, () => {
@@ -280,8 +351,23 @@ const SupportCenter = () => {
   }, [activeTicket, closeRoomChannel, displayHandle, fetchMessages, isSupportAgent, profile, refreshTickets, updateRoomPresence, user]);
 
   /* ─── Actions ─── */
+  const markSeen = useCallback((ticketId: string) => {
+    const now = new Date().toISOString();
+    setSeenAt((prev) => {
+      const next = { ...prev, [ticketId]: now };
+      try { localStorage.setItem("ox-support-seen-v1", JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
+  const openTicket = useCallback((ticket: Ticket) => {
+    markSeen(ticket.id);
+    setActiveTicket(ticket);
+  }, [markSeen]);
+
   const submitTicket = async () => {
-    if (!user || !subject.trim()) return;
+    if (!user || !subject.trim() || submitting) return;
+    setSubmitting(true);
     try {
       const { data, error } = await supabase.from("support_tickets").insert({
         user_id: user.id, username: profile?.username || displayHandle,
@@ -298,6 +384,7 @@ const SupportCenter = () => {
       const agentIds = supportAgents.map((a) => a.user_id).filter((id) => id && id !== user.id);
       if (agentIds.length > 0) void notifyUsers(agentIds, { type: "support_ticket", title: `🎫 New ticket from ${profile?.username || displayHandle}`, message: subject.trim(), url: "/support", data: { ticketId: data.id } });
     } catch { toast.error("Could not create support ticket"); }
+    finally { setSubmitting(false); }
   };
 
   const sendMessage = async () => {
@@ -441,6 +528,18 @@ const SupportCenter = () => {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+            {!loadingMessages && messages.length > 0 && hasMoreMessages && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => { const oldest = messages[0]?.created_at; if (oldest) void fetchMessages(activeTicket.id, oldest); }}
+                  disabled={loadingOlder}
+                  className="rounded-full border border-border/50 bg-muted/30 px-4 py-1.5 text-[12px] font-semibold text-muted-foreground hover:bg-muted/60 transition disabled:opacity-50"
+                >
+                  {loadingOlder ? "Loading…" : "Load older messages"}
+                </button>
+              </div>
+            )}
             {loadingMessages ? (
               <div className="flex justify-center py-16">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/30" />
@@ -605,10 +704,11 @@ const SupportCenter = () => {
                 </button>
                 <button
                   onClick={submitTicket}
-                  disabled={!subject.trim()}
-                  className="flex-1 rounded-full bg-primary py-2.5 text-[14px] font-bold text-primary-foreground hover:bg-primary/80 disabled:opacity-40 transition"
+                  disabled={!subject.trim() || submitting}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-full bg-primary py-2.5 text-[14px] font-bold text-primary-foreground hover:bg-primary/80 disabled:opacity-40 transition"
                 >
-                  Submit Ticket
+                  {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {submitting ? "Submitting…" : "Submit Ticket"}
                 </button>
               </div>
             </div>
@@ -636,10 +736,10 @@ const SupportCenter = () => {
         {isSupportAgent ? (
           <div className="mb-8">
             {/* Header row */}
-            <div className="rounded-3xl border border-violet-500/20 bg-gradient-to-br from-violet-600/10 via-card to-card p-6 sm:p-8">
+            <div className="rounded-3xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-card p-6 sm:p-8">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-400/30 bg-violet-500/15 text-violet-300">
+                  <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/25 bg-primary/15 text-primary">
                     <Inbox className="h-7 w-7" />
                     {openCount > 0 && (
                       <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 text-[10px] font-black text-black">
@@ -650,7 +750,7 @@ const SupportCenter = () => {
                   <div>
                     <div className="flex items-center gap-2">
                       <h1 className="text-2xl font-black text-foreground">Support Inbox</h1>
-                      <span className="rounded-full border border-violet-400/30 bg-violet-500/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-violet-300">
+                      <span className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-primary">
                         Agent View
                       </span>
                     </div>
@@ -666,7 +766,7 @@ const SupportCenter = () => {
                   <span className="text-[12px] font-semibold text-foreground/70">
                     You're online
                   </span>
-                  <Shield className="h-3.5 w-3.5 text-violet-300 ml-1" />
+                  <Shield className="h-3.5 w-3.5 text-primary ml-1" />
                 </div>
               </div>
 
@@ -758,6 +858,20 @@ const SupportCenter = () => {
           <div className="flex justify-center py-20">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/30" />
           </div>
+        ) : loadError && tickets.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4 rounded-3xl border border-border/40 bg-muted/10">
+            <Inbox className="h-10 w-10 text-muted-foreground/20" />
+            <div className="text-center">
+              <p className="text-[15px] font-bold text-muted-foreground/60">Couldn't load tickets</p>
+              <p className="text-[12px] text-muted-foreground/35 mt-1">Check your connection and try again.</p>
+            </div>
+            <button
+              onClick={() => void refreshTickets()}
+              className="flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-[13px] font-bold text-primary-foreground hover:bg-primary/80 transition"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> Retry
+            </button>
+          </div>
         ) : filteredTickets.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4 rounded-3xl border border-border/40 bg-muted/10">
             <Inbox className="h-10 w-10 text-muted-foreground/20" />
@@ -784,10 +898,16 @@ const SupportCenter = () => {
               const meta = statusMeta(ticket.status);
               const StatusIcon = meta.icon;
               const isResolved = ticket.status === "resolved";
+              const lm = lastMsg[ticket.id];
+              const seen = seenAt[ticket.id];
+              const unread = Boolean(
+                lm && (!seen || (lm.created_at && new Date(lm.created_at).getTime() > new Date(seen).getTime())) &&
+                (isSupportAgent ? !lm.is_admin : lm.is_admin),
+              );
               return (
                 <button
                   key={ticket.id}
-                  onClick={() => setActiveTicket(ticket)}
+                  onClick={() => openTicket(ticket)}
                   className="w-full flex items-center gap-4 rounded-2xl border border-border/50 bg-card/60 px-5 py-4 text-left transition hover:bg-card hover:border-border/80 hover:shadow-sm group"
                 >
                   <div className={cn("flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full", isResolved ? "bg-green-400/10 border border-green-400/20" : "bg-primary/10 border border-primary/20")}>
@@ -800,7 +920,17 @@ const SupportCenter = () => {
                         <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
                         {meta.label}
                       </span>
+                      {unread && (
+                        <span className="flex-shrink-0 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-black">
+                          New reply
+                        </span>
+                      )}
                     </div>
+                    {lm && (
+                      <p className="truncate text-[12px] text-muted-foreground/50">
+                        {lm.is_admin ? "Support: " : ""}{lm.content}
+                      </p>
+                    )}
                     <div className="flex items-center gap-2">
                       {isSupportAgent && ticket.username && (
                         <span className="text-[12px] text-muted-foreground/50">@{ticket.username}</span>

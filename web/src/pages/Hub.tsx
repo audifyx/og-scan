@@ -190,7 +190,8 @@ export default function Hub() {
   const platformSections = useMemo(() => visiblePlatformSections(showOwnerSurfaces), [showOwnerSurfaces]);
   const searchableApps = useMemo(() => {
     // Admin apps live ONLY behind the Admin button — never duplicated in the regular list.
-    const base = [...catalogApps];
+    // Bagwork is hidden from every menu (route stays live at /bagwork).
+    const base = [...catalogApps].filter((a) => a.key !== "bagwork");
     // Owner-only: Coming Soon button lives in the Apps list for audifyx@gmail.com.
     if (isOwnerIdentity) {
       base.push({
@@ -512,7 +513,7 @@ export default function Hub() {
       <div className="ox-deck__gates">
         {GATE_KEYS.map((key) => {
           const app = PLATFORM_BY_KEY[key];
-          if (!app) return null;
+          if (!app || !catalogApps.some((c) => c.key === app.key)) return null;
           const copy = GATE_COPY[key];
           return (
             <button key={app.key} type="button" className="ox-gate" onClick={() => push({ id: "app", appKey: app.key })}>

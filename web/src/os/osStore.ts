@@ -36,6 +36,7 @@ export const DEFAULT_OS_SETTINGS: OsSettings = {
 
 const SETTINGS_KEY = "orbitxos:settings:v1";
 const ICONS_KEY = "orbitxos:icons:v1";
+const FOLDERS_KEY = "orbitxos:folders:v1";
 
 export type IconPos = { x: number; y: number }; // percentages 0..100
 
@@ -87,4 +88,27 @@ export function clearIconPositions() {
   } catch {
     /* ignore */
   }
+}
+
+export interface StoredFolder {
+  id: string;
+  name: string;
+  appKeys: string[];
+}
+
+export function loadOsFolders(): StoredFolder[] {
+  const saved = readJson<StoredFolder[]>(FOLDERS_KEY);
+  if (!Array.isArray(saved)) return [];
+  return saved.filter(
+    (f) =>
+      f &&
+      typeof f.id === "string" &&
+      typeof f.name === "string" &&
+      Array.isArray(f.appKeys) &&
+      f.appKeys.length > 0,
+  );
+}
+
+export function saveOsFolders(folders: StoredFolder[]) {
+  writeJson(FOLDERS_KEY, folders);
 }

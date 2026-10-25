@@ -277,7 +277,7 @@
 .osc-verified { color: var(--osc-gold); flex-shrink: 0; align-self: center; }
 .osc-actions { display: flex; align-items: center; justify-content: space-between; margin: 4px -8px -4px; color: #71767b; }
 .osc-act { display: flex; align-items: center; gap: 1px; font-size: 13px; font-weight: 400; transition: color 0.12s; }
-.osc-act__pill { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 999px; transition: background 0.12s; }
+.osc-act__pill { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px; transition: background 0.12s; }
 .osc-act:hover .osc-act__pill { background: rgba(59,130,246,0.12); }
 .osc-act:hover { color: var(--osc-blue-hi); }
 .osc-act--green:hover { color: #22c55e; } .osc-act--green:hover .osc-act__pill { background: rgba(34,197,94,0.12); }

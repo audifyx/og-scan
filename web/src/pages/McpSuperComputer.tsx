@@ -1,22 +1,30 @@
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Suspense, useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
-  Bot, ChevronRight, Command, Cpu, KeyRound, Rocket, Settings2,
+  Bot, ChevronRight, Command, Cpu, KeyRound, Loader2, Rocket, Settings2,
   ShoppingBag, WalletCards, X, Zap,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { isOwnerIdentity } from "@/lib/ownerDesk";
-import { AgentDashboard } from "@/components/agent/agent-dashboard";
-import { McpShop } from "@/components/agent/McpShop";
-import { TradeDesk } from "@/components/agent/TradeDesk";
-import { InAppWalletPanel } from "@/components/agent/InAppWalletPanel";
-import XMcpPage from "@/pages/XMcpPage";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import {
   IosAppShell, IosNav, IosRailBrand, IosRailLink, IosTabBar,
   type IosTabItem,
 } from "@/components/app-shell/IosAppShell";
 import "./mcp-super-computer.css";
+
+const AgentDashboard = lazyWithRetry(() => import("@/components/agent/agent-dashboard").then((m) => ({ default: m.AgentDashboard })));
+const McpShop = lazyWithRetry(() => import("@/components/agent/McpShop").then((m) => ({ default: m.McpShop })));
+const TradeDesk = lazyWithRetry(() => import("@/components/agent/TradeDesk").then((m) => ({ default: m.TradeDesk })));
+const InAppWalletPanel = lazyWithRetry(() => import("@/components/agent/InAppWalletPanel").then((m) => ({ default: m.InAppWalletPanel })));
+const XMcpPage = lazyWithRetry(() => import("@/pages/XMcpPage"));
+
+const PanelFallback = (
+  <div className="flex justify-center py-12">
+    <Loader2 className="h-5 w-5 animate-spin text-white/30" />
+  </div>
+);
 
 /* ── 6 tabs. One place per thing. ──
    home      → Overview dashboard
@@ -34,7 +42,7 @@ const mainTabs: { id: MainTab; label: string; short: string; icon: React.ReactNo
   { id: "wallet", label: "Wallet", short: "Wallet", icon: <WalletCards size={18} /> },
   { id: "trade", label: "Trade", short: "Trade", icon: <Zap size={18} /> },
   { id: "shop", label: "Shop", short: "Shop", icon: <ShoppingBag size={18} /> },
-  { id: "launchpad", label: "Launchpad", short: "Pad", icon: <Rocket size={18} /> },
+  { id: "launchpad", label: "Launchpad", short: "Launch", icon: <Rocket size={18} /> },
 ];
 
 const TAB_ALIASES: Record<string, MainTab> = {
@@ -48,6 +56,12 @@ function resolveTab(v: string | null): MainTab {
   return TAB_ALIASES[v] || "home";
 }
 
+type ConnectSection = "account" | "mcp" | "x" | "ai";
+
+function parseSection(v: string | null): ConnectSection {
+  return v === "mcp" || v === "x" || v === "ai" ? v : "account";
+}
+
 function StatusPill({ ready, children }: { ready: boolean; children: React.ReactNode }) {
   return <span className={`supercomputer-status ${ready ? "is-ready" : "is-pending"}`}><i />{children}</span>;
 }
@@ -57,18 +71,27 @@ export default function McpSuperComputer() {
   const { address: walletAddress, ready: walletReady, label: walletLabel } = useActiveTradingWallet();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState<MainTab>(() => resolveTab(searchParams.get("tab")));
-  const [connectSection, setConnectSection] = useState<"account" | "mcp" | "x" | "ai">("account");
+  const [connectSection, setConnectSection] = useState<ConnectSection>(() => parseSection(searchParams.get("section")));
 
   useEffect(() => {
     const r = resolveTab(searchParams.get("tab"));
     if (r !== tab) setTab(r);
-  }, [searchParams, tab]);
+    if (r === "connect") {
+      const s = parseSection(searchParams.get("section"));
+      if (s !== connectSection) setConnectSection(s);
+    }
+  }, [searchParams, tab, connectSection]);
 
   const go = (next: MainTab) => {
     setTab(next);
     const p = new URLSearchParams();
     if (next !== "home") p.set("tab", next);
     setSearchParams(p, { replace: true });
+  };
+
+  const goConnect = (section: ConnectSection) => {
+    setConnectSection(section);
+    setSearchParams({ tab: "connect", section }, { replace: true });
   };
 
   const accountReady = Boolean(user);
@@ -115,12 +138,24 @@ export default function McpSuperComputer() {
                   </div>
                   <div className="sc-hero-orb"><Cpu size={28} /><span>ORBITX</span></div>
                 </div>
+                <div className="sc-steps">
+                  <p className="sc-steps__def">
+                    <strong>MCP lets your AI use OrbitX.</strong> Connect once, then Claude, ChatGPT, or Grok can trade, check your wallet, and shop for you.{" "}
+                    <Link to="/mcp/guide" className="sc-steps__guide">Read the guide <ChevronRight size={14} /></Link>
+                  </p>
+                  <ol className="sc-steps__list">
+                    <li><button type="button" onClick={() => go("connect")}><span className="sc-steps__num">1</span><strong>Connect account</strong><small>Sign in to OrbitX</small></button></li>
+                    <li><button type="button" onClick={() => go("wallet")}><span className="sc-steps__num">2</span><strong>Create wallet</strong><small>Your in-app wallet</small></button></li>
+                    <li><button type="button" onClick={() => go("connect")}><span className="sc-steps__num">3</span><strong>Connect Claude / ChatGPT / Grok</strong><small>Plug in your AI client</small></button></li>
+                  </ol>
+                </div>
                 <div className="sc-grid">
                   {[
                     { id: "connect" as MainTab, icon: <KeyRound size={20} />, title: "Connect", desc: "Account, API keys, X, AI — all auth in one place", cta: accountReady ? "Manage connections" : "Connect account" },
                     { id: "wallet" as MainTab, icon: <WalletCards size={20} />, title: "Wallet", desc: "Your in-app wallet. Create, view, export.", cta: walletReady ? "Open wallet" : "Set up wallet" },
                     { id: "trade" as MainTab, icon: <Zap size={20} />, title: "Trade", desc: "Natural-language trade commands with exact amounts.", cta: "Open trade desk" },
                     { id: "shop" as MainTab, icon: <ShoppingBag size={20} />, title: "Shop", desc: "Access passes, credits, and upgrades.", cta: "Browse shop" },
+                    { id: "launchpad" as MainTab, icon: <Rocket size={20} />, title: "Launchpad", desc: "Launch tokens from AI — separate MCP, desk-wallet signing.", cta: "Open launchpad" },
                   ].map((c) => (
                     <button key={c.id} type="button" className="sc-card" onClick={() => go(c.id)}>
                       <div className="sc-card-icon">{c.icon}</div>
@@ -148,16 +183,16 @@ export default function McpSuperComputer() {
                     { id: "x" as const, label: "X Account", icon: <X size={15} /> },
                     { id: "ai" as const, label: "AI Clients", icon: <Cpu size={15} /> },
                   ].map((s) => (
-                    <button key={s.id} type="button" className={connectSection === s.id ? "is-active" : ""} onClick={() => setConnectSection(s.id)}>
+                    <button key={s.id} type="button" className={connectSection === s.id ? "is-active" : ""} onClick={() => goConnect(s.id)}>
                       {s.icon}{s.label}
                     </button>
                   ))}
                 </div>
                 <div className="sc-embedded">
-                  {connectSection === "account" && <AgentDashboard embedded initialTab="setup" />}
-                  {connectSection === "mcp" && <AgentDashboard embedded initialTab="keys" />}
-                  {connectSection === "x" && <XMcpPage embedded initialTab="account" />}
-                  {connectSection === "ai" && <AgentDashboard embedded initialTab="connect" />}
+                  {connectSection === "account" && <Suspense fallback={PanelFallback}><AgentDashboard embedded initialTab="setup" hideTabs={["shop", "wallet"]} /></Suspense>}
+                  {connectSection === "mcp" && <Suspense fallback={PanelFallback}><AgentDashboard embedded initialTab="keys" hideTabs={["shop", "wallet"]} /></Suspense>}
+                  {connectSection === "x" && <Suspense fallback={PanelFallback}><XMcpPage embedded initialTab="account" /></Suspense>}
+                  {connectSection === "ai" && <Suspense fallback={PanelFallback}><AgentDashboard embedded initialTab="connect" hideTabs={["shop", "wallet"]} /></Suspense>}
                 </div>
               </div>
             )}
@@ -170,7 +205,7 @@ export default function McpSuperComputer() {
                   <h2>Your wallet.</h2>
                   <p>The only wallet in OrbitX. Create it, view balances, export the key.</p>
                 </div>
-                <InAppWalletPanel />
+                <Suspense fallback={PanelFallback}><InAppWalletPanel /></Suspense>
               </div>
             )}
 
@@ -183,7 +218,7 @@ export default function McpSuperComputer() {
                   <p>Plain language, exact contract address, review before signing.</p>
                   <StatusPill ready={walletReady}>{walletReady ? "Wallet ready" : "Wallet needed"}</StatusPill>
                 </div>
-                <TradeDesk walletAddress={walletAddress} onOpenWallet={() => go("wallet")} />
+                <Suspense fallback={PanelFallback}><TradeDesk walletAddress={walletAddress} onOpenWallet={() => go("wallet")} /></Suspense>
               </div>
             )}
 
@@ -196,7 +231,7 @@ export default function McpSuperComputer() {
                   <p>Passes, credits, and upgrades. One checkout, works everywhere.</p>
                 </div>
                 <div className="sc-shop-grid">
-                  <McpShop variant="both" walletAddress={walletAddress} />
+                  <Suspense fallback={PanelFallback}><McpShop variant="both" walletAddress={walletAddress} /></Suspense>
                 </div>
               </div>
             )}

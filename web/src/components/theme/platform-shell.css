@@ -374,6 +374,38 @@
   border-style: solid;
   border-color: rgba(141, 240, 221, 0.75);
 }
+/* OBX tile: black button, gold OBX mark (replaces the teal ◈ glyph). */
+.ox-platform-fab__btn {
+  background: #000;
+  border-color: rgba(232, 184, 74, 0.45);
+  color: #e8b84a;
+  box-shadow:
+    0 0 0 1px rgba(232, 184, 74, 0.12),
+    0 14px 38px rgba(0, 0, 0, 0.45),
+    0 0 30px rgba(232, 184, 74, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.ox-platform-fab__btn::before {
+  border-color: rgba(232, 184, 74, 0.38);
+}
+.ox-platform-fab__btn::after {
+  background: radial-gradient(circle at 78% 18%, rgba(232, 184, 74, 0.9), rgba(232, 184, 74, 0) 42%);
+}
+.ox-platform-fab__mark {
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+.ox-platform-fab.is-open .ox-platform-fab__btn {
+  border-color: rgba(232, 184, 74, 0.75);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.6),
+    0 0 20px rgba(232, 184, 74, 0.22);
+}
+.ox-platform-fab.is-open .ox-platform-fab__btn::before {
+  border-color: rgba(232, 184, 74, 0.75);
+}
 .ox-platform-fab__panel {
   border-radius: 30px;
   padding: 0.9rem 0.8rem 0.7rem;

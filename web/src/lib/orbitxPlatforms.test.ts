@@ -13,33 +13,39 @@ import {
   visiblePlatformSections,
 } from "./orbitxPlatforms";
 
-const REQUIRED = ["shop", "city", "agents", "os", "play", "intel", "onchain", "agentcalls", "predict", "supercomputer", "dex", "telegram", "trade", "support", "education"];
-const OWNER_ONLY = ["terminal", "scanner", "vamp", "koltracker", "pnltracker", "hq", "gaming"];
+// Current intended layout (2026-10-25 overhaul):
+// - City is admin-only (owner email); everyone else gets the app 404.
+// - Bagwork is hidden from every menu (menu: false); its route stays live.
+// - HQ was removed outright (it was just a copy of the Social app).
+const PUBLIC_LIVE = ["dex", "trade", "shop", "supercomputer", "social", "nft", "education", "support"];
+const OWNER_ONLY = ["city", "scanner", "vamp", "koltracker", "pnltracker", "gaming"];
 
 describe("OrbitX platform catalog", () => {
-  it("lists the live world / MCP / intel platforms on /app", () => {
+  it("lists the live platforms on /app", () => {
     const keys = PLATFORM_APPS.map((a) => a.key);
-    for (const key of REQUIRED) {
-      expect(keys).toContain(key);
-    }
+    for (const key of PUBLIC_LIVE) expect(keys).toContain(key);
     expect(PLATFORM_APPS.find((a) => a.key === "shop")?.href).toBe("/shop");
     expect(PLATFORM_APPS.find((a) => a.key === "city")?.href).toBe("/Orbitxcity");
-    expect(PLATFORM_APPS.find((a) => a.key === "agents")?.href).toBe("/orbitxagents");
-    expect(PLATFORM_APPS.find((a) => a.key === "os")?.href).toBe("/os");
-    expect(PLATFORM_APPS.find((a) => a.key === "play")?.href).toBe("/play");
-    expect(PLATFORM_APPS.find((a) => a.key === "intel")?.href).toBe("/intel");
-    expect(PLATFORM_APPS.find((a) => a.key === "hq")?.href).toBe("/hq");
-    expect(PLATFORM_APPS.find((a) => a.key === "predict")?.href).toBe("/predictions");
-    expect(PLATFORM_APPS.find((a) => a.key === "telegram")?.href).toBe("/telegram");
-    expect(PLATFORM_APPS.find((a) => a.key === "support")?.href).toBe("/support");
-    expect(PLATFORM_APPS.find((a) => a.key === "onchain")?.href).toBe("/on-chain");
-    expect(PLATFORM_APPS.find((a) => a.key === "agentcalls")?.href).toBe("/agentcalls");
-    expect(PLATFORM_APPS.find((a) => a.key === "agentcalls")?.visibility).not.toBe("admin");
+    expect(PLATFORM_APPS.find((a) => a.key === "city")?.visibility).toBe("admin");
     expect(PLATFORM_APPS.find((a) => a.key === "education")?.href).toBe("/education");
+    expect(PLATFORM_APPS.find((a) => a.key === "support")?.href).toBe("/support");
+  });
+
+  it("has no HQ entry (removed — it was a copy of Social)", () => {
+    expect(PLATFORM_APPS.some((a) => a.key === "hq")).toBe(false);
+    expect(PLATFORM_SECTIONS.flatMap((s) => s.keys)).not.toContain("hq");
+  });
+
+  it("hides Bagwork from every menu while keeping its route", () => {
+    const bagwork = PLATFORM_APPS.find((a) => a.key === "bagwork");
+    expect(bagwork?.href).toBe("/bagwork");
+    expect(bagwork?.menu).toBe(false);
+    expect(HOME_GRID_KEYS).not.toContain("bagwork");
+    expect(PLATFORM_MENU.some((a) => a.key === "bagwork")).toBe(false);
   });
 
   it("puts live platforms on the public home grid and mini menu", () => {
-    for (const key of REQUIRED) {
+    for (const key of PUBLIC_LIVE) {
       expect(HOME_GRID_KEYS).toContain(key);
       expect(PLATFORM_MENU.some((a) => a.key === key)).toBe(true);
     }
@@ -49,19 +55,19 @@ describe("OrbitX platform catalog", () => {
     }
   });
 
-  it("shows unfinished surfaces only to the owner", () => {
+  it("shows admin-only surfaces only to the owner", () => {
     const publicKeys = publicPlatformApps().map((a) => a.key);
     for (const key of OWNER_ONLY) {
       expect(publicKeys).not.toContain(key);
       expect(visiblePlatformApps(true).some((a) => a.key === key)).toBe(true);
     }
-    expect(visibleHomeGridKeys(true)).toContain("terminal");
+    expect(visibleHomeGridKeys(true)).toContain("city");
     expect(visiblePlatformMenu(true).some((a) => a.key === "supercomputer")).toBe(true);
     expect(visiblePlatformSections(false).every((s) => s.keys.every((k) => !OWNER_ONLY.includes(k)))).toBe(true);
   });
 
-  it("pins Shop, Agent, DEX, City, On-Chain, and Education as command deck gates", () => {
-    expect(HOME_DOCK.map((a) => a.key)).toEqual(["dex", "onchain", "supercomputer", "shop", "city", "education"]);
+  it("pins DEX, Shop, Super Computer, City, and Education as command deck gates", () => {
+    expect(HOME_DOCK.map((a) => a.key)).toEqual(["dex", "shop", "supercomputer", "city", "education"]);
   });
 
   it("covers every catalog key in a section", () => {

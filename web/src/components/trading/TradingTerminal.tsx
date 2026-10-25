@@ -453,6 +453,9 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   const [mintAlerts, setMintAlerts] = useState<any[]>([]);
   const [tradeBusy, setTradeBusy] = useState(false);
   const [tradeStage, setTradeStage] = useState("");
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewQuote, setReviewQuote] = useState<JupQuote | null>(null);
+  const [reviewQuoteLoading, setReviewQuoteLoading] = useState(false);
   const [tradeErr, setTradeErr] = useState("");
   const [tradeSig, setTradeSig] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -1118,6 +1121,31 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     connection,
   ]);
 
+  /** Open the pre-trade review modal (confirmation UI only — execution still
+   *  goes through the existing handleSwap path). */
+  const openReview = useCallback(() => {
+    if (!selectedMint) return;
+    setTradeErr("");
+    if (!tradeReady || !tradePk) {
+      setShowWalletPicker(true);
+      return;
+    }
+    if (swapMode === "buy") {
+      const n = Number(buyAmt);
+      if (!Number.isFinite(n) || n <= 0) {
+        setTradeErr("Enter a valid SOL amount");
+        return;
+      }
+    }
+    setReviewQuote(null);
+    setReviewOpen(true);
+    setReviewQuoteLoading(true);
+    getFreshQuote()
+      .then((q) => setReviewQuote(q))
+      .catch(() => null)
+      .finally(() => setReviewQuoteLoading(false));
+  }, [selectedMint, tradeReady, tradePk, swapMode, buyAmt, getFreshQuote]);
+
   const selectSearchResult = useCallback(
     (token: JupTokenInfo) => {
       const mint = (token as any).address || token.id;
@@ -1221,7 +1249,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               if (id === "limit") setSwapMode("buy");
               if (id === "tp" || id === "stop") setSwapMode("sell");
             }}
-            className={`rounded-lg py-2 text-[11px] font-bold transition-colors ${
+            className={`rounded-lg py-2 text-[11px] font-bold transition-colors min-h-[44px] ${
               orderMode === id ? "bg-white text-black" : "text-white/70 hover:text-white/70"
             }`}
             title={id === "market" ? "Instant swap" : "Price alert ? Telegram / webhook"}
@@ -1237,7 +1265,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             <button
               type="button"
               onClick={() => setSwapMode("buy")}
-              className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+              className={`flex-1 py-2 text-xs font-semibold transition-colors min-h-[44px] ${
                 swapMode === "buy"
                   ? "border-b-2 border-green-400 bg-green-500/20 text-green-400"
                   : "text-white/70 hover:text-white/60"
@@ -1248,7 +1276,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             <button
               type="button"
               onClick={() => setSwapMode("sell")}
-              className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+              className={`flex-1 py-2 text-xs font-semibold transition-colors min-h-[44px] ${
                 swapMode === "sell"
                   ? "border-b-2 border-red-400 bg-red-500/20 text-red-400"
                   : "text-white/70 hover:text-white/60"
@@ -1298,7 +1326,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                     key={p}
                     type="button"
                     onClick={() => setBuyAmt(String(p))}
-                    className={`rounded-xl border py-2.5 font-mono text-[12px] font-bold transition-colors ${
+                    className={`rounded-xl border py-2.5 font-mono text-[12px] font-bold transition-colors min-h-[44px] ${
                       buyAmt === String(p)
                         ? "border-white bg-white text-black"
                         : "border-white/10 bg-white/[0.04] text-white/70 hover:border-white/25 hover:text-white"
@@ -1315,7 +1343,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                     value={presetDraft}
                     onChange={(e) => setPresetDraft(e.target.value)}
                     placeholder="0.05, 0.1, 0.25, 0.5, 1"
-                    className="h-9 border-white/10 bg-white/[0.04] font-mono text-xs"
+                    className="h-11 border-white/10 bg-white/[0.04] font-mono text-xs"
                   />
                   <button
                     type="button"
@@ -1333,7 +1361,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                       setEditPresetsOpen(false);
                       toast({ title: "Buy presets saved" });
                     }}
-                    className="h-9 w-full rounded-lg bg-white text-xs font-bold text-black"
+                    className="h-11 w-full rounded-lg bg-white text-xs font-bold text-black"
                   >
                     Save presets
                   </button>
@@ -1349,7 +1377,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                     key={p}
                     type="button"
                     onClick={() => setSellPct(p)}
-                    className={`rounded-xl border py-2.5 font-mono text-[12px] font-bold transition-colors ${
+                    className={`rounded-xl border py-2.5 font-mono text-[12px] font-bold transition-colors min-h-[44px] ${
                       sellPct === p
                         ? "border-red-400 bg-red-500/20 text-red-300"
                         : "border-white/10 bg-white/[0.04] text-white/70 hover:border-white/25"
@@ -1371,7 +1399,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               step="0.5"
               value={slippage}
               onChange={(e) => setSlippage(Number(e.target.value) || 10)}
-              className="h-8 w-20 border-white/[0.07] bg-white/[0.04] font-mono text-xs"
+              className="h-11 w-20 border-white/[0.07] bg-white/[0.04] font-mono text-xs"
             />
             <span className="text-[10px] text-white/60">%</span>
           </div>
@@ -1486,7 +1514,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
 
           <Button
             type="button"
-            onClick={() => void handleSwap()}
+            onClick={openReview}
             disabled={tradeBusy || !selectedMint}
             className={`h-12 w-full rounded-xl text-sm font-semibold disabled:opacity-60 ${
               swapMode === "buy"
@@ -1928,6 +1956,10 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       </aside>
 
       {/* ??????????????? CENTER PANEL ??????????????? */}
+      {/* Mobile swap first: on phones the trade panel sits above the chart. */}
+      <div className="lg:hidden border-b border-white/[0.07] bg-[#050505]">
+        {renderSwapPanel()}
+      </div>
       <div className={`flex min-w-0 flex-col ${deskMode ? "min-h-[85vh] lg:min-h-0 lg:flex-1 lg:overflow-hidden" : "min-h-0 flex-1 overflow-hidden"}`}>
 
         {/* Mobile market browser ? only in full mode */}
@@ -2451,9 +2483,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           </div>
         )}
 
-        {renderSwapPanel()}
-
-        {/* Token Info on mobile */}
+        {/* Token Info on mobile (swap panel now renders above the chart) */}
         {security && (
           <div className="p-4">
             <h3 className="text-xs font-semibold text-white/60 mb-3 flex items-center gap-1.5">
@@ -2489,6 +2519,55 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         <div className="h-20" />
       </div>
     </div>
+
+    {/* ── Pre-trade review (confirmation UI only; Confirm runs handleSwap) ── */}
+    {reviewOpen && (
+      <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center" onClick={() => setReviewOpen(false)}>
+        <div className="w-full max-w-sm space-y-4 rounded-3xl border border-white/10 bg-[#111111] p-5" onClick={(e) => e.stopPropagation()}>
+          {(() => {
+            const dec = mintDecimalsRef.current[selectedMint || ""];
+            const recv = swapMode === "buy"
+              ? (buyReceiveUi ?? (reviewQuote && typeof dec === "number" ? Number(reviewQuote.outAmount) / 10 ** dec : null))
+              : (reviewQuote ? Number(reviewQuote.outAmount) / 1e9 : null);
+            const minRecv = recv != null ? recv * (1 - (Number(slippage) || 0) / 100) : null;
+            const impact = reviewQuote?.priceImpactPct != null && Number.isFinite(Number(reviewQuote.priceImpactPct))
+              ? Number(reviewQuote.priceImpactPct) * 100
+              : null;
+            const recvSym = swapMode === "buy" ? (selectedToken?.symbol || t?.symbol || "tokens") : "SOL";
+            const row = "flex items-center justify-between gap-3 text-[13px]";
+            return (
+              <>
+                <div>
+                  <h3 className="text-base font-bold">Review trade</h3>
+                  <p className="text-[12px] text-white/50">Confirm the details before execution.</p>
+                </div>
+                <div className="space-y-2.5">
+                  <div className={row}><span className="text-white/50">Action</span><span className="font-bold">{swapMode === "buy" ? `Buy ${t?.symbol || "token"}` : `Sell ${sellPct}% ${t?.symbol || "token"}`}</span></div>
+                  <div className={row}><span className="text-white/50">You pay</span><span className="font-mono font-semibold">{swapMode === "buy" ? `${buyAmt} SOL` : `${sellPct}% of balance`}</span></div>
+                  <div className={row}><span className="text-white/50">You receive</span><span className="font-mono font-semibold">{recv != null ? `≈ ${fmtTok(recv, recv >= 1000 ? 2 : 4)} ${recvSym}` : reviewQuoteLoading ? "Estimating…" : "Estimate unavailable"}</span></div>
+                  <div className={row}><span className="text-white/50">Slippage</span><span className="font-mono font-semibold">{slippage}%</span></div>
+                  <div className={row}><span className="text-white/50">Minimum received</span><span className="font-mono font-semibold">{minRecv != null ? `≈ ${fmtTok(minRecv, minRecv >= 1000 ? 2 : 4)} ${recvSym}` : "—"}</span></div>
+                  <div className={row}><span className="text-white/50">Price impact</span><span className="font-mono font-semibold">{impact != null ? `${impact.toFixed(2)}%` : "—"}</span></div>
+                  <div className={row}><span className="text-white/50">Fee</span><span className="font-semibold">{reviewQuote ? "Included in route quote" : "Applied by the route at execution"}</span></div>
+                </div>
+                <p className="text-[11px] leading-relaxed text-white/40">The quote refreshes at execution — final amounts may vary slightly from the estimate above.</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setReviewOpen(false)} className="min-h-[44px] flex-1 rounded-xl border border-white/10 bg-white/[0.05] text-sm font-bold">Cancel</button>
+                  <button
+                    type="button"
+                    disabled={tradeBusy}
+                    onClick={() => { setReviewOpen(false); void handleSwap(); }}
+                    className={`min-h-[44px] flex-1 rounded-xl text-sm font-bold disabled:opacity-60 ${swapMode === "buy" ? "bg-green-500 text-black" : "bg-red-500 text-white"}`}
+                  >
+                    Confirm trade
+                  </button>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      </div>
+    )}
     </>
   );
 };

@@ -131,6 +131,7 @@ export default function TradeToken() {
   const { openPicker, picker } = useTradeWalletPicker();
   const connection = new Connection(browserWalletRpcUrl(), "confirmed");
   const [loading, setLoading] = useState(true);
+  const [sectionsLoading, setSectionsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<TabId>("overview");
   const [d, setD] = useState<any>(null);
@@ -156,9 +157,17 @@ export default function TradeToken() {
   const [posCost, setPosCost] = useState<number | null>(null);
 
   const loadBundle = (m: string) => {
-    setLoading(true);
-    return fetchTokenBundle(m).then((b) => {
-      setD(b.token);
+    // Progressive render: header + chart come from the token fetch alone;
+    // the seven below-fold sections fill in from the full bundle.
+    const hadHeader = Boolean(d);
+    if (!hadHeader) setLoading(true);
+    setSectionsLoading(true);
+    const head = fetchTokenOnly(m).then((x) => {
+      if (x) setD(x);
+      setLoading(false);
+    });
+    const sections = fetchTokenBundle(m).then((b) => {
+      if (b.token) setD(b.token);
       setSafetyApi(b.safety);
       setTraders(Array.isArray(b.traders?.traders) ? b.traders.traders : []);
       setHolders(Array.isArray(b.traders?.holders) ? b.traders.holders : []);
@@ -172,8 +181,9 @@ export default function TradeToken() {
       setXray(b.xray);
       setResearch(b.research);
       setTradeTape(Array.isArray(b.tradeTape) ? b.tradeTape : []);
-      setLoading(false);
+      setSectionsLoading(false);
     });
+    return Promise.all([head, sections]);
   };
 
   useEffect(() => {
@@ -430,7 +440,11 @@ export default function TradeToken() {
   if (!d || (!d.token && !d.meta)) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#05080c] px-6 text-center">
-        <p className="text-sm text-white/70">No token found for this address</p>
+        <p className="text-sm text-white/70">Couldn't load this token</p>
+        <p className="text-xs text-white/40">The token data failed to load, or this address has no market data.</p>
+        <button type="button" onClick={() => void loadBundle(mint)} className="rounded-full bg-white px-5 py-2 text-sm font-bold text-black">
+          Retry
+        </button>
         <button type="button" onClick={() => navigate("/trade")} className="text-sm text-[#3de7ff] underline">
           Back to markets
         </button>
@@ -743,7 +757,12 @@ export default function TradeToken() {
           </div>
         )}
 
-        {tab === "holders" && (
+        {sectionsLoading && ["holders", "traders", "trades", "safety", "xray", "forensics", "ath"].includes(tab) && (
+          <div className="flex items-center justify-center gap-2 py-12 text-[12px] text-white/50">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading market data…
+          </div>
+        )}
+        {tab === "holders" && !sectionsLoading && (
           <div className="space-y-2">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
               <Users className="h-3.5 w-3.5" />
@@ -809,7 +828,7 @@ export default function TradeToken() {
           </div>
         )}
 
-        {tab === "traders" && (
+        {tab === "traders" && !sectionsLoading && (
           <div className="space-y-2">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
               <Activity className="h-3.5 w-3.5" /> Top traders
@@ -908,7 +927,7 @@ export default function TradeToken() {
           </div>
         )}
 
-        {tab === "trades" && (
+        {tab === "trades" && !sectionsLoading && (
           <div className="space-y-2">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
               <Flame className="h-3.5 w-3.5 text-[#3de7ff]" /> Live trades
@@ -996,7 +1015,7 @@ export default function TradeToken() {
           </div>
         )}
 
-        {tab === "safety" && (
+        {tab === "safety" && !sectionsLoading && (
           <div className="space-y-3">
             <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
               <Shield className="h-3.5 w-3.5" /> Safety
@@ -1023,7 +1042,7 @@ export default function TradeToken() {
           </div>
         )}
 
-        {tab === "xray" && (
+        {tab === "xray" && !sectionsLoading && (
           <div className="space-y-3">
             <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
               <AlertTriangle className="h-3.5 w-3.5" /> Risk X-ray
@@ -1089,7 +1108,7 @@ export default function TradeToken() {
           </div>
         )}
 
-        {tab === "forensics" && (
+        {tab === "forensics" && !sectionsLoading && (
           <div className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">Forensics</h3>
             {!forensics ? (
@@ -1120,7 +1139,7 @@ export default function TradeToken() {
           </div>
         )}
 
-        {tab === "ath" && (
+        {tab === "ath" && !sectionsLoading && (
           <div className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">All-time high</h3>
             {!ath?.ok && ath?.athPrice == null ? (

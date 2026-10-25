@@ -44,7 +44,8 @@ export default function HubOS() {
   const homeGridKeys = useMemo(() => visibleHomeGridKeys(showOwnerSurfaces), [showOwnerSurfaces]);
 
   const searchableApps = useMemo(() => {
-    const base = [...catalogApps];
+    // Bagwork is hidden from every menu (route stays live at /bagwork).
+    const base = [...catalogApps].filter((a) => a.key !== "bagwork");
     if (isOwnerIdentity) {
       base.push({
         key: "__coming_soon",
@@ -68,9 +69,14 @@ export default function HubOS() {
     return base;
   }, [catalogApps, isOwnerIdentity]);
 
+  // Gates respect catalog visibility: admin-only apps (City) never pin for
+  // public users, even though PLATFORM_BY_KEY still holds their entry.
   const gates = useMemo(
-    () => GATE_KEYS.map((k) => PLATFORM_BY_KEY[k]).filter(Boolean) as PlatformApp[],
-    [],
+    () =>
+      GATE_KEYS.map((k) => PLATFORM_BY_KEY[k])
+        .filter(Boolean)
+        .filter((a) => catalogApps.some((c) => c.key === a.key)) as PlatformApp[],
+    [catalogApps],
   );
 
   const desktopApps = useMemo(() => {

@@ -23,6 +23,7 @@ import Index from "./pages/Index";
 import Splash from "./pages/Splash";
 import Hub from "./pages/Hub";
 import HubOS from "./pages/HubOS";
+import { CityAdminRoute } from "./components/CityAdminRoute";
 import KOLTracker from "./pages/KOLTracker";
 import PnlTracker from "./pages/PnlTracker";
 import NotFound from "./pages/NotFound";
@@ -66,17 +67,6 @@ import TerminalHome from "./pages/orbitx/TerminalHome";
 import TerminalTrade from "./pages/orbitx/TerminalTrade";
 import TerminalPortfolio from "./pages/orbitx/TerminalPortfolio";
 import TerminalLaunch from "./pages/orbitx/TerminalLaunch";
-import TradeApp from "./trade/TradeApp";
-import TradeHome from "./trade/TradeHome";
-import TradeDeskPage from "./trade/TradeDeskPage";
-import TradeToken from "./trade/TradeToken";
-import TradeLeaderboard from "./trade/TradeLeaderboard";
-import TradeProfile from "./trade/TradeProfile";
-import TradeWallet from "./trade/TradeWallet";
-import TradeNotifications from "./trade/TradeNotifications";
-import TradeMore from "./trade/TradeMore";
-import TradePortfolio from "./trade/TradePortfolio";
-import TradeWalletManager from "./trade/TradeWalletManager";
 
 function TradeMintRedirect() {
   const { mint } = useParams<{ mint: string }>();
@@ -120,6 +110,19 @@ const LaunchpadCreatorProfile = lazyWithRetry(() => import("./pages/LaunchpadCre
 const LaunchpadSwipe = lazyWithRetry(() => import("./pages/LaunchpadSwipe"));
 const ModerationAdmin = lazyWithRetry(() => import("./social/pages/ModerationAdmin"));
 const InviteLanding = lazyWithRetry(() => import("./social/pages/InviteLanding"));
+const TradeApp = lazyWithRetry(() => import("./trade/TradeApp"));
+const TradeHome = lazyWithRetry(() => import("./trade/TradeHome"));
+const TradeDeskPage = lazyWithRetry(() => import("./trade/TradeDeskPage"));
+const TradeToken = lazyWithRetry(() => import("./trade/TradeToken"));
+const TradeLeaderboard = lazyWithRetry(() => import("./trade/TradeLeaderboard"));
+const TradeProfile = lazyWithRetry(() => import("./trade/TradeProfile"));
+const TradeWallet = lazyWithRetry(() => import("./trade/TradeWallet"));
+const TradeNotifications = lazyWithRetry(() => import("./trade/TradeNotifications"));
+const TradeMore = lazyWithRetry(() => import("./trade/TradeMore"));
+const TradePortfolio = lazyWithRetry(() => import("./trade/TradePortfolio"));
+const TradeWalletManager = lazyWithRetry(() => import("./trade/TradeWalletManager"));
+const SupportCenter = lazyWithRetry(() => import("./pages/SupportCenter"));
+const McpSuperComputer = lazyWithRetry(() => import("./pages/McpSuperComputer"));
 import LaunchpadPump from "./pages/orbitx/LaunchpadPump";
 import LaunchpadToken from "./pages/orbitx/LaunchpadToken";
 import LaunchpadAbout from "./pages/orbitx/LaunchpadAbout";
@@ -155,7 +158,6 @@ const NftItemPage = lazyWithRetry(() => import("./pages/nft/NftItemPage"));
 import Callouts from "./pages/Callouts";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
-import SupportCenter from "./pages/SupportCenter";
 import VampPortal from "./pages/VampPortal";
 import { SupportNotificationBanner } from "./components/SupportNotificationBanner";
 import Terms from "./pages/Terms";
@@ -207,7 +209,6 @@ import AutoTweet from "./pages/AutoTweet";
 import PodcastPublisher from "./pages/PodcastPublisher";
 import ClipVideoExport from "./pages/ClipVideoExport";
 import InstallApp from "./pages/InstallApp";
-import McpSuperComputer from "./pages/McpSuperComputer";
 import AgentDetailPage from "./pages/AgentDetail";
 import McpAuthPage from "./pages/McpAuthPage";
 import LaunchpadMcpAuthPage from "./pages/LaunchpadMcpAuthPage";
@@ -369,9 +370,11 @@ const App = () => (
               path="/Orbitxcity"
               element={
                 <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#04070f] font-mono text-xs uppercase tracking-[0.2em] text-[#17ff4d]">Loading OrbitX City…</div>}>
-                  <CityGate>
-                    <OrbitxCityPage />
-                  </CityGate>
+                  <CityAdminRoute>
+                    <CityGate>
+                      <OrbitxCityPage />
+                    </CityGate>
+                  </CityAdminRoute>
                 </Suspense>
               }
             />
@@ -460,19 +463,19 @@ const App = () => (
             </Route>
 
             {/* ── OrbitX Trade App (Home · Trade · Leaderboard · Profile) ── */}
-            <Route path="/trade" element={<TradeApp />}>
-              <Route index element={<TradeHome />} />
-              <Route path="home" element={<TradeHome />} />
-              <Route path="desk" element={<TradeDeskPage />} />
-              <Route path="desk/:mint" element={<TradeDeskPage />} />
-              <Route path="leaderboard" element={<TradeLeaderboard />} />
-              <Route path="portfolio" element={<TradePortfolio />} />
-              <Route path="profile" element={<TradeProfile />} />
-              <Route path="wallets" element={<TradeWalletManager />} />
-              <Route path="token/:mint" element={<TradeToken />} />
-              <Route path="wallet/:address" element={<TradeWallet />} />
-              <Route path="notifications" element={<TradeNotifications />} />
-              <Route path="more" element={<TradeMore />} />
+            <Route path="/trade" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeApp /></Suspense>}>
+              <Route index element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeHome /></Suspense>} />
+              <Route path="home" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeHome /></Suspense>} />
+              <Route path="desk" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeDeskPage /></Suspense>} />
+              <Route path="desk/:mint" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeDeskPage /></Suspense>} />
+              <Route path="leaderboard" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeLeaderboard /></Suspense>} />
+              <Route path="portfolio" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradePortfolio /></Suspense>} />
+              <Route path="profile" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeProfile /></Suspense>} />
+              <Route path="wallets" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeWalletManager /></Suspense>} />
+              <Route path="token/:mint" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeToken /></Suspense>} />
+              <Route path="wallet/:address" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeWallet /></Suspense>} />
+              <Route path="notifications" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeNotifications /></Suspense>} />
+              <Route path="more" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeMore /></Suspense>} />
               <Route path=":mint" element={<TradeMintRedirect />} />
             </Route>
 
@@ -736,7 +739,7 @@ const App = () => (
 
             {/* ── Public: Project/legal ── */}
             <Route path="/official-token" element={<OgdexRedirect to="/ORBITX_DEX" />} />
-            <Route path="/support" element={<SupportCenter />} />
+            <Route path="/support" element={<Suspense fallback={<RouteFallback label="Support" />}><SupportCenter /></Suspense>} />
             <Route path="/listen/:spaceId" element={<SpaceReplay />} />
             {/* ── Public: Live space listener (no auth required) ── */}
             <Route path="/space/:spaceId" element={<PublicSpaceListen />} />
@@ -828,7 +831,7 @@ const App = () => (
             <Route path="/ox-desk-m4k9q/intel" element={<AdminRoute><IntelligenceAdmin /></AdminRoute>} />
             <Route path="/alert-settings" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
             {/* Public shell — page handles wallet sign-in (avoids mobile auth spinner traps) */}
-            <Route path="/supercomputer" element={<McpSuperComputer />} />
+            <Route path="/supercomputer" element={<Suspense fallback={<RouteFallback label="Supercomputer" />}><McpSuperComputer /></Suspense>} />
             <Route path="/mcp" element={<Suspense fallback={<RouteFallback label="MCP" />}><McpSetupPage /></Suspense>} />
             <Route path="/mcp/guide" element={<Suspense fallback={<RouteFallback label="MCP Guide" />}><McpGuidePage /></Suspense>} />
             <Route path="/connect-chatgpt" element={<Suspense fallback={<RouteFallback label="Connect to ChatGPT" />}><ConnectChatGptPage /></Suspense>} />

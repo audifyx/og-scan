@@ -245,6 +245,9 @@ export default async function handler(req, res) {
   const type     = url.searchParams.get("type") || "trending";
   const interval = url.searchParams.get("interval") || "24h";
   const limit    = Math.min(Number(url.searchParams.get("limit")) || 100, 200);
+  // Jupiter upstream cap: 2x headroom for post-fetch filters (stables/volume/dedup),
+  // floor 50 so small limits still get a usable pool. Was a hardcoded 500 everywhere.
+  const jupLimit = Math.min(500, Math.max(limit * 2, 50));
   const chain    = (url.searchParams.get("chain") || "solana").toLowerCase();
   cache(res, 15, 45);
 
@@ -331,29 +334,30 @@ export default async function handler(req, res) {
       // DexScreener accepts up to 30 addresses per call
       const CHUNK = 30;
       const dexMap = {};
-      for (let i = 0; i < normCoins.length; i += CHUNK) {
-        const chunk  = normCoins.slice(i, i + CHUNK);
-        const addrs  = chunk.map(c => c.mint).join(",");
-        try {
-          const d = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${addrs}`, {
-            headers: { Accept: "application/json" },
-          }).then(r => r.ok ? r.json() : null).catch(() => null);
-          for (const p of (d?.pairs || [])) {
-            const addr = p.baseToken?.address;
-            if (!addr) continue;
-            const key = addr.toLowerCase();
-            const vol = p.volume?.h24 ?? 0;
-            if (!dexMap[key] || vol > (dexMap[key].volume ?? 0)) {
-              dexMap[key] = {
-                volume:   vol,
-                priceUsd: p.priceUsd ? parseFloat(p.priceUsd) : null,
-                mcap:     p.marketCap ? parseFloat(p.marketCap) : null,
-                change24h: p.priceChange?.h24 ? parseFloat(p.priceChange.h24) : null,
-                liquidity: p.liquidity?.usd ?? null,
-              };
-            }
+      const dexChunks = [];
+      for (let i = 0; i < normCoins.length; i += CHUNK) dexChunks.push(normCoins.slice(i, i + CHUNK));
+      // Chunks are independent — fetch in parallel (was a sequential await loop).
+      const dexResults = await Promise.all(dexChunks.map((chunk) =>
+        fetch(`https://api.dexscreener.com/latest/dex/tokens/${chunk.map((c) => c.mint).join(",")}`, {
+          headers: { Accept: "application/json" },
+        }).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+      ));
+      for (const d of dexResults) {
+        for (const p of (d?.pairs || [])) {
+          const addr = p.baseToken?.address;
+          if (!addr) continue;
+          const key = addr.toLowerCase();
+          const vol = p.volume?.h24 ?? 0;
+          if (!dexMap[key] || vol > (dexMap[key].volume ?? 0)) {
+            dexMap[key] = {
+              volume:   vol,
+              priceUsd: p.priceUsd ? parseFloat(p.priceUsd) : null,
+              mcap:     p.marketCap ? parseFloat(p.marketCap) : null,
+              change24h: p.priceChange?.h24 ? parseFloat(p.priceChange.h24) : null,
+              liquidity: p.liquidity?.usd ?? null,
+            };
           }
-        } catch {}
+        }
       }
 
       // Merge DexScreener data, then filter: volume ≥ $10k
@@ -376,7 +380,7 @@ export default async function handler(req, res) {
 
     // ── Moonshot (Jupiter moonshot-verified tag) ──────────────────────────────
     } else if (type === "moonshot") {
-      const data = await jup(`/tokens/v2/toptraded/24h?limit=500`);
+      const data = await jup(`/tokens/v2/toptraded/24h?limit=${jupLimit}`);
       rows = (Array.isArray(data) ? data : [])
         .filter(t => Array.isArray(t.tags) && t.tags.some(tag => String(tag).toLowerCase().includes("moonshot")))
         .map(t => { const r = normToken(t, "24h"); if (r) r.isMoonshot = true; return r; })
@@ -393,7 +397,7 @@ export default async function handler(req, res) {
 
     // ── FOMO: 1h biggest spikes, must have real volume ────────────────────────
     } else if (type === "fomo") {
-      const data = await jup(`/tokens/v2/toptraded/1h?limit=500`);
+      const data = await jup(`/tokens/v2/toptraded/1h?limit=${jupLimit}`);
       rows = (Array.isArray(data) ? data : [])
         .filter(t => !STABLES.has(String(t.symbol || "").toUpperCase()))
         .map(t => normToken(t, "1h"))
@@ -404,7 +408,7 @@ export default async function handler(req, res) {
 
     // ── Jupiter: verified tokens with strong organic score ────────────────────
     } else if (type === "jupiter") {
-      const data = await jup(`/tokens/v2/toptraded/24h?limit=500`);
+      const data = await jup(`/tokens/v2/toptraded/24h?limit=${jupLimit}`);
       rows = (Array.isArray(data) ? data : [])
         .filter(t => (t.isVerified || (t.organicScore ?? 0) > 40) && !STABLES.has(String(t.symbol || "").toUpperCase()))
         .map(t => { const r = normToken(t, "24h"); if (r) r.isVerified = !!t.isVerified; return r; })
@@ -440,7 +444,7 @@ export default async function handler(req, res) {
 
     // ── Runners: biggest 24h gainers with real liquidity ─────────────────────
     } else if (type === "runners") {
-      const data = await jup(`/tokens/v2/toptraded/24h?limit=500`);
+      const data = await jup(`/tokens/v2/toptraded/24h?limit=${jupLimit}`);
       rows = (Array.isArray(data) ? data : [])
         .filter(t => !STABLES.has(String(t.symbol || "").toUpperCase()))
         .map(t => normToken(t, "24h"))
@@ -476,7 +480,7 @@ export default async function handler(req, res) {
         if (!topMints.length) throw new Error("no kol feed data");
 
         // ── Enrich: Jupiter toptraded (price, volume, mcap, changes) ──────────
-        const jupData = await jup(`/tokens/v2/toptraded/24h?limit=500`).catch(() => []);
+        const jupData = await jup(`/tokens/v2/toptraded/24h?limit=${jupLimit}`).catch(() => []);
         const jupMap  = {};
         for (const t of (Array.isArray(jupData) ? jupData : [])) jupMap[t.id || t.mint] = t;
 
@@ -593,25 +597,27 @@ export default async function handler(req, res) {
       }
       const mints = [...cand.keys()];
       const dexMap = {};
-      for (let i = 0; i < mints.length; i += 30) {
-        const chunk = mints.slice(i, i + 30);
-        try {
-          const d = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${chunk.join(",")}`, { headers: { Accept: "application/json" } })
-            .then(r => r.ok ? r.json() : null).catch(() => null);
-          for (const p of (d?.pairs || [])) {
-            const addr = p.baseToken?.address; if (!addr) continue;
-            const liq = num(p.liquidity?.usd) || 0;
-            if (!dexMap[addr] || liq > (dexMap[addr].liq || 0)) {
-              dexMap[addr] = {
-                liq, vol: num(p.volume?.h24) || 0, price: num(p.priceUsd),
-                mcap: num(p.marketCap) || num(p.fdv) || null,
-                ch1: num(p.priceChange?.h1) || 0, ch24: num(p.priceChange?.h24) || 0,
-                buys: p.txns?.h24?.buys || 0, sells: p.txns?.h24?.sells || 0,
-                icon: p.info?.imageUrl || null, name: p.baseToken?.name || null, symbol: p.baseToken?.symbol || null,
-              };
-            }
+      const dexChunks = [];
+      for (let i = 0; i < mints.length; i += 30) dexChunks.push(mints.slice(i, i + 30));
+      // Chunks are independent — fetch in parallel (was a sequential await loop).
+      const dexResults = await Promise.all(dexChunks.map((chunk) =>
+        fetch(`https://api.dexscreener.com/latest/dex/tokens/${chunk.join(",")}`, { headers: { Accept: "application/json" } })
+          .then((r) => (r.ok ? r.json() : null)).catch(() => null)
+      ));
+      for (const d of dexResults) {
+        for (const p of (d?.pairs || [])) {
+          const addr = p.baseToken?.address; if (!addr) continue;
+          const liq = num(p.liquidity?.usd) || 0;
+          if (!dexMap[addr] || liq > (dexMap[addr].liq || 0)) {
+            dexMap[addr] = {
+              liq, vol: num(p.volume?.h24) || 0, price: num(p.priceUsd),
+              mcap: num(p.marketCap) || num(p.fdv) || null,
+              ch1: num(p.priceChange?.h1) || 0, ch24: num(p.priceChange?.h24) || 0,
+              buys: p.txns?.h24?.buys || 0, sells: p.txns?.h24?.sells || 0,
+              icon: p.info?.imageUrl || null, name: p.baseToken?.name || null, symbol: p.baseToken?.symbol || null,
+            };
           }
-        } catch {}
+        }
       }
       const reasonsFor = (e) => {
         const r = [];
@@ -698,7 +704,7 @@ export default async function handler(req, res) {
     // ── Default: Trending (Jupiter primary + GeckoTerminal fallback) ──────────
     } else {
       try {
-        const data = await jup(`/tokens/v2/toptraded/${interval}?limit=500`);
+        const data = await jup(`/tokens/v2/toptraded/${interval}?limit=${jupLimit}`);
         rows = (Array.isArray(data) ? data : [])
           .filter(t => !STABLES.has(String(t.symbol || "").toUpperCase()))
           .map(t => normToken(t, interval))

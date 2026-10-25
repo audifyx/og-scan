@@ -16,7 +16,7 @@ import {
   Gift, ArrowLeftRight, TrendingDown, Siren, Lock, Gem, CandlestickChart,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { validateUploadFile, safeExtForMime } from "@/lib/safeUpload";
+import { validateUploadFile, safeExtForMime, compressImageFile, supabaseTransformUrl } from "@/lib/safeUpload";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { cn, safeAvatarUrl } from "@/lib/utils";
@@ -65,6 +65,7 @@ interface NotifRow { id: string; type: string; title: string; message: string; i
 interface CommunityLite { id: string; name: string; description: string | null; member_count: number | null; avatar_url?: string | null; icon?: string | null; category?: string | null; }
 
 const FEED_CHANNEL = "social-general";
+const FEED_PAGE_SIZE = 50;
 const MAX_LEN = 500;
 const BOOKMARKS_KEY = "orbitx-x-bookmarks";
 const DRAFT_KEY = "orbitx-x-draft";
@@ -329,7 +330,7 @@ function OnboardingFlow({ suggestions, onFollow, onDone, onConnectWallet, onFirs
             <div className="my-5 max-h-64 space-y-1 overflow-y-auto text-left">
               {suggestions.slice(0, 8).map((s) => (
                 <div key={s.user_id} className="flex items-center gap-3 rounded-2xl p-2 transition hover:bg-white/[0.04]">
-                  <img src={avatarOf(s.avatar_url, s.user_id)} alt="" className="h-10 w-10 rounded-full object-cover" />
+                  <img src={avatarOf(s.avatar_url, s.user_id)} alt="" loading="lazy" className="h-10 w-10 rounded-full object-cover" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1 text-[14px] font-extrabold text-white">
                       <span className="truncate">{s.display_name || s.username}</span>
@@ -541,6 +542,10 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [feedMode, setFeedMode] = useState<"foryou" | "following" | "money">("foryou");
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [feedError, setFeedError] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [feedHasMore, setFeedHasMore] = useState(true);
+  const feedEndRef = useRef<HTMLDivElement>(null);
   const [text, setText] = useState(() => { try { return localStorage.getItem(DRAFT_KEY) || ""; } catch { return ""; } });
   const [posting, setPosting] = useState(false);
   const [pendingImages, setPendingImages] = useState<string[]>([]);
@@ -655,20 +660,55 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
   /* ── Feed data ── */
   const load = useCallback(async () => {
+    setFeedError(false);
+    setFeedHasMore(true);
     try {
       const { data, error } = await supabase
         .from("social_messages")
         .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,repost_of")
-        .eq("channel", FEED_CHANNEL).is("reply_to", null).order("created_at", { ascending: false }).limit(100);
-      if (error) console.error("[social] feed load error:", error.message);
-      if (data) setPosts(data as Post[]);
+        .eq("channel", FEED_CHANNEL).is("reply_to", null).order("created_at", { ascending: false }).range(0, FEED_PAGE_SIZE - 1);
+      if (error) { console.error("[social] feed load error:", error.message); setFeedError(true); }
+      if (data) { setPosts(data as Post[]); setFeedHasMore(data.length === FEED_PAGE_SIZE); }
     } catch (e) {
       console.error("[social] feed load failed:", e);
+      setFeedError(true);
     } finally {
       setLoading(false);
     }
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  /* ── Feed pagination: append older pages as the sentinel scrolls into view ── */
+  const loadMore = useCallback(async () => {
+    if (loading || loadingMore || !feedHasMore || feedError) return;
+    setLoadingMore(true);
+    try {
+      const { data, error } = await supabase
+        .from("social_messages")
+        .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,repost_of")
+        .eq("channel", FEED_CHANNEL).is("reply_to", null).order("created_at", { ascending: false })
+        .range(posts.length, posts.length + FEED_PAGE_SIZE - 1);
+      if (error) { console.error("[social] feed load-more error:", error.message); toast.error("Couldn't load more posts."); }
+      else if (data) {
+        setFeedHasMore(data.length === FEED_PAGE_SIZE);
+        // Realtime prepends shift offsets, so dedupe by id on append.
+        setPosts((prev) => { const seen = new Set(prev.map((p) => p.id)); return [...prev, ...(data as Post[]).filter((p) => !seen.has(p.id))]; });
+      }
+    } catch (e) {
+      console.error("[social] feed load-more failed:", e);
+      toast.error("Couldn't load more posts.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loading, loadingMore, feedHasMore, feedError, posts.length]);
+
+  useEffect(() => {
+    const el = feedEndRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver((entries) => { if (entries[0]?.isIntersecting) loadMore(); }, { root: feedScrollRef.current, rootMargin: "400px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [loadMore]);
 
   useEffect(() => {
     const ch = supabase.channel("x-home-feed")
@@ -829,9 +869,10 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     try {
       for (const file of Array.from(files).slice(0, 4)) {
         if (validateUploadFile(file, { maxMB: 5 })) continue;
-        const ext = safeExtForMime(file.type);
+        const { blob, type } = await compressImageFile(file);
+        const ext = safeExtForMime(type);
         const path = `posts/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-        const { error } = await supabase.storage.from("profile-media").upload(path, file, { contentType: file.type, upsert: false });
+        const { error } = await supabase.storage.from("profile-media").upload(path, blob, { contentType: type, upsert: false });
         if (error) { toast.error("Image upload failed"); continue; }
         const { data } = supabase.storage.from("profile-media").getPublicUrl(path);
         if (data?.publicUrl) setPendingImages((prev) => [...prev, data.publicUrl].slice(0, 4));
@@ -1372,17 +1413,17 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         )}
         <div className="mt-2 flex items-center justify-between border-t border-white/[0.08] pt-2.5">
           <span className="relative flex items-center gap-0.5">
-            <button type="button" onClick={() => composerFileRef.current?.click()} disabled={uploadingImg} className="grid h-9 w-9 place-items-center rounded-full text-[#3b82f6] transition hover:bg-[#3b82f6]/10 disabled:opacity-50" title="Add image">
+            <button type="button" onClick={() => composerFileRef.current?.click()} disabled={uploadingImg} className="grid h-11 w-11 place-items-center rounded-full text-[#3b82f6] transition hover:bg-[#3b82f6]/10 disabled:opacity-50" title="Add image">
               {uploadingImg ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <ImageIcon className="h-[18px] w-[18px]" />}
             </button>
-            <button type="button" onClick={() => setEmojiOpen((v) => !v)} className="grid h-9 w-9 place-items-center rounded-full text-[#3b82f6] transition hover:bg-[#3b82f6]/10" title="Add emoji">
+            <button type="button" onClick={() => setEmojiOpen((v) => !v)} className="grid h-11 w-11 place-items-center rounded-full text-[#3b82f6] transition hover:bg-[#3b82f6]/10" title="Add emoji">
               <Smile className="h-[18px] w-[18px]" />
             </button>
-            <button type="button" onClick={() => setChartPickerOpen(true)} className="grid h-9 w-9 place-items-center rounded-full text-[#f0c75e] transition hover:bg-[#f0c75e]/10" title="Attach price chart">
+            <button type="button" onClick={() => setChartPickerOpen(true)} className="grid h-11 w-11 place-items-center rounded-full text-[#f0c75e] transition hover:bg-[#f0c75e]/10" title="Attach price chart">
               <BarChart3 className="h-[18px] w-[18px]" />
             </button>
             <span className="relative">
-              <button type="button" onClick={() => setPosDir((v) => (v ? null : "long"))} className={cn("grid h-9 w-9 place-items-center rounded-full transition", posDir ? "bg-[#34d399]/15 text-[#34d399]" : "text-[#34d399] hover:bg-[#34d399]/10")} title="Open a position post">
+              <button type="button" onClick={() => setPosDir((v) => (v ? null : "long"))} className={cn("grid h-11 w-11 place-items-center rounded-full transition", posDir ? "bg-[#34d399]/15 text-[#34d399]" : "text-[#34d399] hover:bg-[#34d399]/10")} title="Open a position post">
                 <CandlestickChart className="h-[18px] w-[18px]" />
               </button>
               {posDir && (
@@ -1406,7 +1447,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                 </>
               )}
             </span>
-            <button type="button" onClick={() => setGateOn((v) => !v)} className={cn("grid h-9 w-9 place-items-center rounded-full transition", gateOn ? "bg-[#f0c75e]/15 text-[#f0c75e]" : "text-[#3b82f6] hover:bg-[#3b82f6]/10")} title="Holders only — gate this post to token holders">
+            <button type="button" onClick={() => setGateOn((v) => !v)} className={cn("grid h-11 w-11 place-items-center rounded-full transition", gateOn ? "bg-[#f0c75e]/15 text-[#f0c75e]" : "text-[#3b82f6] hover:bg-[#3b82f6]/10")} title="Holders only — gate this post to token holders">
               <Lock className="h-[18px] w-[18px]" />
             </button>
             {emojiOpen && (
@@ -1617,7 +1658,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     const callTokens = extractCallTokens(p.content);
     return (
       <article onClick={() => onOpen?.(p.id)} className={cn("osc-post x-fade-in group/post relative", onOpen && "osc-post--click")}>
-        <img src={avatarOf(p.avatar_url, p.user_id)} alt="" className="osc-post__avatar transition group-hover/post:ring-[#3b82f6]/50" />
+        <img src={avatarOf(p.avatar_url, p.user_id)} alt="" loading="lazy" width={40} height={40} className="osc-post__avatar transition group-hover/post:ring-[#3b82f6]/50" />
         <div className="min-w-0 flex-1">
           {isRepost && <div className="mb-0.5 flex items-center gap-1.5 text-[12px] font-bold text-white/40"><Repeat2 className="h-3.5 w-3.5" /> @{raw.username || "someone"} reposted</div>}
           <div className="osc-post__head">
@@ -1653,7 +1694,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                 <div className={cn("mt-2 grid gap-1.5 overflow-hidden rounded-2xl border border-white/[0.08]", imgs.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
                   {imgs.map((u, i) => (
                     <a key={i} href={u} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="block overflow-hidden">
-                      <img src={u} alt="" loading="lazy" className={cn("w-full object-cover transition duration-300 hover:scale-[1.02]", imgs.length > 1 ? "h-40" : "max-h-[380px]")} />
+                      <img src={supabaseTransformUrl(u, 1200)} alt="" loading="lazy" onError={(e) => { const el = e.currentTarget; if (el.src !== u) el.src = u; }} className={cn("w-full object-cover transition duration-300 hover:scale-[1.02]", imgs.length > 1 ? "h-40" : "max-h-[380px]")} />
                     </a>
                   ))}
                 </div>
@@ -1749,7 +1790,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
   const FollowCard = ({ s }: { s: Suggestion }) => (
     <div className="osc-row osc-row--hover">
-      <img src={avatarOf(s.avatar_url, s.user_id)} alt="" className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10" />
+      <img src={avatarOf(s.avatar_url, s.user_id)} alt="" loading="lazy" className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1 text-[14px] font-extrabold text-white">
           <span className="truncate">{s.display_name || s.username}</span>
@@ -1783,9 +1824,9 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   };
 
   const CommunityRow = ({ c }: { c: CommunityLite }) => (
-    <button type="button" onClick={() => { setCommView("groups"); setTab("communities"); }} className="osc-row w-full text-left">
+    <button type="button" onClick={() => { window.location.href = `/c/${c.id}`; }} className="osc-row w-full text-left">
       {c.avatar_url ? (
-        <img src={c.avatar_url} alt="" className="h-11 w-11 shrink-0 rounded-2xl object-cover ring-1 ring-white/[0.1]" />
+        <img src={c.avatar_url} alt="" loading="lazy" className="h-11 w-11 shrink-0 rounded-2xl object-cover ring-1 ring-white/[0.1]" />
       ) : (
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#3b82f6]/30 to-[#f0c75e]/15 text-[18px] font-extrabold text-white ring-1 ring-white/[0.1]">
           {(c.name || "?").slice(0, 1).toUpperCase()}
@@ -1878,6 +1919,17 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                   </div>
                 ))}
               </div>
+            ) : feedError ? (
+              <div className="osc-empty">
+                <div className="osc-empty__icon"><Sparkles className="h-6 w-6 text-[#f0c75e]" /></div>
+                <div className="mt-4 text-[20px] font-extrabold text-white">Couldn't load the feed</div>
+                <p className="mx-auto mt-2 max-w-xs text-[14px] leading-relaxed text-white/40">
+                  Check your connection and try again.
+                </p>
+                <button type="button" onClick={() => { setLoading(true); load(); }} className="osc-btn-primary mt-5">
+                  Retry
+                </button>
+              </div>
             ) : shownPosts.length === 0 ? (
               <div className="osc-empty">
                 <div className="osc-empty__icon"><Sparkles className="h-6 w-6 text-[#f0c75e]" /></div>
@@ -1896,7 +1948,16 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                 )}
               </div>
             ) : (
-              <>{shownPosts.map((p) => <PostCard key={p.id} p={p} onOpen={setOpenPostId} />)}</>
+              <>
+                {shownPosts.map((p) => <PostCard key={p.id} p={p} onOpen={setOpenPostId} />)}
+                <div ref={feedEndRef} aria-hidden="true" />
+                {loadingMore && (
+                  <div className="py-4 text-center text-[13px] text-white/40">Loading more…</div>
+                )}
+                {!feedHasMore && posts.length > 0 && !loadingMore && (
+                  <div className="py-4 text-center text-[13px] text-white/30">You&apos;re caught up</div>
+                )}
+              </>
             )}
           </>
         );

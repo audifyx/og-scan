@@ -81,6 +81,9 @@ export default async function handler(req, res) {
   const url  = new URL(req.url, "http://x");
   const mint = url.searchParams.get("mint") || "";
   const chainHint = (url.searchParams.get("chain") || "").toLowerCase();
+  // ?sections=header returns only the token header (Jupiter + DexScreener) so
+  // the page can paint before ATH/intel work finishes. Default is unchanged.
+  const headerOnly = url.searchParams.get("sections") === "header";
   if (!mint) return send(res, 400, { error: "mint required" });
   cache(res, 10, 30);
 
@@ -195,8 +198,8 @@ export default async function handler(req, res) {
       jup(`/tokens/v2/search?query=${mint}`).catch(() => null),
       fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { headers: { Accept: "application/json" } })
         .then((r) => (r.ok ? r.json() : null)).catch(() => null),
-      callFn("og-scan-token", { query: mint }).catch(() => null),
-      callFn(INTEL_FN, { mint }).catch(() => null),
+      headerOnly ? Promise.resolve(null) : callFn("og-scan-token", { query: mint }).catch(() => null),
+      headerOnly ? Promise.resolve(null) : callFn(INTEL_FN, { mint }).catch(() => null),
     ]);
 
     const jupRaw = Array.isArray(jupArr) ? (jupArr.find((t) => (t.id || t.mint) === mint) || null) : null;
@@ -267,67 +270,90 @@ export default async function handler(req, res) {
       if (!token.holderCount) token.holderCount = scanMeta.holderCount;
     }
 
-    // 4. ATH via the canonical (deepest) GeckoTerminal pool + real supply.
-    let { athPrice, athMcap } = await computeAth(
-      "solana", mint, token, best?.pairAddress || token?.firstPool?.id || null
-    );
-    // Fallback to OG Scan's stored ATH mcap if GeckoTerminal had no history.
-    if (athMcap == null && scanMeta?.athMcap) athMcap = num(scanMeta.athMcap);
-
-    // 5. Mapped pair list.
+    // 4. Mapped pair list (pure mapping — moved before ATH so the header
+    // fast path below can return it without waiting on ATH/intel).
     const pairsMapped = pairs.slice(0, 5).map((p) => ({
       dex: p.dexId, address: p.pairAddress, priceUsd: num(p.priceUsd),
       liquidity: num(p.liquidity?.usd), volume24h: num(p.volume?.h24), change24h: num(p.priceChange?.h24),
       txnsBuys: p.txns?.h24?.buys || 0, txnsSells: p.txns?.h24?.sells || 0,
     }));
 
-    // Backfill top holders if the intel function returned none (e.g. its
-    // Birdeye source is down / Helius index overloaded). Uses the resilient
-    // largest-accounts helper so the holders *list* / whales tab keep working.
-    // NOTE: this sample length is NOT a total holder count.
-    let intelOut = intel?.ok ? intel : null;
-    if (!intelOut?.holders?.length) {
-      const hp = token?.priceUsd ?? null;
-      const hb = await Promise.race([
-        getLabeledHolders(mint, hp).catch(() => ({ holders: [] })),
-        new Promise((r) => setTimeout(() => r({ holders: [] }), 6500)),
-      ]);
-      if (hb.holders?.length) {
-        intelOut = { ...(intelOut || { ok: true }), ok: true, holders: hb.holders, holdersBackfilled: true, holdersSource: hb.source };
-      }
+    if (headerOnly) {
+      return send(res, 200, {
+        mint, token,
+        pairs: pairsMapped,
+        meta: {
+          chain: "solana",
+          socials: links.socials, banner: links.banner,
+          ageDays: token?.ageDays ?? null, createdAt: token?.createdAt ?? null,
+          pairDexId: best?.dexId || null,
+        },
+      });
     }
 
-    // Live trades fallback when INTEL_FN is down / Birdeye empty — same
-    // GeckoTerminal path EVM already uses so Solana Live Trades isn't blank.
-    // Never pass the mint itself as a "pool" (Jupiter firstPool.id sometimes is the CA).
-    if (!intelOut?.trades?.length) {
-      const rawPool = best?.pairAddress || token?.firstPool?.id || null;
-      const poolId = rawPool && String(rawPool).includes("_") ? String(rawPool).split("_").pop() : rawPool;
-      const pool = poolId && poolId !== mint ? poolId : null;
-      const tryPools = [pool, ...(pairs || []).map((p) => p.pairAddress)].filter(Boolean);
-      const uniq = [...new Set(tryPools)].slice(0, 2);
-      for (const p of uniq) {
-        const gtTrades = await evmTrades("solana", p, mint, 100).catch(() => []);
-        if (gtTrades?.length) {
-          const normalized = gtTrades.map((tr) => {
-            let time = tr.time;
-            if (typeof time === "string") time = new Date(time).getTime();
-            else if (typeof time === "number" && time > 0 && time < 1e12) time = time * 1000;
-            return {
-              ...tr,
-              kind: tr.side,
-              usd: tr.volumeUsd,
-              amountUsd: tr.volumeUsd,
-              amount: tr.tokenAmount,
-              wallet: tr.owner,
-              time: Number.isFinite(time) ? time : null,
-              dex: tr.dex || "geckoterminal",
-            };
-          });
-          intelOut = { ...(intelOut || { ok: true }), ok: true, trades: normalized, tradesSource: "geckoterminal" };
-          break;
-        }
-      }
+    // 5. ATH + holders backfill + live-trades fallback are independent of each
+    // other — run concurrently (was three sequential awaits; the holders race
+    // alone could add 6.5s). Merged in the original order afterwards. The
+    // trades check reads the pre-backfill intelOut, which is equivalent: the
+    // backfill never sets trades, and vice versa for holders.
+    let intelOut = intel?.ok ? intel : null;
+    const athPromise = computeAth(
+      "solana", mint, token, best?.pairAddress || token?.firstPool?.id || null
+    ).then(({ athPrice, athMcap }) => ({
+      athPrice,
+      // Fallback to OG Scan's stored ATH mcap if GeckoTerminal had no history.
+      athMcap: athMcap ?? (scanMeta?.athMcap ? num(scanMeta.athMcap) : null),
+    }));
+    const holdersPromise = !intelOut?.holders?.length
+      ? Promise.race([
+          // Backfill top holders if the intel function returned none (e.g. its
+          // Birdeye source is down / Helius index overloaded). Uses the resilient
+          // largest-accounts helper so the holders *list* / whales tab keep working.
+          // NOTE: this sample length is NOT a total holder count.
+          getLabeledHolders(mint, token?.priceUsd ?? null).catch(() => ({ holders: [] })),
+          new Promise((r) => setTimeout(() => r({ holders: [] }), 6500)),
+        ])
+      : Promise.resolve(null);
+    const tradesPromise = !intelOut?.trades?.length
+      ? (async () => {
+          // Live trades fallback when INTEL_FN is down / Birdeye empty — same
+          // GeckoTerminal path EVM already uses so Solana Live Trades isn't blank.
+          // Never pass the mint itself as a "pool" (Jupiter firstPool.id sometimes is the CA).
+          const rawPool = best?.pairAddress || token?.firstPool?.id || null;
+          const poolId = rawPool && String(rawPool).includes("_") ? String(rawPool).split("_").pop() : rawPool;
+          const pool = poolId && poolId !== mint ? poolId : null;
+          const tryPools = [pool, ...(pairs || []).map((p) => p.pairAddress)].filter(Boolean);
+          const uniq = [...new Set(tryPools)].slice(0, 2);
+          for (const p of uniq) {
+            const gtTrades = await evmTrades("solana", p, mint, 100).catch(() => []);
+            if (gtTrades?.length) {
+              const normalized = gtTrades.map((tr) => {
+                let time = tr.time;
+                if (typeof time === "string") time = new Date(time).getTime();
+                else if (typeof time === "number" && time > 0 && time < 1e12) time = time * 1000;
+                return {
+                  ...tr,
+                  kind: tr.side,
+                  usd: tr.volumeUsd,
+                  amountUsd: tr.volumeUsd,
+                  amount: tr.tokenAmount,
+                  wallet: tr.owner,
+                  time: Number.isFinite(time) ? time : null,
+                  dex: tr.dex || "geckoterminal",
+                };
+              });
+              return { trades: normalized, tradesSource: "geckoterminal" };
+            }
+          }
+          return null;
+        })()
+      : Promise.resolve(null);
+    const [{ athPrice, athMcap }, hb, tradeRes] = await Promise.all([athPromise, holdersPromise, tradesPromise]);
+    if (hb?.holders?.length) {
+      intelOut = { ...(intelOut || { ok: true }), ok: true, holders: hb.holders, holdersBackfilled: true, holdersSource: hb.source };
+    }
+    if (tradeRes) {
+      intelOut = { ...(intelOut || { ok: true }), ok: true, trades: tradeRes.trades, tradesSource: tradeRes.tradesSource };
     }
 
     // Authoritative total holder count (never top-N sample length).

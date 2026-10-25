@@ -228,7 +228,7 @@ export function PlatformDock() {
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
-        <span aria-hidden>{open ? "✕" : "◈"}</span>
+        <span aria-hidden className={open ? undefined : "ox-platform-fab__mark"}>{open ? "✕" : "OBX"}</span>
       </button>
     </div>
   );

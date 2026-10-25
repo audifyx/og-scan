@@ -36,7 +36,10 @@ export function send(res, status, data) {
   else { res.statusCode = status; res.end(payload); }
 }
 export function cache(res, s = 10, swr = 30) {
-  res.setHeader("Cache-Control", `s-maxage=${s}, stale-while-revalidate=${swr}`);
+  // NOTE: `public` is required — without it the edge rewrites the header to
+  // `public, max-age=0, must-revalidate` (measured live on screener/token),
+  // while health's explicit `public, s-maxage=...` header survives intact.
+  res.setHeader("Cache-Control", `public, s-maxage=${s}, stale-while-revalidate=${swr}`);
 }
 
 export async function callFn(name, body) {

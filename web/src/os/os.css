@@ -122,6 +122,153 @@
   max-width: 88px;
 }
 
+/* Folder icons — iOS-style mini grid */
+.oxos-folder__grid {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding: 4px;
+  box-sizing: border-box;
+}
+.oxos-folder__mini {
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.oxos-folder__mini svg,
+.oxos-folder__mini span {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Folder panel */
+.oxos-folderpanel {
+  position: absolute;
+  inset: 0;
+  z-index: 20000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.oxos-folderpanel__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+}
+.oxos-folderpanel__card {
+  position: relative;
+  width: min(420px, 94vw);
+  background: rgba(22, 22, 30, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  padding: 18px;
+}
+.oxos-folderpanel__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.oxos-folderpanel__name {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 17px;
+  font-weight: 750;
+  padding: 6px 2px;
+  outline: none;
+}
+.oxos-folderpanel__name:focus {
+  border-color: var(--os-accent);
+}
+.oxos-folderpanel__close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 13px;
+}
+.oxos-folderpanel__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px 8px;
+}
+.oxos-folderpanel__cell {
+  position: relative;
+}
+.oxos-folderpanel__app {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 6px 2px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.oxos-folderpanel__app:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.oxos-folderpanel__mark {
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.oxos-folderpanel__mark svg,
+.oxos-folderpanel__mark span {
+  width: 27px;
+  height: 27px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.oxos-folderpanel__remove {
+  position: absolute;
+  top: 0;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(229, 72, 77, 0.9);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+}
+.oxos-folderpanel__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.oxos-folderpanel__foot .oxos-btn:last-child {
+  margin-right: 0;
+}
+
 /* Windows */
 .oxos-window {
   position: absolute;
@@ -842,4 +989,31 @@
   .oxos-icon {
     width: 76px;
   }
+}
+
+/* AppMark real-icon overlay (batch 2b): tiles clip the image to their own
+   radius; the image fills the tile above the gradient+glyph fallback. */
+.oxos-icon__mark,
+.oxos-appcell__mark,
+.oxos-folderpanel__mark,
+.oxos-window__mark,
+.oxos-start__pinmark,
+.oxos-start__rowmark,
+.oxos-taskbar__mark {
+  position: relative;
+  overflow: hidden;
+}
+.oxos-icon__mark img,
+.oxos-appcell__mark img,
+.oxos-folderpanel__mark img,
+.oxos-window__mark img,
+.oxos-start__pinmark img,
+.oxos-start__rowmark img,
+.oxos-taskbar__mark img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
 }
