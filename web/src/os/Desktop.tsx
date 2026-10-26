@@ -632,7 +632,17 @@ export default function Desktop(props: DesktopProps) {
           const members = folder.appKeys.map((k) => appByKey.get(k)).filter(Boolean) as PlatformApp[];
           return (
             <div className="oxos-folderpanel">
-              <div className="oxos-folderpanel__backdrop" onClick={() => setOpenFolderId(null)} />
+              <div
+                className="oxos-folderpanel__backdrop"
+                // Close on pointerdown, NOT click: on touch, the tap that opens
+                // the folder fires pointerup (panel mounts) and the browser then
+                // retargets the compatibility mouse/click sequence to the element
+                // now under the finger — the backdrop — so an onClick closer
+                // instantly closes the panel it just opened ("opens and closes",
+                // app stuck inside). Pointer events are never retargeted, so the
+                // opening tap has no pointerdown on the backdrop to swallow.
+                onPointerDown={() => setOpenFolderId(null)}
+              />
               <div className="oxos-folderpanel__card">
                 <div className="oxos-folderpanel__head">
                   <input
