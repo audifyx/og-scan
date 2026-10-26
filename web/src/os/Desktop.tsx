@@ -139,9 +139,15 @@ import {
   type OsFolder,
 } from "./osFolders";
 import {
+  ChartWidgetBody,
   DesktopCtxMenu,
   LiveWallpaper,
+  MarketWidgetBody,
+  MiniChartWidgetBody,
+  NoteWidgetBody,
+  TasksWidgetBody,
   ThemeMock,
+  TokenWidgetBody,
   WindowOptionsMenu,
   playBootChime,
   playUiBlip,
@@ -358,7 +364,7 @@ function OrbitxPulse() {
 }
 
 /** Notes — list + editor. State lives in Desktop (persistence + sync). */
-function NotesApp({ notes, onChange, openNoteId }: { notes: OsNote[]; onChange: (n: OsNote[]) => void; openNoteId?: string | null }) {
+function NotesApp({ notes, onChange, openNoteId, onPin }: { notes: OsNote[]; onChange: (n: OsNote[]) => void; openNoteId?: string | null; onPin?: (id: string) => void }) {
   const [q, setQ] = useState("");
   const [folderFilter, setFolderFilter] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -445,6 +451,11 @@ function NotesApp({ notes, onChange, openNoteId }: { notes: OsNote[]; onChange: 
             >
               Delete note
             </button>
+            {onPin && (
+              <button type="button" className="oxos-btn oxos-btn--ghost" onClick={() => onPin(active.id)}>
+                📌 Pin to desktop
+              </button>
+            )}
           </>
         ) : (
           <p className="oxos-hint">Pick a note, or make a new one. Notes sync with your account.</p>
@@ -1607,6 +1618,11 @@ export default function Desktop(props: DesktopProps) {
                 key={t.mint}
                 type="button"
                 className="oxos-row"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/orbitx-mint", t.mint);
+                  e.dataTransfer.setData("text/plain", t.symbol);
+                }}
                 onClick={() => window.location.assign(`/ORBITX_DEX?mint=${encodeURIComponent(t.mint)}`)}
               >
                 {t.image ? (
@@ -1682,7 +1698,28 @@ export default function Desktop(props: DesktopProps) {
       return <OrbitxPulse />;
     }
     if (w.kind === "notes") {
-      return <NotesApp notes={notes} onChange={setNotes} openNoteId={jumpNoteId} />;
+      return (
+        <NotesApp
+          notes={notes}
+          onChange={setNotes}
+          openNoteId={jumpNoteId}
+          onPin={(id) => {
+            setDeskWidgets((prev) => {
+              if (prev.some((w) => w.type === "note" && w.noteId === id)) return prev;
+              return [
+                ...prev,
+                {
+                  id: `wdg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+                  type: "note",
+                  x: 4 + prev.length * 2,
+                  y: 12,
+                  noteId: id,
+                },
+              ];
+            });
+          }}
+        />
+      );
     }
     if (w.kind === "files") {
       return <FilesApp files={files} onChange={setFiles} />;
@@ -3116,6 +3153,26 @@ export default function Desktop(props: DesktopProps) {
       onClick={(e) => {
         if (settings.uiSounds && (e.target as HTMLElement).closest("button")) playUiBlip();
       }}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("text/orbitx-mint")) e.preventDefault();
+      }}
+      onDrop={(e) => {
+        const mint = e.dataTransfer.getData("text/orbitx-mint");
+        if (!mint) return;
+        e.preventDefault();
+        const x = Math.max(2, Math.min(80, (e.clientX / window.innerWidth) * 100));
+        const y = Math.max(4, Math.min(70, (e.clientY / window.innerHeight) * 100));
+        setDeskWidgets((prev) => [
+          ...prev,
+          {
+            id: `wdg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+            type: "token",
+            x,
+            y,
+            mint,
+          },
+        ]);
+      }}
       onContextMenu={(e) => {
         const t = e.target as HTMLElement;
         if (t.closest(".oxos-window, .oxos-panel, .oxos-taskbar, .oxos-start, .oxos-deskwd, .oxos-folderpanel, .oxos-phone, .oxos-lock")) return;
@@ -3158,7 +3215,7 @@ export default function Desktop(props: DesktopProps) {
       {deskWidgets.map((wdg) => (
         <section
           key={wdg.id}
-          className="oxos-deskwd"
+          className={`oxos-deskwd${wdg.expanded ? " is-expanded" : ""}`}
           style={{ left: `${wdg.x}%`, top: `${wdg.y}%` }}
         >
           <header
@@ -3167,7 +3224,45 @@ export default function Desktop(props: DesktopProps) {
               dragRef.current = { type: "widget", id: wdg.id, startX: e.clientX, startY: e.clientY, origX: wdg.x, origY: wdg.y };
             }}
           >
-            <span>{wdg.type === "ticker" ? "Market" : wdg.type === "trending" ? "Trending" : wdg.type === "countdown" ? "Countdown" : wdg.type === "quote" ? "Quote" : "My alerts"}</span>
+            <span>
+              {wdg.type === "ticker"
+                ? "Market"
+                : wdg.type === "trending"
+                  ? "Trending"
+                  : wdg.type === "countdown"
+                    ? "Countdown"
+                    : wdg.type === "quote"
+                      ? "Quote"
+                      : wdg.type === "token"
+                        ? "Token"
+                        : wdg.type === "chart"
+                          ? "Chart"
+                          : wdg.type === "market"
+                            ? "Top 10"
+                            : wdg.type === "tasks"
+                              ? "Tasks"
+                              : wdg.type === "note"
+                                ? "Note"
+                                : wdg.type === "minichart"
+                                  ? "Mini chart"
+                                  : "My alerts"}
+            </span>
+            <button
+              type="button"
+              title={wdg.type === "tasks" || wdg.type === "note" ? "Open app" : wdg.expanded ? "Shrink" : "Expand"}
+              onClick={() => {
+                if (wdg.type === "tasks") {
+                  openBuiltin("tasks", "Tasks");
+                } else if (wdg.type === "note") {
+                  if (wdg.noteId) setJumpNoteId(wdg.noteId);
+                  openBuiltin("notes", "Notes");
+                } else {
+                  setDeskWidgets((prev) => prev.map((x) => (x.id === wdg.id ? { ...x, expanded: !x.expanded } : x)));
+                }
+              }}
+            >
+              {wdg.type === "tasks" || wdg.type === "note" ? "↗" : "⤢"}
+            </button>
             <button
               type="button"
               title="Remove widget"
@@ -3255,6 +3350,33 @@ export default function Desktop(props: DesktopProps) {
                 <p>“{quoteOfDay()}”</p>
                 <span className="oxos-hint">Quote of the day</span>
               </div>
+            )}
+            {wdg.type === "token" && (
+              <TokenWidgetBody
+                mint={wdg.mint}
+                onMint={(m) => setDeskWidgets((prev) => prev.map((x) => (x.id === wdg.id ? { ...x, mint: m } : x)))}
+              />
+            )}
+            {wdg.type === "chart" && (
+              <ChartWidgetBody
+                mint={wdg.mint}
+                onMint={(m) => setDeskWidgets((prev) => prev.map((x) => (x.id === wdg.id ? { ...x, mint: m } : x)))}
+              />
+            )}
+            {wdg.type === "market" && <MarketWidgetBody trending={props.trending} />}
+            {wdg.type === "minichart" && <MiniChartWidgetBody />}
+            {wdg.type === "tasks" && (
+              <TasksWidgetBody
+                tasks={tasks}
+                onToggle={(id) => setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: true } : t)))}
+              />
+            )}
+            {wdg.type === "note" && (
+              <NoteWidgetBody
+                note={notes.find((n) => n.id === wdg.noteId)}
+                notes={notes}
+                onPick={(id) => setDeskWidgets((prev) => prev.map((x) => (x.id === wdg.id ? { ...x, noteId: id } : x)))}
+              />
             )}
           </div>
         </section>
@@ -4344,6 +4466,12 @@ export default function Desktop(props: DesktopProps) {
                 ["alerts", "Alerts"],
                 ["countdown", "Countdown"],
                 ["quote", "Quote"],
+                ["token", "Token"],
+                ["chart", "Chart"],
+                ["market", "Top 10"],
+                ["tasks", "Tasks"],
+                ["note", "Note"],
+                ["minichart", "Mini chart"],
               ] as const
             ).map(([t, label]) => (
               <button
@@ -4361,6 +4489,8 @@ export default function Desktop(props: DesktopProps) {
                       ...(t === "countdown"
                         ? { label: "Countdown", targetDate: isoDay(new Date(Date.now() + 7 * 86400000)) }
                         : {}),
+                      ...(t === "token" || t === "chart" ? { mint: ORBITX_MINT } : {}),
+                      ...(t === "note" && notes.length ? { noteId: notes[0].id } : {}),
                     },
                   ])
                 }
@@ -4369,6 +4499,55 @@ export default function Desktop(props: DesktopProps) {
               </button>
             ))}
           </div>
+          <h3 className="oxos-h3">Widget layouts</h3>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <input
+              className="oxos-input"
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              placeholder="Layout name…"
+              aria-label="Widget layout name"
+              style={{ flex: 1, minWidth: 140 }}
+            />
+            <button
+              type="button"
+              className="oxos-btn oxos-btn--ghost"
+              disabled={!presetName.trim()}
+              onClick={() => {
+                const next = [...widgetPresets.filter((p) => p.name !== presetName.trim()), { name: presetName.trim(), widgets: deskWidgets }];
+                setWidgetPresets(next);
+                saveOsWidgetPresets(next);
+                setPresetName("");
+              }}
+            >
+              Save layout
+            </button>
+          </div>
+          {widgetPresets.map((pr) => (
+            <div key={pr.name} className="oxos-deskwd__row">
+              <span>{pr.name} ({pr.widgets.length})</span>
+              <span style={{ display: "flex", gap: 6 }}>
+                <button
+                  type="button"
+                  className="oxos-btn oxos-btn--ghost"
+                  onClick={() => setDeskWidgets(pr.widgets.map((w) => ({ ...w })))}
+                >
+                  Apply
+                </button>
+                <button
+                  type="button"
+                  className="oxos-btn oxos-btn--ghost"
+                  onClick={() => {
+                    const next = widgetPresets.filter((p) => p.name !== pr.name);
+                    setWidgetPresets(next);
+                    saveOsWidgetPresets(next);
+                  }}
+                >
+                  Delete
+                </button>
+              </span>
+            </div>
+          ))}
           <h3 className="oxos-h3">Quick actions</h3>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" className="oxos-btn" onClick={openVoiceMiniPlayer}>

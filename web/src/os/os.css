@@ -1759,3 +1759,8 @@
 .oxos-lock__wall { position: absolute; inset: 0; }
 .oxos-lock__card { position: relative; z-index: 1; }
 .oxos-lock__msg { color: var(--os-accent); font-weight: 600; }
+
+/* OS wave 6 Plan C: expanded widgets + widget body inputs. */
+.oxos-deskwd.is-expanded { width: 340px; }
+.oxos-deskwd__token .oxos-input { width: 100%; margin-bottom: 6px; }
+.oxos-deskwd__note .oxos-input { width: 100%; margin-bottom: 6px; }

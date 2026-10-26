@@ -218,7 +218,8 @@ export type DeskWidgetType =
   | "chart"
   | "market"
   | "tasks"
-  | "note";
+  | "note"
+  | "minichart";
 
 export interface DeskWidget {
   id: string;
@@ -305,7 +306,13 @@ export function loadDeskWidgets(): DeskWidget[] {
         w.type === "trending" ||
         w.type === "alerts" ||
         w.type === "countdown" ||
-        w.type === "quote"),
+        w.type === "quote" ||
+        w.type === "token" ||
+        w.type === "chart" ||
+        w.type === "market" ||
+        w.type === "tasks" ||
+        w.type === "note" ||
+        w.type === "minichart"),
   );
 }
 export function saveDeskWidgets(w: DeskWidget[]) {

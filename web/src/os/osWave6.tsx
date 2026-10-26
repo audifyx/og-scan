@@ -398,3 +398,203 @@ export function ThemeMock({
     </div>
   );
 }
+
+/* ================= OS wave 6 Plan C: home smarts ================= */
+
+function fmtW(p: number): string {
+  if (!Number.isFinite(p)) return "—";
+  if (p >= 1000) return `$${p.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  if (p >= 1) return `$${p.toFixed(2)}`;
+  return `$${p.toFixed(6)}`;
+}
+
+function MintInput({ value, onCommit }: { value: string; onCommit: (m: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return (
+    <input
+      className="oxos-input"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        if (draft.trim() && draft.trim() !== value) onCommit(draft.trim());
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+      placeholder="Paste a Solana mint…"
+      aria-label="Token mint"
+      spellCheck={false}
+    />
+  );
+}
+
+/** Any-token price widget (idea bank #1003): quote + sparkline + mint input. */
+export function TokenWidgetBody({ mint, onMint }: { mint?: string; onMint: (m: string) => void }) {
+  const quote = useTokenPrice(mint);
+  const samples = useSampledHistory(mint);
+  return (
+    <div className="oxos-deskwd__token">
+      <MintInput value={mint ?? ""} onCommit={onMint} />
+      {!mint ? (
+        <p className="oxos-hint">Paste a mint to track it here.</p>
+      ) : !quote ? (
+        <p className="oxos-hint">Listening for {mint.slice(0, 8)}… (needs network)</p>
+      ) : (
+        <>
+          <div className="oxos-deskwd__row">
+            <span>{quote.symbol || "Token"}</span>
+            <span>{fmtW(quote.price)}</span>
+            <span className={quote.change24h >= 0 ? "up" : "down"}>
+              {quote.change24h >= 0 ? "+" : ""}
+              {quote.change24h.toFixed(1)}%
+            </span>
+          </div>
+          {samples.length >= 2 ? (
+            <Sparkline samples={samples} width={200} height={44} />
+          ) : (
+            <p className="oxos-hint">Chart builds as prices arrive.</p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Any-token chart widget (idea bank #1004): sampled history, larger. */
+export function ChartWidgetBody({ mint, onMint }: { mint?: string; onMint: (m: string) => void }) {
+  const quote = useTokenPrice(mint);
+  const samples = useSampledHistory(mint);
+  return (
+    <div className="oxos-deskwd__token">
+      <MintInput value={mint ?? ""} onCommit={onMint} />
+      {!mint ? (
+        <p className="oxos-hint">Paste a mint to chart it here.</p>
+      ) : samples.length >= 2 ? (
+        <>
+          <div className="oxos-deskwd__row">
+            <span>{quote?.symbol || "Token"}</span>
+            <span>{quote ? fmtW(quote.price) : "—"}</span>
+            <span className={(quote?.change24h ?? 0) >= 0 ? "up" : "down"}>
+              {quote ? `${quote.change24h >= 0 ? "+" : ""}${quote.change24h.toFixed(1)}%` : ""}
+            </span>
+          </div>
+          <Sparkline samples={samples} width={200} height={90} />
+          <p className="oxos-hint">{samples.length} samples · sampled live, no feed needed</p>
+        </>
+      ) : (
+        <p className="oxos-hint">Listening for {mint.slice(0, 8)}… chart builds as prices arrive.</p>
+      )}
+    </div>
+  );
+}
+
+/** Mini chart widget (idea bank #1031): compact ORBITX sparkline. */
+export function MiniChartWidgetBody() {
+  const quote = useTokenPrice(ORBITX_MINT);
+  const samples = useSampledHistory(ORBITX_MINT);
+  return (
+    <div className="oxos-deskwd__token">
+      <div className="oxos-deskwd__row">
+        <span>$ORBITX</span>
+        <span>{quote ? fmtW(quote.price) : "—"}</span>
+        {quote && (
+          <span className={quote.change24h >= 0 ? "up" : "down"}>
+            {quote.change24h >= 0 ? "+" : ""}
+            {quote.change24h.toFixed(1)}%
+          </span>
+        )}
+      </div>
+      {samples.length >= 2 ? (
+        <Sparkline samples={samples} width={200} height={36} />
+      ) : (
+        <p className="oxos-hint">Chart builds as prices arrive.</p>
+      )}
+    </div>
+  );
+}
+
+export interface MarketRow {
+  mint: string;
+  symbol: string;
+  price: number;
+  change24h: number;
+}
+
+/** Top-10 market widget (idea bank #1021): trending list, ten rows. */
+export function MarketWidgetBody({ trending }: { trending: MarketRow[] }) {
+  if (!trending.length) return <p className="oxos-hint">Listening for pulse…</p>;
+  return (
+    <>
+      {trending.slice(0, 10).map((t) => (
+        <div key={t.mint} className="oxos-deskwd__row">
+          <span>{t.symbol}</span>
+          <span>{fmtW(t.price)}</span>
+          <span className={t.change24h >= 0 ? "up" : "down"}>
+            {t.change24h >= 0 ? "+" : ""}
+            {t.change24h.toFixed(1)}%
+          </span>
+        </div>
+      ))}
+    </>
+  );
+}
+
+export interface TaskRow {
+  id: string;
+  title: string;
+  done: boolean;
+  due?: string;
+}
+
+/** Tasks widget (idea bank #1007): open tasks with toggles. */
+export function TasksWidgetBody({ tasks, onToggle }: { tasks: TaskRow[]; onToggle: (id: string) => void }) {
+  const open = tasks.filter((t) => !t.done);
+  if (!open.length) return <p className="oxos-hint">Nothing open — add a task in the Tasks app.</p>;
+  return (
+    <>
+      {open.slice(0, 6).map((t) => (
+        <label key={t.id} className="oxos-deskwd__row" style={{ cursor: "pointer" }}>
+          <input type="checkbox" checked={false} onChange={() => onToggle(t.id)} aria-label={`Complete ${t.title}`} />
+          <span style={{ flex: 1 }}>{t.title}</span>
+          {t.due && <span className="oxos-hint">{t.due}</span>}
+        </label>
+      ))}
+    </>
+  );
+}
+
+export interface NoteRow {
+  id: string;
+  title: string;
+  body: string;
+}
+
+/** Notes widget (idea bank #1008): pick a note, read it on the desktop. */
+export function NoteWidgetBody({ note, notes, onPick }: { note?: NoteRow; notes: NoteRow[]; onPick: (id: string) => void }) {
+  return (
+    <div className="oxos-deskwd__note">
+      <select
+        className="oxos-input"
+        value={note?.id ?? ""}
+        onChange={(e) => onPick(e.target.value)}
+        aria-label="Pinned note"
+      >
+        <option value="">Pick a note…</option>
+        {notes.map((n) => (
+          <option key={n.id} value={n.id}>
+            {n.title || "Untitled"}
+          </option>
+        ))}
+      </select>
+      {note ? (
+        <>
+          <p style={{ fontWeight: 700, margin: "6px 0 2px" }}>{note.title || "Untitled"}</p>
+          <p style={{ whiteSpace: "pre-wrap", margin: 0 }}>{note.body.slice(0, 280)}</p>
+        </>
+      ) : (
+        <p className="oxos-hint">Pick a note to pin it here.</p>
+      )}
+    </div>
+  );
+}
