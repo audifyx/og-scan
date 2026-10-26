@@ -2004,6 +2004,53 @@ export default function Desktop(props: DesktopProps) {
               </div>
             </>
           )}
+          <div className="oxos-start__label">System</div>
+          <div className="oxos-start__list">
+            <button type="button" className="oxos-start__row" onClick={() => openBuiltin("store", "App Store")}>
+              <span className="oxos-start__rowmeta">
+                <span>App Store</span>
+                <span>Install apps</span>
+              </span>
+            </button>
+            <button type="button" className="oxos-start__row" onClick={() => openBuiltin("browser", "Browser")}>
+              <span className="oxos-start__rowmeta">
+                <span>Browser</span>
+                <span>Web apps</span>
+              </span>
+            </button>
+            <button type="button" className="oxos-start__row" onClick={() => openBuiltin("themes", "Theme Store")}>
+              <span className="oxos-start__rowmeta">
+                <span>Theme Store</span>
+                <span>Wallpapers + icons</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="oxos-start__row"
+              onClick={() => {
+                setStartOpen(false);
+                setControlOpen(true);
+              }}
+            >
+              <span className="oxos-start__rowmeta">
+                <span>Control Center</span>
+                <span>Panel</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="oxos-start__row"
+              onClick={() => {
+                setStartOpen(false);
+                setNotifOpen(true);
+              }}
+            >
+              <span className="oxos-start__rowmeta">
+                <span>Notifications</span>
+                <span>Alerts</span>
+              </span>
+            </button>
+          </div>
           <div className="oxos-start__foot">
             <span className="oxos-start__user">
               <span className="oxos-start__ava">{props.userInitial}</span>
@@ -2070,6 +2117,20 @@ export default function Desktop(props: DesktopProps) {
               <span className="oxos-taskbar__badge">{unreadCount > 9 ? "9+" : unreadCount}</span>
             )}
           </span>
+        </button>
+        <button
+          type="button"
+          className="oxos-taskbar__btn"
+          title="App Store"
+          onClick={() => {
+            setStartOpen(false);
+            setControlOpen(false);
+            setNotifOpen(false);
+            setCmdOpen(false);
+            openBuiltin("store", "App Store");
+          }}
+        >
+          ▦
         </button>
         <span className="oxos-taskbar__sep" />
         {gates.map((a) => (
