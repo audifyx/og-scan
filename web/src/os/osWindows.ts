@@ -20,7 +20,10 @@ export type OsWindowKind =
   | "themes"
   | "feed"
   | "notes"
-  | "files";
+  | "files"
+  | "tasks"
+  | "calendar"
+  | "shortcuts";
 
 export interface OsWindow {
   /** Built-ins use their kind as id; apps use `app:<key>`. */

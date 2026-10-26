@@ -1456,3 +1456,55 @@
   flex-direction: column;
   gap: 6px;
 }
+
+/* ------------------------------------------------------------------ */
+/* OS wave 4 — tasks, calendar, shortcuts, notes folders, new widgets, */
+/* tray calendar, toggle states.                                       */
+/* ------------------------------------------------------------------ */
+
+.oxos-btn.is-on { border-color: var(--os-accent); color: var(--os-accent); }
+.oxos-btn:disabled { opacity: 0.45; cursor: default; }
+
+.oxos-tasks { padding: 16px; display: flex; flex-direction: column; gap: 12px; height: 100%; overflow: auto; }
+.oxos-tasks__form { display: grid; grid-template-columns: 1fr 150px 110px auto; gap: 8px; }
+.oxos-tasks__filters { display: flex; gap: 8px; }
+.oxos-tasks__list { display: flex; flex-direction: column; gap: 6px; }
+.oxos-tasks__row { display: flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.oxos-tasks__row.is-done .oxos-tasks__title { text-decoration: line-through; color: rgba(244, 244, 245, 0.45); }
+.oxos-tasks__title { flex: 1; }
+.oxos-tasks__due { color: rgba(244, 244, 245, 0.55); font-size: 12px; }
+.oxos-tasks__pri { font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.oxos-tasks__pri--low { color: #4ade80; }
+.oxos-tasks__pri--normal { color: rgba(244, 244, 245, 0.6); }
+.oxos-tasks__pri--high { color: #f87171; }
+.oxos-tasks__del { background: none; border: none; color: rgba(244, 244, 245, 0.5); cursor: pointer; }
+
+.oxos-cal { padding: 16px; display: flex; flex-direction: column; gap: 12px; height: 100%; overflow: auto; }
+.oxos-cal__head { display: flex; justify-content: space-between; align-items: center; }
+.oxos-cal__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+.oxos-cal__wd { font-size: 11px; color: rgba(244, 244, 245, 0.5); padding: 4px 0; }
+.oxos-cal__day { background: rgba(255, 255, 255, 0.05); border: 1px solid transparent; color: #f4f4f5; border-radius: 8px; padding: 8px 0; cursor: pointer; font-size: 13px; }
+.oxos-cal__day.is-today { border-color: rgba(232, 184, 74, 0.6); }
+.oxos-cal__day.is-on { background: rgba(232, 184, 74, 0.18); border-color: rgba(232, 184, 74, 0.55); }
+.oxos-cal__day.has-event { font-weight: 700; }
+.oxos-cal__events { display: flex; flex-direction: column; gap: 6px; }
+.oxos-cal__form { display: flex; gap: 8px; }
+.oxos-cal__form .oxos-input { flex: 1; }
+
+.oxos-shortcuts { padding: 16px; display: flex; flex-direction: column; gap: 12px; height: 100%; overflow: auto; }
+.oxos-shortcuts h3 { margin: 0; }
+.oxos-shortcuts__list { display: flex; flex-direction: column; gap: 6px; }
+.oxos-shortcuts__row { display: flex; gap: 12px; align-items: baseline; font-size: 13px; background: rgba(255, 255, 255, 0.04); border-radius: 8px; padding: 8px 10px; }
+.oxos-shortcuts__row kbd { font-family: inherit; font-weight: 700; white-space: nowrap; background: rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 2px 8px; }
+
+.oxos-notes__folders { display: flex; gap: 6px; flex-wrap: wrap; }
+.oxos-notes__folder { background: rgba(255, 255, 255, 0.06); border: 1px solid transparent; color: rgba(244, 244, 245, 0.75); border-radius: 999px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
+.oxos-notes__folder.is-on { border-color: rgba(232, 184, 74, 0.55); color: #e8b84a; }
+
+.oxos-deskwd__countdown { display: flex; flex-direction: column; gap: 8px; }
+.oxos-deskwd__bignum { font-size: 22px; font-weight: 800; }
+.oxos-deskwd__quote p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; font-style: italic; }
+
+.oxos-tray__clock { background: none; border: none; color: inherit; font: inherit; cursor: pointer; padding: 2px 6px; border-radius: 8px; }
+.oxos-tray__clock:hover { background: rgba(255, 255, 255, 0.1); }
+.oxos-calpanel .oxos-btn { margin-top: 4px; }

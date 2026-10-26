@@ -19,6 +19,7 @@ import {
   osWindowsReducer,
   type OsWindowKind,
 } from "./osWindows";
+import { CalendarApp, MiniCal, ShortcutsBody, TasksApp, daysUntil, isoDay, quoteOfDay } from "./osWave4";
 import {
   OS_ACCENTS,
   OS_WALLPAPERS,
@@ -62,12 +63,21 @@ import {
   saveOsDesktops,
   loadOsLayouts,
   saveOsLayouts,
+  loadOsTasks,
+  saveOsTasks,
+  loadOsCalEvents,
+  saveOsCalEvents,
+  loadOsClosed,
+  saveOsClosed,
   type DeskWidget,
   type InstalledApp,
   type IconPos,
   type LockState,
   type OsNote,
   type OsFileItem,
+  type OsTask,
+  type OsCalEvent,
+  type OsClosedWindow,
   type OsBookmark,
   type OsDesktop,
   type OsLayoutSnapshot,
@@ -325,10 +335,14 @@ function OrbitxPulse() {
 /** Notes — list + editor. State lives in Desktop (persistence + sync). */
 function NotesApp({ notes, onChange }: { notes: OsNote[]; onChange: (n: OsNote[]) => void }) {
   const [q, setQ] = useState("");
+  const [folderFilter, setFolderFilter] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = notes.find((n) => n.id === activeId) ?? null;
+  const folders = [...new Set(notes.map((n) => n.folder).filter((f): f is string => !!f))].sort();
   const filtered = notes.filter(
-    (n) => !q.trim() || `${n.title} ${n.body}`.toLowerCase().includes(q.trim().toLowerCase()),
+    (n) =>
+      (!folderFilter || n.folder === folderFilter) &&
+      (!q.trim() || `${n.title} ${n.body}`.toLowerCase().includes(q.trim().toLowerCase())),
   );
   const sorted = [...filtered].sort((a, b) => b.updatedAt - a.updatedAt);
   const create = () => {
@@ -340,6 +354,16 @@ function NotesApp({ notes, onChange }: { notes: OsNote[]; onChange: (n: OsNote[]
     <div className="oxos-notes">
       <div className="oxos-notes__list">
         <input className="oxos-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search notes…" />
+        <div className="oxos-notes__folders">
+          <button type="button" className={`oxos-notes__folder${folderFilter === "" ? " is-on" : ""}`} onClick={() => setFolderFilter("")}>
+            All
+          </button>
+          {folders.map((f) => (
+            <button key={f} type="button" className={`oxos-notes__folder${folderFilter === f ? " is-on" : ""}`} onClick={() => setFolderFilter(f)}>
+              {f}
+            </button>
+          ))}
+        </div>
         <button type="button" className="oxos-btn" onClick={create}>
           + New note
         </button>
@@ -351,7 +375,7 @@ function NotesApp({ notes, onChange }: { notes: OsNote[]; onChange: (n: OsNote[]
             onClick={() => setActiveId(n.id)}
           >
             <span>{n.title || "Untitled"}</span>
-            <span>{n.body.slice(0, 60)}</span>
+            <span>{n.folder ? `[${n.folder}] ` : ""}{n.body.slice(0, 60)}</span>
           </button>
         ))}
         {!sorted.length && <p className="oxos-hint">No notes yet — write the first one.</p>}
@@ -366,6 +390,14 @@ function NotesApp({ notes, onChange }: { notes: OsNote[]; onChange: (n: OsNote[]
                 onChange(notes.map((n) => (n.id === active.id ? { ...n, title: e.target.value, updatedAt: Date.now() } : n)))
               }
               placeholder="Title"
+            />
+            <input
+              className="oxos-input"
+              value={active.folder ?? ""}
+              onChange={(e) =>
+                onChange(notes.map((n) => (n.id === active.id ? { ...n, folder: e.target.value || undefined, updatedAt: Date.now() } : n)))
+              }
+              placeholder="Folder (optional)"
             />
             <textarea
               className="oxos-input oxos-notes__body"
@@ -544,7 +576,7 @@ export default function Desktop(props: DesktopProps) {
   const [cmdTokens, setCmdTokens] = useState<TokenSearchRow[]>([]);
   const [snapPreview, setSnapPreview] = useState<"left" | "right" | "max" | null>(null);
   const [dim, setDim] = useState(0);
-  const [browserTabs, setBrowserTabs] = useState<{ id: string; url: string; title: string }[]>(() => loadBrowserTabs() ?? [
+  const [browserTabs, setBrowserTabs] = useState<{ id: string; url: string; title: string; private?: boolean }[]>(() => loadBrowserTabs() ?? [
     { id: "tab-1", url: "https://dexscreener.com", title: "DexScreener" },
   ]);
   const [browserActiveId, setBrowserActiveId] = useState("tab-1");
@@ -582,6 +614,10 @@ export default function Desktop(props: DesktopProps) {
   const [activeDesktopId, setActiveDesktopId] = useState<string>("main");
   const [deskOpen, setDeskOpen] = useState(false);
   const [layouts, setLayouts] = useState<OsLayoutSnapshot[]>(loadOsLayouts);
+  const [tasks, setTasks] = useState<OsTask[]>(loadOsTasks);
+  const [calEvents, setCalEvents] = useState<OsCalEvent[]>(loadOsCalEvents);
+  const [closed, setClosed] = useState<OsClosedWindow[]>(loadOsClosed);
+  const [calPanelOpen, setCalPanelOpen] = useState(false);
   const [layoutName, setLayoutName] = useState("");
   const [galleryThemes, setGalleryThemes] = useState<GalleryTheme[]>([]);
   const [galleryMsg, setGalleryMsg] = useState("");
@@ -596,6 +632,9 @@ export default function Desktop(props: DesktopProps) {
 
   useEffect(() => { saveInstalledApps(installed); }, [installed]);
   useEffect(() => { saveDeskWidgets(deskWidgets); }, [deskWidgets]);
+  useEffect(() => { saveOsTasks(tasks); }, [tasks]);
+  useEffect(() => { saveOsCalEvents(calEvents); }, [calEvents]);
+  useEffect(() => { saveOsClosed(closed); }, [closed]);
   useEffect(() => { saveThemePacks(packs); }, [packs]);
   useEffect(() => { saveActivePackId(activePackId); }, [activePackId]);
   useEffect(() => { saveDnd(dnd); }, [dnd]);
@@ -909,12 +948,30 @@ export default function Desktop(props: DesktopProps) {
     });
   };
 
+  const prevPackIdRef = useRef<string | null>(null);
+  const suppressPrevRef = useRef(false);
   const applyThemePack = (p: ThemePack) => {
+    if (!suppressPrevRef.current) prevPackIdRef.current = activePackId;
+    suppressPrevRef.current = false;
     setSettings((s) => ({ ...s, wallpaper: p.wallpaper, accent: p.accent }));
     setActivePackId(p.id);
     pushNotification("Theme applied", p.name, "system");
   };
 
+  const undoTheme = () => {
+    const prevId = prevPackIdRef.current;
+    if (!prevId) return;
+    const target = packs.find((x) => x.id === prevId) ?? galleryThemes.find((g) => g.pack.id === prevId)?.pack;
+    if (!target) return;
+    prevPackIdRef.current = null;
+    suppressPrevRef.current = true;
+    applyThemePack(target);
+  };
+  const surpriseTheme = () => {
+    const pool = [...packs, ...galleryThemes.map((g) => g.pack)].filter((x) => x.id !== activePackId);
+    if (!pool.length) return;
+    applyThemePack(pool[Math.floor(Math.random() * pool.length)]);
+  };
   const activePack = packs.find((p) => p.id === activePackId) ?? packs[0];
 
   const unlockAttempt = async () => {
@@ -933,6 +990,25 @@ export default function Desktop(props: DesktopProps) {
   };
 
   const closeWin = (id: string) => {
+    // Recently closed (#17): remember the window for an hour so the
+    // Desktops panel can reopen it. Desktop moves dispatch "close"
+    // directly and skip this, so moves don't pollute the list.
+    const w = ws.windows.find((x) => x.id === id);
+    if (w) {
+      setClosed((prev) =>
+        [
+          {
+            id: `closed-${Date.now().toString(36)}`,
+            kind: w.kind,
+            appKey: w.appKey,
+            title: w.title,
+            hrefOverride: w.hrefOverride,
+            closedAt: Date.now(),
+          },
+          ...prev,
+        ].slice(0, 10),
+      );
+    }
     dispatch({ type: "close", id });
     setActiveWin((a) => (a === id ? null : a));
   };
@@ -1133,12 +1209,30 @@ export default function Desktop(props: DesktopProps) {
     { id: "feed", label: "Open ORBITX Pulse", hint: "Window", run: () => { setCmdOpen(false); openBuiltin("feed", "ORBITX Pulse"); } },
     { id: "notes", label: "Open Notes", hint: "Window", run: () => { setCmdOpen(false); openBuiltin("notes", "Notes"); } },
     { id: "files", label: "Open Files", hint: "Window", run: () => { setCmdOpen(false); openBuiltin("files", "Files"); } },
+    { id: "tasks", label: "Open Tasks", hint: "Window", run: () => { setCmdOpen(false); openBuiltin("tasks", "Tasks"); } },
+    { id: "calendar", label: "Open Calendar", hint: "Window", run: () => { setCmdOpen(false); openBuiltin("calendar", "Calendar"); } },
+    { id: "shortcuts", label: "Open Shortcuts", hint: "Window", run: () => { setCmdOpen(false); openBuiltin("shortcuts", "Shortcuts"); } },
     { id: "desktops", label: "Open Desktops", hint: "Panel", run: () => { setCmdOpen(false); setDeskOpen(true); } },
     { id: "voice", label: "Voice mini-player", hint: "Pinned Social window", run: () => { setCmdOpen(false); openVoiceMiniPlayer(); } },
     { id: "sync", label: "Sync layout now", hint: "Account", run: () => { saveOsLayoutToCloud(currentLayout()); flushOsLayoutToCloud(); setSyncStatus("synced"); setCmdOpen(false); } },
     { id: "reset", label: "Reset icon layout", hint: "Desktop", run: () => { clearIconPositions(); setIconPos({}); setCmdOpen(false); } },
     { id: "clear-notif", label: "Clear notifications", hint: "Notifications", run: () => { setNotifications([]); setCmdOpen(false); } },
   ];
+  // Calculator (#73): a bare arithmetic query shows its result as the
+  // first row; tapping it copies the answer. Input is regex-gated to
+  // digits, operators, parens, and spaces only.
+  const calcMatch = cmdQTrim.match(/^(?:calc\s+)?([0-9+\-*/().\s]+)$/);
+  const calcResult = ((): number | null => {
+    if (cmdTokenMode || !calcMatch) return null;
+    const expr = calcMatch[1].trim();
+    if (!/[0-9]/.test(expr)) return null;
+    try {
+      const v = Function(`"use strict"; return (${expr})`)();
+      return typeof v === "number" && Number.isFinite(v) ? Math.round(v * 1e10) / 1e10 : null;
+    } catch {
+      return null;
+    }
+  })();
   const cmdFiltered = cmdTokenMode
     ? []
     : cmdQTrim
@@ -1338,6 +1432,15 @@ export default function Desktop(props: DesktopProps) {
     if (w.kind === "files") {
       return <FilesApp files={files} onChange={setFiles} />;
     }
+    if (w.kind === "tasks") {
+      return <TasksApp tasks={tasks} onChange={setTasks} />;
+    }
+    if (w.kind === "calendar") {
+      return <CalendarApp events={calEvents} onChange={setCalEvents} />;
+    }
+    if (w.kind === "shortcuts") {
+      return <ShortcutsBody />;
+    }
     if (w.kind === "browser") {
       const activeTab = browserTabs.find((t) => t.id === browserActiveId) ?? browserTabs[0];
       const blocked = activeTab ? isBlockedFrame(activeTab.url) : false;
@@ -1347,7 +1450,7 @@ export default function Desktop(props: DesktopProps) {
         setBrowserTabs((prev) =>
           prev.map((t) => (t.id === activeTab.id ? { ...t, url: clean, title: hostOf(clean) || "Browser" } : t)),
         );
-        setHistory((prev) => [clean, ...prev.filter((u) => u !== clean)].slice(0, 100));
+        if (!activeTab.private) setHistory((prev) => [clean, ...prev.filter((u) => u !== clean)].slice(0, 100));
         // X profile URLs (x.com/<handle>) retarget the embedded timeline.
         const host = hostOf(clean);
         if (host === "x.com" || host === "twitter.com") {
@@ -1467,6 +1570,16 @@ export default function Desktop(props: DesktopProps) {
                   onClick={() => setHistoryOpen((v) => !v)}
                 >
                   History
+                </button>
+                <button
+                  type="button"
+                  className={`oxos-btn oxos-btn--ghost${activeTab.private ? " is-on" : ""}`}
+                  title="Private tab: visits are not saved to history"
+                  onClick={() =>
+                    setBrowserTabs((prev) => prev.map((t) => (t.id === activeTab.id ? { ...t, private: !t.private } : t)))
+                  }
+                >
+                  {activeTab.private ? "Private ●" : "Private ○"}
                 </button>
                 <button type="button" className="oxos-btn oxos-btn--ghost" onClick={() => window.open(activeTab.url, "_blank", "noopener")}>
                   ↗ Tab
@@ -1779,6 +1892,14 @@ export default function Desktop(props: DesktopProps) {
             Themes change your wallpaper, accent, and icon shape. Make one, share it as JSON, or import a
             friend's.
           </p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" className="oxos-btn oxos-btn--ghost" disabled={!prevPackIdRef.current} onClick={undoTheme}>
+              Undo last theme
+            </button>
+            <button type="button" className="oxos-btn oxos-btn--ghost" onClick={surpriseTheme}>
+              Surprise me
+            </button>
+          </div>
           <h3 className="oxos-h3">Theme store</h3>
           <div className="oxos-store__grid">
             {packs.map((p) => (
@@ -2318,7 +2439,7 @@ export default function Desktop(props: DesktopProps) {
               dragRef.current = { type: "widget", id: wdg.id, startX: e.clientX, startY: e.clientY, origX: wdg.x, origY: wdg.y };
             }}
           >
-            <span>{wdg.type === "ticker" ? "Market" : wdg.type === "trending" ? "Trending" : "My alerts"}</span>
+            <span>{wdg.type === "ticker" ? "Market" : wdg.type === "trending" ? "Trending" : wdg.type === "countdown" ? "Countdown" : wdg.type === "quote" ? "Quote" : "My alerts"}</span>
             <button
               type="button"
               title="Remove widget"
@@ -2374,6 +2495,39 @@ export default function Desktop(props: DesktopProps) {
                   </div>
                 ))
               ))}
+            {wdg.type === "countdown" && (
+              <div className="oxos-deskwd__countdown">
+                <input
+                  className="oxos-input"
+                  value={wdg.label ?? "Countdown"}
+                  onChange={(e) => setDeskWidgets((prev) => prev.map((x) => (x.id === wdg.id ? { ...x, label: e.target.value } : x)))}
+                  aria-label="Countdown label"
+                />
+                <input
+                  className="oxos-input"
+                  type="date"
+                  value={wdg.targetDate ?? ""}
+                  onChange={(e) => setDeskWidgets((prev) => prev.map((x) => (x.id === wdg.id ? { ...x, targetDate: e.target.value } : x)))}
+                  aria-label="Countdown date"
+                />
+                {wdg.targetDate ? (
+                  <div className="oxos-deskwd__bignum">
+                    {(() => {
+                      const d = daysUntil(wdg.targetDate as string);
+                      return d > 0 ? `${d} days left` : d === 0 ? "Today!" : `${Math.abs(d)} days ago`;
+                    })()}
+                  </div>
+                ) : (
+                  <p className="oxos-hint">Pick a date.</p>
+                )}
+              </div>
+            )}
+            {wdg.type === "quote" && (
+              <div className="oxos-deskwd__quote">
+                <p>“{quoteOfDay()}”</p>
+                <span className="oxos-hint">Quote of the day</span>
+              </div>
+            )}
           </div>
         </section>
       ))}
@@ -2876,6 +3030,24 @@ export default function Desktop(props: DesktopProps) {
                 <span>Device-local shelf</span>
               </span>
             </button>
+            <button type="button" className="oxos-start__row" onClick={() => openBuiltin("tasks", "Tasks")}>
+              <span className="oxos-start__rowmeta">
+                <span>Tasks</span>
+                <span>Todo lists, due dates</span>
+              </span>
+            </button>
+            <button type="button" className="oxos-start__row" onClick={() => openBuiltin("calendar", "Calendar")}>
+              <span className="oxos-start__rowmeta">
+                <span>Calendar</span>
+                <span>Events, device-local</span>
+              </span>
+            </button>
+            <button type="button" className="oxos-start__row" onClick={() => openBuiltin("shortcuts", "Shortcuts")}>
+              <span className="oxos-start__rowmeta">
+                <span>Shortcuts</span>
+                <span>What the OS actually does</span>
+              </span>
+            </button>
             <button
               type="button"
               className="oxos-start__row"
@@ -3045,11 +3217,34 @@ export default function Desktop(props: DesktopProps) {
               {props.orbitxPrice != null && <span>$ORBITX {fmtUsd(props.orbitxPrice, 6)}</span>}
             </span>
           )}
-          <span className="oxos-tray__clock">
+          <button type="button" className="oxos-tray__clock" title="Calendar" onClick={() => setCalPanelOpen((v) => !v)}>
             {clock} · {dateStr}
-          </span>
+          </button>
         </span>
       </footer>
+
+      {/* Mini calendar (tray clock, #56) */}
+      {calPanelOpen && (
+        <div className="oxos-panel oxos-panel--right oxos-calpanel">
+          <div className="oxos-panel__head">
+            <span>Calendar</span>
+            <button type="button" onClick={() => setCalPanelOpen(false)}>
+              ✕
+            </button>
+          </div>
+          <MiniCal />
+          <button
+            type="button"
+            className="oxos-btn oxos-btn--ghost"
+            onClick={() => {
+              setCalPanelOpen(false);
+              openBuiltin("calendar", "Calendar");
+            }}
+          >
+            Open Calendar app
+          </button>
+        </div>
+      )}
 
       {/* Control Center */}
       {controlOpen && (
@@ -3121,6 +3316,8 @@ export default function Desktop(props: DesktopProps) {
                 ["ticker", "Market"],
                 ["trending", "Trending"],
                 ["alerts", "Alerts"],
+                ["countdown", "Countdown"],
+                ["quote", "Quote"],
               ] as const
             ).map(([t, label]) => (
               <button
@@ -3135,6 +3332,9 @@ export default function Desktop(props: DesktopProps) {
                       type: t,
                       x: 4 + prev.length * 2,
                       y: 12,
+                      ...(t === "countdown"
+                        ? { label: "Countdown", targetDate: isoDay(new Date(Date.now() + 7 * 86400000)) }
+                        : {}),
                     },
                   ])
                 }
@@ -3267,6 +3467,50 @@ export default function Desktop(props: DesktopProps) {
               }}
             >
               + New desktop
+            </button>
+          )}
+          <h3 className="oxos-h3">Recently closed</h3>
+          <p className="oxos-hint">Windows closed in the last hour — reopen them here.</p>
+          <div className="oxos-desklist">
+            {closed
+              .filter((c) => Date.now() - c.closedAt < 3600000)
+              .map((c) => (
+                <div key={c.id} className="oxos-desk">
+                  <span className="oxos-desk__name">{c.title}</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      type="button"
+                      className="oxos-btn oxos-btn--ghost"
+                      onClick={() => {
+                        if (c.kind === "app" && c.appKey) {
+                          const a = appByKey.get(c.appKey);
+                          if (a) {
+                            if (c.hrefOverride) openAppWithHref(a, c.hrefOverride);
+                            else openApp(a);
+                          }
+                        } else {
+                          openBuiltin(c.kind as OsWindowKind, c.title);
+                        }
+                        setClosed((prev) => prev.filter((x) => x.id !== c.id));
+                      }}
+                    >
+                      Reopen
+                    </button>
+                    <button
+                      type="button"
+                      className="oxos-btn oxos-btn--ghost"
+                      onClick={() => setClosed((prev) => prev.filter((x) => x.id !== c.id))}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ))}
+            {!closed.some((c) => Date.now() - c.closedAt < 3600000) && <p className="oxos-hint">Nothing closed recently.</p>}
+          </div>
+          {closed.length > 0 && (
+            <button type="button" className="oxos-btn oxos-btn--ghost" onClick={() => setClosed([])}>
+              Clear closed list
             </button>
           )}
           <h3 className="oxos-h3">Saved layouts</h3>
@@ -3515,6 +3759,27 @@ export default function Desktop(props: DesktopProps) {
               ))}
             {cmdTokenMode && cmdQTrim.slice(6).trim().length >= 2 && cmdTokens.length === 0 && (
               <p className="oxos-hint">Searching tokens…</p>
+            )}
+            {!cmdTokenMode && calcResult != null && (
+              <button
+                type="button"
+                className="oxos-start__row"
+                onClick={() => {
+                  try {
+                    void navigator.clipboard?.writeText(String(calcResult));
+                  } catch {
+                    /* clipboard unavailable: result is still shown */
+                  }
+                  setCmdOpen(false);
+                }}
+              >
+                <span className="oxos-start__rowmeta">
+                  <span>
+                    {cmdQTrim} = {calcResult}
+                  </span>
+                  <span>Calculator — tap to copy</span>
+                </span>
+              </button>
             )}
             {!cmdTokenMode &&
               cmdFiltered.map((c) => (

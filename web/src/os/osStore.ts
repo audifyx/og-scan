@@ -137,13 +137,16 @@ export interface OsPriceAlert {
   triggered: boolean;
 }
 
-export type DeskWidgetType = "ticker" | "trending" | "alerts";
+export type DeskWidgetType = "ticker" | "trending" | "alerts" | "countdown" | "quote";
 
 export interface DeskWidget {
   id: string;
   type: DeskWidgetType;
   x: number; // percentages
   y: number;
+  /** Countdown widget (idea bank #1009). */
+  label?: string;
+  targetDate?: string; // YYYY-MM-DD
 }
 
 export interface InstalledApp {
@@ -204,11 +207,69 @@ export function loadDeskWidgets(): DeskWidget[] {
   const saved = readJson<DeskWidget[]>(DESK_WIDGETS_KEY);
   if (!Array.isArray(saved)) return [];
   return saved.filter(
-    (w) => w && (w.type === "ticker" || w.type === "trending" || w.type === "alerts"),
+    (w) =>
+      w &&
+      (w.type === "ticker" ||
+        w.type === "trending" ||
+        w.type === "alerts" ||
+        w.type === "countdown" ||
+        w.type === "quote"),
   );
 }
 export function saveDeskWidgets(w: DeskWidget[]) {
   writeJson(DESK_WIDGETS_KEY, w);
+}
+
+/* --- OS wave 4: tasks, calendar events, recently closed windows --- */
+
+export interface OsTask {
+  id: string;
+  title: string;
+  done: boolean;
+  priority: "low" | "normal" | "high";
+  due?: string; // YYYY-MM-DD
+  createdAt: number;
+}
+
+export interface OsCalEvent {
+  id: string;
+  date: string; // YYYY-MM-DD
+  title: string;
+}
+
+export interface OsClosedWindow {
+  id: string;
+  kind: string;
+  appKey?: string;
+  title: string;
+  hrefOverride?: string;
+  closedAt: number;
+}
+
+const TASKS_KEY = "orbitxos:tasks:v1";
+const CAL_EVENTS_KEY = "orbitxos:events:v1";
+const CLOSED_KEY = "orbitxos:closed:v1";
+
+export function loadOsTasks(): OsTask[] {
+  const saved = readJson<OsTask[]>(TASKS_KEY);
+  return Array.isArray(saved) ? saved.filter((t) => t && typeof t.title === "string") : [];
+}
+export function saveOsTasks(t: OsTask[]) {
+  writeJson(TASKS_KEY, t.slice(0, 500));
+}
+export function loadOsCalEvents(): OsCalEvent[] {
+  const saved = readJson<OsCalEvent[]>(CAL_EVENTS_KEY);
+  return Array.isArray(saved) ? saved.filter((e) => e && typeof e.date === "string" && typeof e.title === "string") : [];
+}
+export function saveOsCalEvents(e: OsCalEvent[]) {
+  writeJson(CAL_EVENTS_KEY, e.slice(0, 1000));
+}
+export function loadOsClosed(): OsClosedWindow[] {
+  const saved = readJson<OsClosedWindow[]>(CLOSED_KEY);
+  return Array.isArray(saved) ? saved.filter((c) => c && typeof c.title === "string") : [];
+}
+export function saveOsClosed(c: OsClosedWindow[]) {
+  writeJson(CLOSED_KEY, c.slice(0, 10));
 }
 
 export function loadInstalledApps(): InstalledApp[] {
@@ -285,6 +346,8 @@ export interface OsNote {
   title: string;
   body: string;
   updatedAt: number;
+  /** Optional folder label (idea bank #1101). Synced with the note (JSONB). */
+  folder?: string;
 }
 
 export interface OsFileItem {
@@ -358,6 +421,8 @@ export interface StoredBrowserTab {
   id: string;
   url: string;
   title: string;
+  /** Private tab (idea bank #813): visits are not recorded in history. */
+  private?: boolean;
 }
 export function loadBrowserTabs(): StoredBrowserTab[] | null {
   const saved = readJson<StoredBrowserTab[]>(BROWSER_TABS_KEY);
