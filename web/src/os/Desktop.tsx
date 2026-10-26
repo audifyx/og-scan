@@ -552,6 +552,18 @@ export default function Desktop(props: DesktopProps) {
     saveOsSettings(settings);
   }, [settings]);
 
+  /* Wallpaper slideshow (#12): rotate hourly while enabled. */
+  useEffect(() => {
+    if (!settings.wallpaperShuffle) return;
+    const id = setInterval(() => {
+      setSettings((s) => {
+        const idx = OS_WALLPAPERS.findIndex((w) => w.id === s.wallpaper);
+        return { ...s, wallpaper: OS_WALLPAPERS[(idx + 1) % OS_WALLPAPERS.length].id };
+      });
+    }, 3600000);
+    return () => clearInterval(id);
+  }, [settings.wallpaperShuffle]);
+
   /* --- OS wave 2 state --- */
   const [installed, setInstalled] = useState<InstalledApp[]>(loadInstalledApps);
   const [deskWidgets, setDeskWidgets] = useState<DeskWidget[]>(loadDeskWidgets);
@@ -953,7 +965,7 @@ export default function Desktop(props: DesktopProps) {
   const applyThemePack = (p: ThemePack) => {
     if (!suppressPrevRef.current) prevPackIdRef.current = activePackId;
     suppressPrevRef.current = false;
-    setSettings((s) => ({ ...s, wallpaper: p.wallpaper, accent: p.accent }));
+    setSettings((s) => ({ ...s, wallpaper: p.wallpaper, accent: p.accent, accentGrad: null }));
     setActivePackId(p.id);
     pushNotification("Theme applied", p.name, "system");
   };
@@ -1201,7 +1213,8 @@ export default function Desktop(props: DesktopProps) {
         setCmdOpen(false);
       },
     },
-    { id: "control", label: "Open Control Center", hint: "Panel", run: () => { setCmdOpen(false); setControlOpen(true); } },
+    { id: "control", label: "Open Control Center", hint: "Panel", run: () => { setCmdOpen(false); setControlOpen(true);  } },
+    { id: "focus", label: "Toggle focus mode", hint: "Dim inactive windows", run: () => { setSettings((s) => ({ ...s, focusMode: !s.focusMode })); setCmdOpen(false); } },
     { id: "notif", label: "Open Notifications", hint: "Panel", run: () => { setCmdOpen(false); setNotifOpen(true); } },
     { id: "store", label: "Open App Store", hint: "Window", run: () => { setCmdOpen(false); openBuiltin("store", "App Store"); } },
     { id: "browser", label: "Open Browser", hint: "Window", run: () => { setCmdOpen(false); openBuiltin("browser", "Browser"); } },
@@ -2247,7 +2260,7 @@ export default function Desktop(props: DesktopProps) {
                     style={{ background: a.hex }}
                     title={a.label}
                     aria-label={a.label}
-                    onClick={() => set({ accent: a.hex })}
+                    onClick={() => set({ accent: a.hex, accentGrad: null })}
                   />
                 ))}
               </div>
@@ -2257,6 +2270,223 @@ export default function Desktop(props: DesktopProps) {
               <button type="button" className="oxos-btn oxos-btn--ghost" onClick={() => openBuiltin("themes", "Theme Store")}>
                 Open Theme Store
               </button>
+              <h3 className="oxos-h3">Theme mode</h3>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  className={`oxos-btn oxos-btn--ghost${settings.themeMode !== "light" ? " is-on" : ""}`}
+                  onClick={() => set({ themeMode: "dark" })}
+                >
+                  Dark
+                </button>
+                <button
+                  type="button"
+                  className={`oxos-btn oxos-btn--ghost${settings.themeMode === "light" ? " is-on" : ""}`}
+                  onClick={() => set({ themeMode: "light" })}
+                >
+                  Light
+                </button>
+              </div>
+              <h3 className="oxos-h3">Gradient accent</h3>
+              <p className="oxos-hint">A two-color accent for buttons and the Start key. Picking a solid accent or a theme pack clears it.</p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {(
+                  [
+                    ["Gold to Blue", "linear-gradient(135deg, #e8b84a, #60a5fa)"],
+                    ["Teal to Violet", "linear-gradient(135deg, #2dd4bf, #c084fc)"],
+                    ["Violet to Gold", "linear-gradient(135deg, #c084fc, #e8b84a)"],
+                    ["Ocean to Gold", "linear-gradient(135deg, #2dd4bf, #e8b84a)"],
+                  ] as const
+                ).map(([label, g]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    className={`oxos-btn oxos-btn--ghost${settings.accentGrad === g ? " is-on" : ""}`}
+                    style={{ background: settings.accentGrad === g ? g : undefined }}
+                    onClick={() => set({ accentGrad: g })}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <button type="button" className="oxos-btn oxos-btn--ghost" onClick={() => set({ accentGrad: null })}>
+                  Clear gradient
+                </button>
+              </div>
+              <label className="oxos-toggle">
+                <span>Focus mode (dim inactive windows)</span>
+                <input
+                  type="checkbox"
+                  checked={!!settings.focusMode}
+                  onChange={(e) => set({ focusMode: e.target.checked })}
+                />
+              </label>
+              <h3 className="oxos-h3">Window borders</h3>
+              <div style={{ display: "flex", gap: 8 }}>
+                {(
+                  [
+                    ["rounded", "Rounded"],
+                    ["sharp", "Sharp"],
+                    ["neon", "Neon glow"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`oxos-btn oxos-btn--ghost${(settings.windowBorder ?? "rounded") === id ? " is-on" : ""}`}
+                    onClick={() => set({ windowBorder: id })}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <h3 className="oxos-h3">Taskbar style</h3>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  className={`oxos-btn oxos-btn--ghost${(settings.taskbarStyle ?? "pill") === "pill" ? " is-on" : ""}`}
+                  onClick={() => set({ taskbarStyle: "pill" })}
+                >
+                  Floating pill
+                </button>
+                <button
+                  type="button"
+                  className={`oxos-btn oxos-btn--ghost${settings.taskbarStyle === "bar" ? " is-on" : ""}`}
+                  onClick={() => set({ taskbarStyle: "bar" })}
+                >
+                  Full-width bar
+                </button>
+              </div>
+              <h3 className="oxos-h3">Desktop icons</h3>
+              <label className="oxos-toggle">
+                <span>Show icon labels</span>
+                <input
+                  type="checkbox"
+                  checked={settings.showIconLabels !== false}
+                  onChange={(e) => set({ showIconLabels: e.target.checked })}
+                />
+              </label>
+              <p className="oxos-hint">Icon size: {settings.iconSize ?? 56}px</p>
+              <input
+                type="range"
+                min={48}
+                max={72}
+                step={4}
+                value={settings.iconSize ?? 56}
+                onChange={(e) => set({ iconSize: Number(e.target.value) })}
+              />
+              <h3 className="oxos-h3">Font</h3>
+              <div style={{ display: "flex", gap: 8 }}>
+                {(
+                  [
+                    ["system", "System"],
+                    ["serif", "Serif"],
+                    ["mono", "Mono"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`oxos-btn oxos-btn--ghost${(settings.fontFamily ?? "system") === id ? " is-on" : ""}`}
+                    onClick={() => set({ fontFamily: id })}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <h3 className="oxos-h3">Interface scale</h3>
+              <div style={{ display: "flex", gap: 8 }}>
+                {(
+                  [
+                    ["s", "Small"],
+                    ["m", "Medium"],
+                    ["l", "Large"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`oxos-btn oxos-btn--ghost${(settings.uiScale ?? "m") === id ? " is-on" : ""}`}
+                    onClick={() => set({ uiScale: id })}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <h3 className="oxos-h3">Wallpaper</h3>
+              <p className="oxos-hint">Blur: {settings.wallBlur ?? 0}px</p>
+              <input
+                type="range"
+                min={0}
+                max={12}
+                step={1}
+                value={settings.wallBlur ?? 0}
+                onChange={(e) => set({ wallBlur: Number(e.target.value) })}
+              />
+              <p className="oxos-hint">Dim: {settings.scrimOpacity ?? 100}%</p>
+              <input
+                type="range"
+                min={30}
+                max={100}
+                step={5}
+                value={settings.scrimOpacity ?? 100}
+                onChange={(e) => set({ scrimOpacity: Number(e.target.value) })}
+              />
+              <label className="oxos-toggle">
+                <span>Rotate wallpaper hourly</span>
+                <input
+                  type="checkbox"
+                  checked={!!settings.wallpaperShuffle}
+                  onChange={(e) => set({ wallpaperShuffle: e.target.checked })}
+                />
+              </label>
+              <button
+                type="button"
+                className="oxos-btn oxos-btn--ghost"
+                onClick={() => {
+                  const others = OS_WALLPAPERS.filter((w) => w.id !== settings.wallpaper);
+                  set({ wallpaper: others[Math.floor(Math.random() * others.length)].id });
+                }}
+              >
+                Shuffle wallpaper now
+              </button>
+              <h3 className="oxos-h3">Animation speed</h3>
+              <p className="oxos-hint">{(settings.animSpeed ?? 1) === 0 ? "Off" : `${settings.animSpeed ?? 1}x`}</p>
+              <input
+                type="range"
+                min={0}
+                max={2}
+                step={0.5}
+                value={settings.animSpeed ?? 1}
+                onChange={(e) => set({ animSpeed: Number(e.target.value) })}
+              />
+              <h3 className="oxos-h3">Desk widgets</h3>
+              <div style={{ display: "flex", gap: 8 }}>
+                {(
+                  [
+                    ["s", "Small"],
+                    ["m", "Medium"],
+                    ["l", "Large"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`oxos-btn oxos-btn--ghost${(settings.widgetSize ?? "m") === id ? " is-on" : ""}`}
+                    onClick={() => set({ widgetSize: id })}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="oxos-hint">Widget opacity: {settings.widgetOpacity ?? 100}%</p>
+              <input
+                type="range"
+                min={40}
+                max={100}
+                step={5}
+                value={settings.widgetOpacity ?? 100}
+                onChange={(e) => set({ widgetOpacity: Number(e.target.value) })}
+              />
             </>
           )}
           {settingsNav === "account" && (
@@ -2384,6 +2614,14 @@ export default function Desktop(props: DesktopProps) {
   };
 
   const foldered = useMemo(() => folderedKeys(folders), [folders]);
+  const uiFont =
+    settings.fontFamily === "serif"
+      ? "Georgia, 'Times New Roman', serif"
+      : settings.fontFamily === "mono"
+        ? "ui-monospace, Menlo, monospace"
+        : "inherit";
+  const uiFontSize = settings.uiScale === "s" ? "15px" : settings.uiScale === "l" ? "18px" : undefined;
+  const widgetW = settings.widgetSize === "s" ? "180px" : settings.widgetSize === "l" ? "280px" : "220px";
   const visibleDesktopApps = [...desktopApps, ...installedAsApps].filter((a) => !foldered.has(a.key));
   const unplaced = visibleDesktopApps.filter((a) => !iconPos[a.key]);
   const placed = visibleDesktopApps.filter((a) => iconPos[a.key]);
@@ -2393,12 +2631,21 @@ export default function Desktop(props: DesktopProps) {
   return (
     <div
       ref={rootRef}
-      className={`oxos${settings.reduceMotion ? " oxos--reduced" : ""}`}
+      className={`oxos${settings.reduceMotion ? " oxos--reduced" : ""}${settings.themeMode === "light" ? " oxos--light" : ""}${settings.focusMode ? " oxos--focus" : ""}${settings.taskbarStyle === "bar" ? " oxos--taskbar-bar" : ""}${settings.windowBorder === "sharp" ? " oxos--sharp" : settings.windowBorder === "neon" ? " oxos--neon" : ""}${settings.showIconLabels === false ? " oxos--no-labels" : ""}${settings.uiScale === "s" ? " oxos--font-s" : settings.uiScale === "l" ? " oxos--font-l" : ""}`}
       style={
         {
           "--os-accent": settings.accent,
           "--os-icon-radius": `${activePack?.radius ?? 18}px`,
           "--os-icon-ring": activePack?.ring ?? "none",
+          "--os-icon-size": `${settings.iconSize ?? 56}px`,
+          "--os-font": uiFont,
+          "--os-font-size": uiFontSize,
+          "--os-wall-blur": `${settings.wallBlur ?? 0}px`,
+          "--os-scrim-opacity": (settings.scrimOpacity ?? 100) / 100,
+          "--os-anim": settings.animSpeed ?? 1,
+          "--os-widget-w": widgetW,
+          "--os-widget-opacity": (settings.widgetOpacity ?? 100) / 100,
+          ...(settings.accentGrad ? { "--os-accent-grad": settings.accentGrad } : {}),
         } as React.CSSProperties
       }
       onPointerMove={onRootMove}
@@ -3305,6 +3552,22 @@ export default function Desktop(props: DesktopProps) {
               type="checkbox"
               checked={settings.reduceMotion}
               onChange={(e) => setSettings((s) => ({ ...s, reduceMotion: e.target.checked }))}
+            />
+          </label>
+          <label className="oxos-toggle">
+            <span>Focus mode</span>
+            <input
+              type="checkbox"
+              checked={!!settings.focusMode}
+              onChange={(e) => setSettings((s) => ({ ...s, focusMode: e.target.checked }))}
+            />
+          </label>
+          <label className="oxos-toggle">
+            <span>Light mode</span>
+            <input
+              type="checkbox"
+              checked={settings.themeMode === "light"}
+              onChange={(e) => setSettings((s) => ({ ...s, themeMode: e.target.checked ? "light" : "dark" }))}
             />
           </label>
           <h3 className="oxos-h3">Screen dim</h3>

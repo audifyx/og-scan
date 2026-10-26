@@ -11,6 +11,22 @@ export interface OsSettings {
   accent: string;
   reduceMotion: boolean;
   showTrayPrices: boolean;
+  /* --- OS wave 5: look & feel --- */
+  themeMode: "dark" | "light";
+  focusMode: boolean;
+  windowBorder: "rounded" | "sharp" | "neon";
+  taskbarStyle: "pill" | "bar";
+  iconSize: number;
+  showIconLabels: boolean;
+  fontFamily: "system" | "serif" | "mono";
+  uiScale: "s" | "m" | "l";
+  wallBlur: number;
+  scrimOpacity: number;
+  wallpaperShuffle: boolean;
+  animSpeed: number;
+  accentGrad: string | null;
+  widgetSize: "s" | "m" | "l";
+  widgetOpacity: number;
 }
 
 export const OS_ACCENTS: { id: string; label: string; hex: string }[] = [
@@ -32,6 +48,21 @@ export const DEFAULT_OS_SETTINGS: OsSettings = {
   accent: "#e8b84a",
   reduceMotion: false,
   showTrayPrices: true,
+  themeMode: "dark",
+  focusMode: false,
+  windowBorder: "rounded",
+  taskbarStyle: "pill",
+  iconSize: 56,
+  showIconLabels: true,
+  fontFamily: "system",
+  uiScale: "m",
+  wallBlur: 0,
+  scrimOpacity: 100,
+  wallpaperShuffle: false,
+  animSpeed: 1,
+  accentGrad: null,
+  widgetSize: "m",
+  widgetOpacity: 100,
 };
 
 const SETTINGS_KEY = "orbitxos:settings:v1";

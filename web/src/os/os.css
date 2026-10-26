@@ -6,9 +6,14 @@
   inset: 0;
   overflow: hidden;
   background: #050508;
-  color: #f4f4f5;
-  font-family: inherit;
+  color: rgb(var(--os-text-rgb));
+  font-family: var(--os-font, inherit);
+  font-size: var(--os-font-size, inherit);
   --os-accent: #e8b84a;
+  --os-text-rgb: 244, 244, 245;
+  --os-line-rgb: 255, 255, 255;
+  --os-panel-rgb: 16, 16, 22;
+  --os-window-rgb: 13, 13, 18;
   -webkit-user-select: none;
   user-select: none;
 }
@@ -34,6 +39,8 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
+  filter: blur(var(--os-wall-blur, 0px));
+  transform: scale(1.03);
 }
 .oxos-wallpaper--midnight {
   background:
@@ -58,6 +65,7 @@
   inset: 0;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.25), transparent 30%, transparent 70%, rgba(0, 0, 0, 0.35));
   pointer-events: none;
+  opacity: var(--os-scrim-opacity, 1);
 }
 
 /* Desktop icons */
@@ -77,7 +85,7 @@
   padding-top: 8px;
 }
 .oxos-icon {
-  width: 88px;
+  width: calc(var(--os-icon-size, 56px) + 32px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -89,21 +97,21 @@
   touch-action: none;
 }
 .oxos-icon:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--os-line-rgb), 0.08);
 }
 .oxos-icons .oxos-icon[style] {
   position: absolute;
   margin: 0;
 }
 .oxos-icon__mark {
-  width: 56px;
-  height: 56px;
+  width: var(--os-icon-size, 56px);
+  height: var(--os-icon-size, 56px);
   border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(var(--os-line-rgb), 0.18);
 }
 .oxos-icon__mark svg,
 .oxos-icon__mark span {
@@ -119,16 +127,16 @@
   text-align: center;
   line-height: 1.25;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
-  max-width: 88px;
+  max-width: calc(var(--os-icon-size, 56px) + 32px);
 }
 
 /* Folder icons — iOS-style mini grid */
 .oxos-folder__grid {
-  width: 56px;
-  height: 56px;
+  width: var(--os-icon-size, 56px);
+  height: var(--os-icon-size, 56px);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(var(--os-line-rgb), 0.14);
+  border: 1px solid rgba(var(--os-line-rgb), 0.18);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -172,7 +180,7 @@
   position: relative;
   width: min(420px, 94vw);
   background: rgba(22, 22, 30, 0.97);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(var(--os-line-rgb), 0.14);
   border-radius: 20px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
   padding: 18px;
@@ -187,7 +195,7 @@
   flex: 1;
   background: transparent;
   border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  border-bottom: 1px solid rgba(var(--os-line-rgb), 0.16);
   font-size: 17px;
   font-weight: 750;
   padding: 6px 2px;
@@ -201,7 +209,7 @@
   height: 32px;
   border-radius: 50%;
   border: none;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(var(--os-line-rgb), 0.1);
   font-size: 13px;
 }
 .oxos-folderpanel__grid {
@@ -226,7 +234,7 @@
   font-weight: 600;
 }
 .oxos-folderpanel__app:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(var(--os-line-rgb), 0.07);
 }
 .oxos-folderpanel__mark {
   width: 52px;
@@ -253,7 +261,7 @@
   border-radius: 50%;
   border: none;
   background: rgba(229, 72, 77, 0.9);
-  color: #fff;
+  color: rgb(var(--os-text-rgb));
   font-size: 10px;
   line-height: 1;
 }
@@ -263,7 +271,7 @@
   gap: 0;
   margin-top: 18px;
   padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(var(--os-line-rgb), 0.1);
 }
 .oxos-folderpanel__foot .oxos-btn:last-child {
   margin-right: 0;
@@ -274,8 +282,9 @@
   position: absolute;
   display: flex;
   flex-direction: column;
-  background: rgba(13, 13, 18, 0.97);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  animation: oxos-win-in calc(var(--os-anim, 1) * 180ms) ease-out;
+  background: rgba(var(--os-window-rgb), 0.97);
+  border: 1px solid rgba(var(--os-line-rgb), 0.12);
   border-radius: 14px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
   overflow: hidden;
@@ -301,8 +310,8 @@
   align-items: center;
   gap: 10px;
   padding: 0 8px 0 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(var(--os-line-rgb), 0.05);
+  border-bottom: 1px solid rgba(var(--os-line-rgb), 0.09);
   touch-action: none;
   cursor: grab;
 }
@@ -344,7 +353,7 @@
   line-height: 1;
 }
 .oxos-window__ctl:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(var(--os-line-rgb), 0.12);
 }
 .oxos-window__ctl--close:hover {
   background: #e5484d;
@@ -374,7 +383,7 @@
 
 /* Shared bits */
 .oxos-hint {
-  color: rgba(244, 244, 245, 0.6);
+  color: rgba(var(--os-text-rgb), 0.6);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -389,8 +398,8 @@
 .oxos-input {
   width: 100%;
   box-sizing: border-box;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(var(--os-line-rgb), 0.07);
+  border: 1px solid rgba(var(--os-line-rgb), 0.12);
   border-radius: 10px;
   padding: 10px 12px;
   outline: none;
@@ -400,7 +409,7 @@
 }
 .oxos-btn {
   display: inline-block;
-  background: var(--os-accent);
+  background: var(--os-accent-grad, var(--os-accent));
   color: #121212;
   border: none;
   border-radius: 10px;
@@ -412,8 +421,8 @@
   margin-bottom: 8px;
 }
 .oxos-btn--ghost {
-  background: rgba(255, 255, 255, 0.08);
-  color: #f4f4f5;
+  background: rgba(var(--os-line-rgb), 0.08);
+  color: rgb(var(--os-text-rgb));
 }
 .oxos-btn--danger {
   background: rgba(229, 72, 77, 0.16);
@@ -432,9 +441,9 @@
   max-width: 94vw;
   overflow-x: auto;
   padding: 8px 10px;
-  background: rgba(16, 16, 22, 0.82);
+  background: rgba(var(--os-panel-rgb), 0.82);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(var(--os-line-rgb), 0.12);
   border-radius: 18px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
   scrollbar-width: none;
@@ -447,7 +456,7 @@
   height: 42px;
   border-radius: 12px;
   border: none;
-  background: var(--os-accent);
+  background: var(--os-accent-grad, var(--os-accent));
   color: #121212;
   font-size: 20px;
   font-weight: 800;
@@ -466,7 +475,7 @@
   justify-content: center;
 }
 .oxos-taskbar__btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(var(--os-line-rgb), 0.1);
 }
 .oxos-taskbar__mark {
   width: 26px;
@@ -487,7 +496,7 @@
 .oxos-taskbar__sep {
   width: 1px;
   height: 28px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(var(--os-line-rgb), 0.14);
   flex: 0 0 1px;
 }
 .oxos-taskbar__win {
@@ -502,7 +511,7 @@
   flex: 0 0 auto;
 }
 .oxos-taskbar__win.is-on {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(var(--os-line-rgb), 0.12);
   box-shadow: inset 0 -2px 0 var(--os-accent);
 }
 .oxos-taskbar__tray {
@@ -512,12 +521,12 @@
   margin-left: 6px;
   white-space: nowrap;
   font-size: 12px;
-  color: rgba(244, 244, 245, 0.85);
+  color: rgba(var(--os-text-rgb), 0.85);
 }
 .oxos-tray__prices {
   display: flex;
   gap: 10px;
-  color: rgba(244, 244, 245, 0.65);
+  color: rgba(var(--os-text-rgb), 0.65);
 }
 .oxos-tray__clock {
   font-weight: 650;
@@ -532,9 +541,9 @@
   width: min(580px, 94vw);
   max-height: calc(100% - 180px);
   overflow: auto;
-  background: rgba(16, 16, 22, 0.94);
+  background: rgba(var(--os-panel-rgb), 0.94);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  border: 1px solid rgba(var(--os-line-rgb), 0.13);
   border-radius: 20px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
   padding: 18px;
@@ -549,7 +558,7 @@
 .oxos-start__mood {
   display: block;
   font-size: 12px;
-  color: rgba(244, 244, 245, 0.6);
+  color: rgba(var(--os-text-rgb), 0.6);
   margin-bottom: 12px;
 }
 .oxos-start__label {
@@ -557,7 +566,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(244, 244, 245, 0.5);
+  color: rgba(var(--os-text-rgb), 0.5);
   margin: 16px 0 8px;
 }
 .oxos-start__pinned {
@@ -579,7 +588,7 @@
   font-weight: 600;
 }
 .oxos-start__pin:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--os-line-rgb), 0.08);
 }
 .oxos-start__pinmark {
   width: 44px;
@@ -613,7 +622,7 @@
   text-align: left;
 }
 .oxos-start__row:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--os-line-rgb), 0.08);
 }
 .oxos-start__rowmark {
   width: 38px;
@@ -643,7 +652,7 @@
 }
 .oxos-start__rowmeta span:last-child {
   font-size: 12px;
-  color: rgba(244, 244, 245, 0.55);
+  color: rgba(var(--os-text-rgb), 0.55);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -654,7 +663,7 @@
   gap: 8px;
   margin-top: 16px;
   padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(var(--os-line-rgb), 0.1);
 }
 .oxos-start__user {
   flex: 1;
@@ -678,7 +687,7 @@
   flex: 0 0 32px;
 }
 .oxos-start__footbtn {
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(var(--os-line-rgb), 0.14);
   background: transparent;
   border-radius: 10px;
   padding: 8px 12px;
@@ -704,8 +713,8 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(var(--os-line-rgb), 0.05);
+  border: 1px solid rgba(var(--os-line-rgb), 0.08);
   border-radius: 14px;
   padding: 14px;
   text-align: left;
@@ -735,7 +744,7 @@
 }
 .oxos-appcell__cap {
   font-size: 12px;
-  color: rgba(244, 244, 245, 0.55);
+  color: rgba(var(--os-text-rgb), 0.55);
   line-height: 1.4;
 }
 
@@ -749,7 +758,7 @@
 .oxos-seg {
   display: flex;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--os-line-rgb), 0.06);
   border-radius: 12px;
   padding: 4px;
 }
@@ -784,7 +793,7 @@
   box-sizing: border-box;
 }
 .oxos-row:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--os-line-rgb), 0.06);
 }
 .oxos-row--static {
   cursor: default;
@@ -800,7 +809,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(var(--os-line-rgb), 0.1);
   font-weight: 800;
 }
 .oxos-row__meta {
@@ -815,7 +824,7 @@
 }
 .oxos-row__sub {
   font-size: 12px;
-  color: rgba(244, 244, 245, 0.55);
+  color: rgba(var(--os-text-rgb), 0.55);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -847,7 +856,7 @@
   flex-direction: column;
   gap: 4px;
   padding: 16px 12px;
-  border-right: 1px solid rgba(255, 255, 255, 0.09);
+  border-right: 1px solid rgba(var(--os-line-rgb), 0.09);
 }
 .oxos-settings__navbtn {
   border: none;
@@ -859,7 +868,7 @@
   font-weight: 600;
 }
 .oxos-settings__navbtn.is-on {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(var(--os-line-rgb), 0.1);
   box-shadow: inset 2px 0 0 var(--os-accent);
 }
 .oxos-settings__pane {
@@ -872,8 +881,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(var(--os-line-rgb), 0.05);
+  border: 1px solid rgba(var(--os-line-rgb), 0.08);
   border-radius: 12px;
   padding: 12px 14px;
   font-size: 13px;
@@ -897,7 +906,7 @@
   border: 2px solid transparent;
   font-size: 12px;
   font-weight: 700;
-  color: #fff;
+  color: rgb(var(--os-text-rgb));
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
 }
 .oxos-wall.is-on {
@@ -927,15 +936,15 @@
   border: 2px solid transparent;
 }
 .oxos-accent.is-on {
-  border-color: #fff;
+  border-color: rgb(var(--os-text-rgb));
   box-shadow: 0 0 0 2px var(--os-accent);
 }
 .oxos-idcard {
   display: flex;
   align-items: center;
   gap: 14px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(var(--os-line-rgb), 0.05);
+  border: 1px solid rgba(var(--os-line-rgb), 0.08);
   border-radius: 14px;
   padding: 16px;
   margin-bottom: 14px;
@@ -961,7 +970,7 @@
 .oxos-idcard__sub {
   display: block;
   font-size: 12px;
-  color: rgba(244, 244, 245, 0.55);
+  color: rgba(var(--os-text-rgb), 0.55);
   margin-top: 2px;
 }
 
@@ -974,7 +983,7 @@
     flex-direction: row;
     overflow-x: auto;
     border-right: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+    border-bottom: 1px solid rgba(var(--os-line-rgb), 0.09);
     padding: 10px;
   }
   .oxos-settings__navbtn {
@@ -1041,7 +1050,7 @@
   top: -6px;
   right: -8px;
   background: #ef4444;
-  color: #fff;
+  color: rgb(var(--os-text-rgb));
   font-size: 10px;
   font-weight: 700;
   border-radius: 999px;
@@ -1072,9 +1081,9 @@
   width: min(380px, 92vw);
   z-index: 70000;
   overflow: auto;
-  background: rgba(16, 16, 22, 0.94);
+  background: rgba(var(--os-panel-rgb), 0.94);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  border: 1px solid rgba(var(--os-line-rgb), 0.13);
   border-radius: 20px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
   padding: 16px;
@@ -1090,9 +1099,9 @@
   font-size: 15px;
 }
 .oxos-panel__head button {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--os-line-rgb), 0.08);
   border: 0;
-  color: #fff;
+  color: rgb(var(--os-text-rgb));
   border-radius: 8px;
   width: 28px;
   height: 28px;
@@ -1101,8 +1110,8 @@
 
 .oxos-notif__list { display: flex; flex-direction: column; gap: 8px; }
 .oxos-notif {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(var(--os-line-rgb), 0.05);
+  border: 1px solid rgba(var(--os-line-rgb), 0.08);
   border-radius: 12px;
   padding: 10px;
   display: flex;
@@ -1112,8 +1121,8 @@
 }
 .oxos-notif.is-read { opacity: 0.6; }
 .oxos-notif__title { font-size: 13px; font-weight: 700; }
-.oxos-notif__body { font-size: 12px; color: rgba(244, 244, 245, 0.65); }
-.oxos-notif__time { font-size: 11px; color: rgba(244, 244, 245, 0.45); }
+.oxos-notif__body { font-size: 12px; color: rgba(var(--os-text-rgb), 0.65); }
+.oxos-notif__time { font-size: 11px; color: rgba(var(--os-text-rgb), 0.45); }
 
 .oxos-alert__form { display: flex; flex-direction: column; gap: 8px; }
 
@@ -1125,9 +1134,9 @@
   transform: translateX(-50%);
   width: min(560px, 94vw);
   z-index: 70000;
-  background: rgba(16, 16, 22, 0.94);
+  background: rgba(var(--os-panel-rgb), 0.94);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  border: 1px solid rgba(var(--os-line-rgb), 0.13);
   border-radius: 20px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
   padding: 16px;
@@ -1156,8 +1165,8 @@
 .oxos-toast {
   pointer-events: auto;
   text-align: left;
-  background: rgba(16, 16, 22, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(var(--os-panel-rgb), 0.94);
+  border: 1px solid rgba(var(--os-line-rgb), 0.15);
   border-left: 3px solid var(--os-accent);
   border-radius: 12px;
   padding: 10px 12px;
@@ -1165,11 +1174,11 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  color: #fff;
+  color: rgb(var(--os-text-rgb));
   cursor: pointer;
 }
 .oxos-toast__title { font-size: 13px; font-weight: 700; }
-.oxos-toast__body { font-size: 12px; color: rgba(244, 244, 245, 0.65); }
+.oxos-toast__body { font-size: 12px; color: rgba(var(--os-text-rgb), 0.65); }
 
 /* Screen dimmer (never blocks clicks). */
 .oxos-dim {
@@ -1201,17 +1210,18 @@
   text-align: center;
 }
 .oxos-lock__card h2 { margin: 0; }
-.oxos-lock__card p { margin: 0; color: rgba(244, 244, 245, 0.65); font-size: 13px; }
+.oxos-lock__card p { margin: 0; color: rgba(var(--os-text-rgb), 0.65); font-size: 13px; }
 .oxos-lock__mark { font-size: 40px; color: var(--os-accent); }
 
 /* Desk widgets. */
 .oxos-deskwd {
   position: absolute;
-  width: 220px;
+  width: var(--os-widget-w, 220px);
+  opacity: var(--os-widget-opacity, 1);
   z-index: 10;
-  background: rgba(16, 16, 22, 0.78);
+  background: rgba(var(--os-panel-rgb), 0.78);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(var(--os-line-rgb), 0.12);
   border-radius: 16px;
   overflow: hidden;
 }
@@ -1223,12 +1233,12 @@
   font-size: 12px;
   font-weight: 700;
   cursor: grab;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(var(--os-line-rgb), 0.05);
 }
 .oxos-deskwd__head button {
   background: none;
   border: 0;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(var(--os-line-rgb), 0.6);
   cursor: pointer;
 }
 .oxos-deskwd__body {
@@ -1246,9 +1256,9 @@
 .oxos-browser { display: flex; flex-direction: column; height: 100%; }
 .oxos-browser__tabs { display: flex; gap: 4px; padding: 8px 8px 0; overflow-x: auto; }
 .oxos-browser__tab {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--os-line-rgb), 0.06);
   border: 0;
-  color: #fff;
+  color: rgb(var(--os-text-rgb));
   border-radius: 10px 10px 0 0;
   padding: 6px 10px;
   font-size: 12px;
@@ -1258,12 +1268,12 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.oxos-browser__tab.is-on { background: rgba(255, 255, 255, 0.13); }
+.oxos-browser__tab.is-on { background: rgba(var(--os-line-rgb), 0.13); }
 .oxos-browser__tabx { opacity: 0.6; }
 .oxos-browser__tabadd {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--os-line-rgb), 0.06);
   border: 0;
-  color: #fff;
+  color: rgb(var(--os-text-rgb));
   border-radius: 10px 10px 0 0;
   padding: 6px 12px;
   cursor: pointer;
@@ -1274,8 +1284,8 @@
   height: 32px;
   min-width: 32px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.07);
-  color: #fff;
+  background: rgba(var(--os-line-rgb), 0.07);
+  color: rgb(var(--os-text-rgb));
   border: 0;
   cursor: pointer;
 }
@@ -1285,8 +1295,8 @@
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
-  color: #fff;
+  background: rgba(var(--os-line-rgb), 0.07);
+  color: rgb(var(--os-text-rgb));
   border: 0;
   white-space: nowrap;
   cursor: pointer;
@@ -1301,7 +1311,7 @@
   align-items: flex-start;
 }
 .oxos-browser__blocked h3 { margin: 0; }
-.oxos-browser__blocked p { margin: 0; color: rgba(244, 244, 245, 0.65); font-size: 13px; }
+.oxos-browser__blocked p { margin: 0; color: rgba(var(--os-text-rgb), 0.65); font-size: 13px; }
 
 /* ------------------------------------------------------------------ */
 /* OS wave 3 — feed, notes, files, bookmarks/history, embeds, desks,  */
@@ -1313,15 +1323,15 @@
 .oxos-feed__price { font-size: 34px; font-weight: 800; }
 .oxos-feed__chg { font-weight: 700; color: #4ade80; }
 .oxos-feed__chg.is-down { color: #f87171; }
-.oxos-feed__grid { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; color: rgba(244, 244, 245, 0.65); font-size: 13px; }
-.oxos-feed__grid b { color: #f4f4f5; }
+.oxos-feed__grid { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; color: rgba(var(--os-text-rgb), 0.65); font-size: 13px; }
+.oxos-feed__grid b { color: rgb(var(--os-text-rgb)); }
 
 .oxos-notes { display: flex; height: 100%; min-height: 0; }
-.oxos-notes__list { width: 220px; flex-shrink: 0; border-right: 1px solid rgba(255, 255, 255, 0.08); padding: 12px; display: flex; flex-direction: column; gap: 8px; overflow: auto; }
-.oxos-notes__item { text-align: left; background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 8px 10px; color: #f4f4f5; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.oxos-notes__list { width: 220px; flex-shrink: 0; border-right: 1px solid rgba(var(--os-line-rgb), 0.08); padding: 12px; display: flex; flex-direction: column; gap: 8px; overflow: auto; }
+.oxos-notes__item { text-align: left; background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 8px 10px; color: rgb(var(--os-text-rgb)); cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
 .oxos-notes__item.is-on { border-color: rgba(232, 184, 74, 0.5); background: rgba(232, 184, 74, 0.08); }
 .oxos-notes__item span:first-child { font-weight: 600; font-size: 13px; }
-.oxos-notes__item span:last-child { font-size: 12px; color: rgba(244, 244, 245, 0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oxos-notes__item span:last-child { font-size: 12px; color: rgba(var(--os-text-rgb), 0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .oxos-notes__edit { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .oxos-notes__body { flex: 1; resize: none; line-height: 1.5; }
 
@@ -1329,9 +1339,9 @@
 .oxos-files__form { display: flex; flex-direction: column; gap: 8px; }
 .oxos-files__list { display: flex; flex-direction: column; gap: 8px; }
 
-.oxos-browser__bookmarks { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.oxos-browser__bookmarks { border-top: 1px solid rgba(var(--os-line-rgb), 0.06); }
 .oxos-browser__bm { display: inline-flex; align-items: center; gap: 2px; }
-.oxos-browser__bm button { background: transparent; border: none; color: rgba(244, 244, 245, 0.75); cursor: pointer; font-size: 12px; padding: 4px 6px; }
+.oxos-browser__bm button { background: transparent; border: none; color: rgba(var(--os-text-rgb), 0.75); cursor: pointer; font-size: 12px; padding: 4px 6px; }
 .oxos-browser__bm button:hover { color: #e8b84a; }
 
 .oxos-history { padding: 16px; display: flex; flex-direction: column; gap: 8px; height: 100%; overflow: auto; }
@@ -1343,12 +1353,12 @@
 .oxos-discordview__frame { width: 100%; height: 500px; border: none; border-radius: 12px; background: #1e1f22; }
 
 .oxos-desklist { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
-.oxos-desk { border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.oxos-desk { border: 1px solid rgba(var(--os-line-rgb), 0.1); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
 .oxos-desk.is-on { border-color: rgba(232, 184, 74, 0.55); }
-.oxos-desk__name { background: none; border: none; color: #f4f4f5; font-weight: 700; cursor: pointer; text-align: left; padding: 0; font-size: 14px; }
-.oxos-desk__count { font-size: 12px; color: rgba(244, 244, 245, 0.55); }
+.oxos-desk__name { background: none; border: none; color: rgb(var(--os-text-rgb)); font-weight: 700; cursor: pointer; text-align: left; padding: 0; font-size: 14px; }
+.oxos-desk__count { font-size: 12px; color: rgba(var(--os-text-rgb), 0.55); }
 .oxos-desk__wins { display: flex; flex-direction: column; gap: 4px; }
-.oxos-desk__win { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: rgba(244, 244, 245, 0.75); }
+.oxos-desk__win { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: rgba(var(--os-text-rgb), 0.75); }
 .oxos-desk__win button { background: none; border: none; color: #e8b84a; cursor: pointer; font-size: 12px; }
 
 /* Phone shell (narrow viewports): home grid + dock + sheets + indicator.
@@ -1363,22 +1373,22 @@
 .oxos-phone { position: absolute; inset: 0; z-index: 0; display: flex; flex-direction: column; padding: 14px 14px 0; }
 .oxos-phone__status { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; padding: 4px 6px 12px; }
 .oxos-phone__statusbtns { display: flex; gap: 10px; }
-.oxos-phone__statusbtns button { background: rgba(255, 255, 255, 0.08); border: none; color: #f4f4f5; border-radius: 999px; width: 32px; height: 32px; cursor: pointer; font-size: 14px; }
+.oxos-phone__statusbtns button { background: rgba(var(--os-line-rgb), 0.08); border: none; color: rgb(var(--os-text-rgb)); border-radius: 999px; width: 32px; height: 32px; cursor: pointer; font-size: 14px; }
 .oxos-phone__grid { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px 8px; align-content: start; overflow: auto; padding-top: 8px; }
-.oxos-phone__icon { background: none; border: none; color: #f4f4f5; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; }
+.oxos-phone__icon { background: none; border: none; color: rgb(var(--os-text-rgb)); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; }
 .oxos-phone__mark { width: 56px; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 24px; overflow: hidden; }
-.oxos-phone__mark--browser { background: rgba(255, 255, 255, 0.1); }
-.oxos-phone__folder { width: 56px; height: 56px; border-radius: 16px; background: rgba(255, 255, 255, 0.08); display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 6px; box-sizing: border-box; }
+.oxos-phone__mark--browser { background: rgba(var(--os-line-rgb), 0.1); }
+.oxos-phone__folder { width: 56px; height: 56px; border-radius: 16px; background: rgba(var(--os-line-rgb), 0.08); display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 6px; box-sizing: border-box; }
 .oxos-phone__foldermini { border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 11px; overflow: hidden; }
-.oxos-phone__dock { margin: 0 4px 26px; background: rgba(255, 255, 255, 0.1); border-radius: 22px; padding: 10px; display: flex; justify-content: space-around; }
+.oxos-phone__dock { margin: 0 4px 26px; background: rgba(var(--os-line-rgb), 0.1); border-radius: 22px; padding: 10px; display: flex; justify-content: space-around; }
 .oxos-phone__dockbtn { background: none; border: none; cursor: pointer; padding: 0; }
 .oxos-phone__sheet { position: absolute; inset: 0; z-index: 70000; background: rgba(10, 10, 14, 0.97); padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow: auto; }
 .oxos-phone__sheethead { display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
-.oxos-phone__sheethead button { background: rgba(255, 255, 255, 0.1); border: none; color: #f4f4f5; border-radius: 999px; width: 32px; height: 32px; cursor: pointer; }
+.oxos-phone__sheethead button { background: rgba(var(--os-line-rgb), 0.1); border: none; color: rgb(var(--os-text-rgb)); border-radius: 999px; width: 32px; height: 32px; cursor: pointer; }
 .oxos-phone__switcher { display: flex; flex-direction: column; gap: 8px; }
-.oxos-phone__card { display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.07); border-radius: 12px; padding: 12px; }
-.oxos-phone__card button { background: none; border: none; color: #f4f4f5; cursor: pointer; font-size: 14px; }
-.oxos-phone__home { position: absolute; left: 50%; transform: translateX(-50%); bottom: 8px; width: 120px; height: 5px; border-radius: 999px; background: rgba(244, 244, 245, 0.7); border: none; cursor: pointer; z-index: 66000; padding: 0; }
+.oxos-phone__card { display: flex; justify-content: space-between; align-items: center; background: rgba(var(--os-line-rgb), 0.07); border-radius: 12px; padding: 12px; }
+.oxos-phone__card button { background: none; border: none; color: rgb(var(--os-text-rgb)); cursor: pointer; font-size: 14px; }
+.oxos-phone__home { position: absolute; left: 50%; transform: translateX(-50%); bottom: 8px; width: 120px; height: 5px; border-radius: 999px; background: rgba(var(--os-text-rgb), 0.7); border: none; cursor: pointer; z-index: 66000; padding: 0; }
 
 /* Embedded X timeline (official widgets.js) for x.com / twitter.com tabs. */
 .oxos-xview {
@@ -1390,12 +1400,12 @@
   gap: 12px;
 }
 .oxos-xview h3 { margin: 0; }
-.oxos-xview p { margin: 0; color: rgba(244, 244, 245, 0.65); font-size: 13px; }
+.oxos-xview p { margin: 0; color: rgba(var(--os-text-rgb), 0.65); font-size: 13px; }
 .oxos-xview__row { display: flex; gap: 8px; }
 .oxos-xview__row .oxos-input { flex: 1; min-width: 0; }
 .oxos-xembed { flex: 1; min-height: 0; }
 .oxos-xembed iframe { width: 100% !important; }
-.oxos-xembed__fail { color: rgba(244, 244, 245, 0.7); font-size: 13px; margin: 12px 0 0; }
+.oxos-xembed__fail { color: rgba(var(--os-text-rgb), 0.7); font-size: 13px; margin: 12px 0 0; }
 
 /* App Store + Theme Store. */
 .oxos-store, .oxos-themes {
@@ -1415,8 +1425,8 @@
   display: flex;
   gap: 10px;
   align-items: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(var(--os-line-rgb), 0.05);
+  border: 1px solid rgba(var(--os-line-rgb), 0.08);
   border-radius: 14px;
   padding: 10px;
 }
@@ -1429,7 +1439,7 @@
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  color: #fff;
+  color: rgb(var(--os-text-rgb));
   overflow: hidden;
   object-fit: cover;
 }
@@ -1443,7 +1453,7 @@
 .oxos-store__meta span:first-child { font-size: 13px; font-weight: 700; }
 .oxos-store__meta span:last-child {
   font-size: 12px;
-  color: rgba(244, 244, 245, 0.6);
+  color: rgba(var(--os-text-rgb), 0.6);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1451,7 +1461,7 @@
 .oxos-themes__form { display: flex; flex-direction: column; gap: 10px; }
 .oxos-field {
   font-size: 12px;
-  color: rgba(244, 244, 245, 0.7);
+  color: rgba(var(--os-text-rgb), 0.7);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1469,21 +1479,21 @@
 .oxos-tasks__form { display: grid; grid-template-columns: 1fr 150px 110px auto; gap: 8px; }
 .oxos-tasks__filters { display: flex; gap: 8px; }
 .oxos-tasks__list { display: flex; flex-direction: column; gap: 6px; }
-.oxos-tasks__row { display: flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
-.oxos-tasks__row.is-done .oxos-tasks__title { text-decoration: line-through; color: rgba(244, 244, 245, 0.45); }
+.oxos-tasks__row { display: flex; align-items: center; gap: 10px; background: rgba(var(--os-line-rgb), 0.05); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.oxos-tasks__row.is-done .oxos-tasks__title { text-decoration: line-through; color: rgba(var(--os-text-rgb), 0.45); }
 .oxos-tasks__title { flex: 1; }
-.oxos-tasks__due { color: rgba(244, 244, 245, 0.55); font-size: 12px; }
+.oxos-tasks__due { color: rgba(var(--os-text-rgb), 0.55); font-size: 12px; }
 .oxos-tasks__pri { font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .oxos-tasks__pri--low { color: #4ade80; }
-.oxos-tasks__pri--normal { color: rgba(244, 244, 245, 0.6); }
+.oxos-tasks__pri--normal { color: rgba(var(--os-text-rgb), 0.6); }
 .oxos-tasks__pri--high { color: #f87171; }
-.oxos-tasks__del { background: none; border: none; color: rgba(244, 244, 245, 0.5); cursor: pointer; }
+.oxos-tasks__del { background: none; border: none; color: rgba(var(--os-text-rgb), 0.5); cursor: pointer; }
 
 .oxos-cal { padding: 16px; display: flex; flex-direction: column; gap: 12px; height: 100%; overflow: auto; }
 .oxos-cal__head { display: flex; justify-content: space-between; align-items: center; }
 .oxos-cal__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
-.oxos-cal__wd { font-size: 11px; color: rgba(244, 244, 245, 0.5); padding: 4px 0; }
-.oxos-cal__day { background: rgba(255, 255, 255, 0.05); border: 1px solid transparent; color: #f4f4f5; border-radius: 8px; padding: 8px 0; cursor: pointer; font-size: 13px; }
+.oxos-cal__wd { font-size: 11px; color: rgba(var(--os-text-rgb), 0.5); padding: 4px 0; }
+.oxos-cal__day { background: rgba(var(--os-line-rgb), 0.05); border: 1px solid transparent; color: rgb(var(--os-text-rgb)); border-radius: 8px; padding: 8px 0; cursor: pointer; font-size: 13px; }
 .oxos-cal__day.is-today { border-color: rgba(232, 184, 74, 0.6); }
 .oxos-cal__day.is-on { background: rgba(232, 184, 74, 0.18); border-color: rgba(232, 184, 74, 0.55); }
 .oxos-cal__day.has-event { font-weight: 700; }
@@ -1494,11 +1504,11 @@
 .oxos-shortcuts { padding: 16px; display: flex; flex-direction: column; gap: 12px; height: 100%; overflow: auto; }
 .oxos-shortcuts h3 { margin: 0; }
 .oxos-shortcuts__list { display: flex; flex-direction: column; gap: 6px; }
-.oxos-shortcuts__row { display: flex; gap: 12px; align-items: baseline; font-size: 13px; background: rgba(255, 255, 255, 0.04); border-radius: 8px; padding: 8px 10px; }
-.oxos-shortcuts__row kbd { font-family: inherit; font-weight: 700; white-space: nowrap; background: rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 2px 8px; }
+.oxos-shortcuts__row { display: flex; gap: 12px; align-items: baseline; font-size: 13px; background: rgba(var(--os-line-rgb), 0.04); border-radius: 8px; padding: 8px 10px; }
+.oxos-shortcuts__row kbd { font-family: inherit; font-weight: 700; white-space: nowrap; background: rgba(var(--os-line-rgb), 0.1); border-radius: 6px; padding: 2px 8px; }
 
 .oxos-notes__folders { display: flex; gap: 6px; flex-wrap: wrap; }
-.oxos-notes__folder { background: rgba(255, 255, 255, 0.06); border: 1px solid transparent; color: rgba(244, 244, 245, 0.75); border-radius: 999px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
+.oxos-notes__folder { background: rgba(var(--os-line-rgb), 0.06); border: 1px solid transparent; color: rgba(var(--os-text-rgb), 0.75); border-radius: 999px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
 .oxos-notes__folder.is-on { border-color: rgba(232, 184, 74, 0.55); color: #e8b84a; }
 
 .oxos-deskwd__countdown { display: flex; flex-direction: column; gap: 8px; }
@@ -1506,5 +1516,82 @@
 .oxos-deskwd__quote p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; font-style: italic; }
 
 .oxos-tray__clock { background: none; border: none; color: inherit; font: inherit; cursor: pointer; padding: 2px 6px; border-radius: 8px; }
-.oxos-tray__clock:hover { background: rgba(255, 255, 255, 0.1); }
+.oxos-tray__clock:hover { background: rgba(var(--os-line-rgb), 0.1); }
 .oxos-calpanel .oxos-btn { margin-top: 4px; }
+
+/* ------------------------------------------------------------------ */
+/* OS wave 5 — light mode, focus, borders, taskbar styles, animation.  */
+/* ------------------------------------------------------------------ */
+
+@keyframes oxos-win-in {
+  from { opacity: 0; transform: scale(0.985); }
+  to { opacity: 1; transform: scale(1); }
+}
+.oxos-panel,
+.oxos-start {
+  animation: oxos-win-in calc(var(--os-anim, 1) * 180ms) ease-out;
+}
+
+.oxos--light {
+  --os-text-rgb: 18, 18, 22;
+  --os-line-rgb: 18, 18, 22;
+  --os-panel-rgb: 244, 244, 246;
+  --os-window-rgb: 250, 250, 252;
+  background: #e9e9ee;
+}
+.oxos--light .oxos-icon__label { text-shadow: 0 1px 6px rgba(255, 255, 255, 0.9); }
+.oxos--light .oxos-window { box-shadow: 0 24px 64px rgba(0, 0, 0, 0.22); }
+.oxos--light .oxos-window.is-active { box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25), 0 0 0 1px var(--os-accent); }
+.oxos--light .oxos-scrim { background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent 30%, transparent 70%, rgba(255, 255, 255, 0.4)); }
+.oxos--light .oxos-btn.is-on { color: color-mix(in srgb, var(--os-accent) 60%, black); }
+
+.oxos--focus .oxos-window:not(.is-active) { opacity: 0.4; }
+
+.oxos--sharp .oxos-window,
+.oxos--sharp .oxos-panel,
+.oxos--sharp .oxos-start,
+.oxos--sharp .oxos-taskbar { border-radius: 0; }
+
+.oxos--neon .oxos-window { box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 28px var(--os-accent); }
+.oxos--neon .oxos-window.is-active { box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), 0 0 0 1px var(--os-accent), 0 0 36px var(--os-accent); }
+
+.oxos--taskbar-bar .oxos-taskbar {
+  left: 0;
+  right: 0;
+  transform: none;
+  bottom: 0;
+  width: 100%;
+  max-width: none;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  justify-content: center;
+}
+
+.oxos--no-labels .oxos-icon__label { display: none; }
+
+/* Font-size scale (wave 5 #100): root size covers inherited text;
+   explicit px sizes below scale with it. */
+.oxos--font-l .oxos-hint { font-size: 15px; }
+.oxos--font-l .oxos-h3 { font-size: 17px; }
+.oxos--font-l .oxos-icon__label { font-size: 14px; }
+.oxos--font-l .oxos-start__greet { font-size: 18px; }
+.oxos--font-l .oxos-start__mood { font-size: 13px; }
+.oxos--font-l .oxos-start__label { font-size: 12px; }
+.oxos--font-l .oxos-panel__head { font-size: 17px; }
+.oxos--font-l .oxos-deskwd__head { font-size: 13px; }
+.oxos--font-l .oxos-deskwd__body { font-size: 14px; }
+.oxos--font-l .oxos-window__title { font-size: 16px; }
+.oxos--font-l .oxos-toast__title { font-size: 15px; }
+.oxos--font-l .oxos-toast__body { font-size: 13px; }
+.oxos--font-s .oxos-hint { font-size: 12px; }
+.oxos--font-s .oxos-h3 { font-size: 14px; }
+.oxos--font-s .oxos-icon__label { font-size: 11px; }
+.oxos--font-s .oxos-start__greet { font-size: 15px; }
+.oxos--font-s .oxos-panel__head { font-size: 14px; }
+.oxos--font-s .oxos-deskwd__body { font-size: 11px; }
+.oxos--font-s .oxos-window__title { font-size: 13px; }
+
+/* Swatch labels sit on dark art in both modes; beat `.oxos button` (0,1,1). */
+.oxos button.oxos-wall { color: #fff; }
