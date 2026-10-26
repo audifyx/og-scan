@@ -273,3 +273,115 @@ export async function hashPin(pin: string): Promise<string> {
     return `fallback:${h}`;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* OS wave 3 — notes, files shelf, bookmarks, history, browser tabs,  */
+/* virtual desktops, saved window layouts. Notes + bookmarks sync    */
+/* through the account layout; the rest stays device-local.           */
+/* ------------------------------------------------------------------ */
+
+export interface OsNote {
+  id: string;
+  title: string;
+  body: string;
+  updatedAt: number;
+}
+
+export interface OsFileItem {
+  id: string;
+  name: string;
+  /** "text" = typed note-file; "file" = uploaded small file (data URL). */
+  kind: "text" | "file";
+  content: string;
+  size: number;
+  at: number;
+}
+
+export interface OsBookmark {
+  id: string;
+  title: string;
+  url: string;
+}
+
+export interface OsDesktop {
+  id: string;
+  name: string;
+}
+
+export interface OsLayoutSnapshot {
+  id: string;
+  name: string;
+  wins: { kind: string; appKey?: string; title: string; hrefOverride?: string }[];
+}
+
+const NOTES_KEY = "orbitxos:notes:v1";
+const FILES_KEY = "orbitxos:files:v1";
+const BOOKMARKS_KEY = "orbitxos:bookmarks:v1";
+const HISTORY_KEY = "orbitxos:history:v1";
+const BROWSER_TABS_KEY = "orbitxos:browsertabs:v1";
+const DESKTOPS_KEY = "orbitxos:desktops:v1";
+const LAYOUTS_KEY = "orbitxos:layouts:v1";
+
+export function loadOsNotes(): OsNote[] {
+  const saved = readJson<OsNote[]>(NOTES_KEY);
+  return Array.isArray(saved) ? saved.filter((n) => n && typeof n.id === "string") : [];
+}
+export function saveOsNotes(n: OsNote[]) {
+  writeJson(NOTES_KEY, n.slice(0, 200));
+}
+
+export function loadOsFiles(): OsFileItem[] {
+  const saved = readJson<OsFileItem[]>(FILES_KEY);
+  return Array.isArray(saved) ? saved.filter((f) => f && typeof f.id === "string" && typeof f.content === "string") : [];
+}
+export function saveOsFiles(f: OsFileItem[]) {
+  writeJson(FILES_KEY, f.slice(0, 100));
+}
+
+export function loadOsBookmarks(): OsBookmark[] {
+  const saved = readJson<OsBookmark[]>(BOOKMARKS_KEY);
+  return Array.isArray(saved) ? saved.filter((b) => b && typeof b.url === "string") : [];
+}
+export function saveOsBookmarks(b: OsBookmark[]) {
+  writeJson(BOOKMARKS_KEY, b.slice(0, 200));
+}
+
+export function loadOsHistory(): string[] {
+  const saved = readJson<string[]>(HISTORY_KEY);
+  return Array.isArray(saved) ? saved.filter((u) => typeof u === "string") : [];
+}
+export function saveOsHistory(h: string[]) {
+  writeJson(HISTORY_KEY, h.slice(0, 100));
+}
+
+export interface StoredBrowserTab {
+  id: string;
+  url: string;
+  title: string;
+}
+export function loadBrowserTabs(): StoredBrowserTab[] | null {
+  const saved = readJson<StoredBrowserTab[]>(BROWSER_TABS_KEY);
+  if (!Array.isArray(saved) || !saved.length) return null;
+  const ok = saved.filter((t) => t && typeof t.url === "string" && typeof t.title === "string");
+  return ok.length ? ok : null;
+}
+export function saveBrowserTabs(t: StoredBrowserTab[]) {
+  writeJson(BROWSER_TABS_KEY, t.slice(0, 20));
+}
+
+export function loadOsDesktops(): OsDesktop[] {
+  const saved = readJson<OsDesktop[]>(DESKTOPS_KEY);
+  if (!Array.isArray(saved) || !saved.length) return [{ id: "main", name: "Main" }];
+  return saved.filter((d) => d && typeof d.id === "string" && typeof d.name === "string").slice(0, 4);
+}
+export function saveOsDesktops(d: OsDesktop[]) {
+  writeJson(DESKTOPS_KEY, d.slice(0, 4));
+}
+
+export function loadOsLayouts(): OsLayoutSnapshot[] {
+  const saved = readJson<OsLayoutSnapshot[]>(LAYOUTS_KEY);
+  return Array.isArray(saved) ? saved.filter((l) => l && typeof l.id === "string" && Array.isArray(l.wins)) : [];
+}
+export function saveOsLayouts(l: OsLayoutSnapshot[]) {
+  writeJson(LAYOUTS_KEY, l.slice(0, 20));
+}

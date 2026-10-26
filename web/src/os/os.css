@@ -1303,6 +1303,83 @@
 .oxos-browser__blocked h3 { margin: 0; }
 .oxos-browser__blocked p { margin: 0; color: rgba(244, 244, 245, 0.65); font-size: 13px; }
 
+/* ------------------------------------------------------------------ */
+/* OS wave 3 — feed, notes, files, bookmarks/history, embeds, desks,  */
+/* phone shell.                                                        */
+/* ------------------------------------------------------------------ */
+
+.oxos-feed { padding: 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; overflow: auto; }
+.oxos-feed h3 { margin: 0; }
+.oxos-feed__price { font-size: 34px; font-weight: 800; }
+.oxos-feed__chg { font-weight: 700; color: #4ade80; }
+.oxos-feed__chg.is-down { color: #f87171; }
+.oxos-feed__grid { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; color: rgba(244, 244, 245, 0.65); font-size: 13px; }
+.oxos-feed__grid b { color: #f4f4f5; }
+
+.oxos-notes { display: flex; height: 100%; min-height: 0; }
+.oxos-notes__list { width: 220px; flex-shrink: 0; border-right: 1px solid rgba(255, 255, 255, 0.08); padding: 12px; display: flex; flex-direction: column; gap: 8px; overflow: auto; }
+.oxos-notes__item { text-align: left; background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 8px 10px; color: #f4f4f5; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.oxos-notes__item.is-on { border-color: rgba(232, 184, 74, 0.5); background: rgba(232, 184, 74, 0.08); }
+.oxos-notes__item span:first-child { font-weight: 600; font-size: 13px; }
+.oxos-notes__item span:last-child { font-size: 12px; color: rgba(244, 244, 245, 0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oxos-notes__edit { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.oxos-notes__body { flex: 1; resize: none; line-height: 1.5; }
+
+.oxos-files { padding: 16px; display: flex; flex-direction: column; gap: 12px; height: 100%; overflow: auto; }
+.oxos-files__form { display: flex; flex-direction: column; gap: 8px; }
+.oxos-files__list { display: flex; flex-direction: column; gap: 8px; }
+
+.oxos-browser__bookmarks { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.oxos-browser__bm { display: inline-flex; align-items: center; gap: 2px; }
+.oxos-browser__bm button { background: transparent; border: none; color: rgba(244, 244, 245, 0.75); cursor: pointer; font-size: 12px; padding: 4px 6px; }
+.oxos-browser__bm button:hover { color: #e8b84a; }
+
+.oxos-history { padding: 16px; display: flex; flex-direction: column; gap: 8px; height: 100%; overflow: auto; }
+.oxos-history__head { display: flex; justify-content: space-between; align-items: center; }
+.oxos-history__head h3 { margin: 0; }
+
+.oxos-ytview { height: 100%; display: flex; flex-direction: column; gap: 12px; padding: 16px; }
+.oxos-ytview__frame { flex: 1; width: 100%; border: none; border-radius: 12px; background: #000; min-height: 0; }
+.oxos-discordview__frame { width: 100%; height: 500px; border: none; border-radius: 12px; background: #1e1f22; }
+
+.oxos-desklist { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
+.oxos-desk { border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.oxos-desk.is-on { border-color: rgba(232, 184, 74, 0.55); }
+.oxos-desk__name { background: none; border: none; color: #f4f4f5; font-weight: 700; cursor: pointer; text-align: left; padding: 0; font-size: 14px; }
+.oxos-desk__count { font-size: 12px; color: rgba(244, 244, 245, 0.55); }
+.oxos-desk__wins { display: flex; flex-direction: column; gap: 4px; }
+.oxos-desk__win { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: rgba(244, 244, 245, 0.75); }
+.oxos-desk__win button { background: none; border: none; color: #e8b84a; cursor: pointer; font-size: 12px; }
+
+/* Phone shell (narrow viewports): home grid + dock + sheets + indicator.
+   The desktop icon grid, desk widgets, and taskbar hide under 768px. */
+@media (max-width: 767px) {
+  .oxos-icons,
+  .oxos-deskwd,
+  .oxos-taskbar {
+    display: none !important;
+  }
+}
+.oxos-phone { position: absolute; inset: 0; z-index: 0; display: flex; flex-direction: column; padding: 14px 14px 0; }
+.oxos-phone__status { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; padding: 4px 6px 12px; }
+.oxos-phone__statusbtns { display: flex; gap: 10px; }
+.oxos-phone__statusbtns button { background: rgba(255, 255, 255, 0.08); border: none; color: #f4f4f5; border-radius: 999px; width: 32px; height: 32px; cursor: pointer; font-size: 14px; }
+.oxos-phone__grid { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px 8px; align-content: start; overflow: auto; padding-top: 8px; }
+.oxos-phone__icon { background: none; border: none; color: #f4f4f5; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; }
+.oxos-phone__mark { width: 56px; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 24px; overflow: hidden; }
+.oxos-phone__mark--browser { background: rgba(255, 255, 255, 0.1); }
+.oxos-phone__folder { width: 56px; height: 56px; border-radius: 16px; background: rgba(255, 255, 255, 0.08); display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 6px; box-sizing: border-box; }
+.oxos-phone__foldermini { border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 11px; overflow: hidden; }
+.oxos-phone__dock { margin: 0 4px 26px; background: rgba(255, 255, 255, 0.1); border-radius: 22px; padding: 10px; display: flex; justify-content: space-around; }
+.oxos-phone__dockbtn { background: none; border: none; cursor: pointer; padding: 0; }
+.oxos-phone__sheet { position: absolute; inset: 0; z-index: 70000; background: rgba(10, 10, 14, 0.97); padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow: auto; }
+.oxos-phone__sheethead { display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+.oxos-phone__sheethead button { background: rgba(255, 255, 255, 0.1); border: none; color: #f4f4f5; border-radius: 999px; width: 32px; height: 32px; cursor: pointer; }
+.oxos-phone__switcher { display: flex; flex-direction: column; gap: 8px; }
+.oxos-phone__card { display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.07); border-radius: 12px; padding: 12px; }
+.oxos-phone__card button { background: none; border: none; color: #f4f4f5; cursor: pointer; font-size: 14px; }
+.oxos-phone__home { position: absolute; left: 50%; transform: translateX(-50%); bottom: 8px; width: 120px; height: 5px; border-radius: 999px; background: rgba(244, 244, 245, 0.7); border: none; cursor: pointer; z-index: 66000; padding: 0; }
+
 /* Embedded X timeline (official widgets.js) for x.com / twitter.com tabs. */
 .oxos-xview {
   height: 100%;

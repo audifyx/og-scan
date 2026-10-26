@@ -2,6 +2,8 @@ import { supabase } from "@/lib/supabase";
 import type {
   DeskWidget,
   InstalledApp,
+  OsBookmark,
+  OsNote,
   OsPriceAlert,
   OsSettings,
   StoredFolder,
@@ -27,6 +29,8 @@ export interface OsCloudLayout {
   dnd: boolean;
   alerts: OsPriceAlert[];
   activePackId: string;
+  notes: OsNote[];
+  bookmarks: OsBookmark[];
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;

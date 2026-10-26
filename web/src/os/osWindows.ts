@@ -17,7 +17,10 @@ export type OsWindowKind =
   | "widget-library"
   | "browser"
   | "store"
-  | "themes";
+  | "themes"
+  | "feed"
+  | "notes"
+  | "files";
 
 export interface OsWindow {
   /** Built-ins use their kind as id; apps use `app:<key>`. */
@@ -36,6 +39,8 @@ export interface OsWindow {
   pinned?: boolean;
   /** App windows opened to a specific URL (e.g. DEX with ?mint=…). */
   hrefOverride?: string;
+  /** Virtual desktop this window lives on (undefined = all desktops). */
+  desktopId?: string;
 }
 
 export interface OsWindowsState {
