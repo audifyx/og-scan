@@ -56,4 +56,26 @@ describe("osWindowsReducer", () => {
     s = osWindowsReducer(s, { type: "close", id: "a" });
     expect(s.windows).toHaveLength(0);
   });
+
+  it("toggle-pin flips the pinned flag, snap tiles and un-maximizes", () => {
+    let s = osWindowsReducer(EMPTY_OS_WINDOWS, { type: "open", window: win("a", "A") });
+    s = osWindowsReducer(s, { type: "toggle-pin", id: "a" });
+    expect(s.windows[0].pinned).toBe(true);
+    s = osWindowsReducer(s, { type: "toggle-pin", id: "a" });
+    expect(s.windows[0].pinned).toBe(false);
+    s = osWindowsReducer(s, { type: "toggle-maximize", id: "a" });
+    s = osWindowsReducer(s, { type: "snap", id: "a", x: 0, y: 0, w: 640, h: 800 });
+    expect(s.windows[0].maximized).toBe(false);
+    expect(s.windows[0].w).toBe(640);
+    expect(s.windows[0].h).toBe(800);
+  });
+
+  it("open keeps hrefOverride and pinned on the window", () => {
+    const s = osWindowsReducer(EMPTY_OS_WINDOWS, {
+      type: "open",
+      window: { ...win("app:dex", "DEX"), hrefOverride: "/ORBITX_DEX?mint=abc", pinned: true },
+    });
+    expect(s.windows[0].hrefOverride).toBe("/ORBITX_DEX?mint=abc");
+    expect(s.windows[0].pinned).toBe(true);
+  });
 });

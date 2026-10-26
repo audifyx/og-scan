@@ -23,15 +23,58 @@ import {
   OS_ACCENTS,
   OS_WALLPAPERS,
   clearIconPositions,
+  hashPin,
+  loadDnd,
+  loadDeskWidgets,
+  loadInstalledApps,
+  loadActivePackId,
+  loadLockState,
+  loadOsAlerts,
+  loadOsNotifications,
+  loadSyncMeta,
+  loadThemePacks,
   loadIconPositions,
   loadOsFolders,
   loadOsSettings,
+  saveDnd,
+  saveDeskWidgets,
+  saveInstalledApps,
+  saveActivePackId,
+  saveLockState,
+  saveOsAlerts,
+  saveOsNotifications,
+  saveSyncMeta,
+  saveThemePacks,
   saveIconPositions,
   saveOsFolders,
   saveOsSettings,
+  type DeskWidget,
+  type InstalledApp,
   type IconPos,
+  type LockState,
+  type OsNotification,
+  type OsPriceAlert,
   type OsSettings,
+  type ThemePack,
 } from "./osStore";
+import {
+  EXTERNAL_APPS,
+  fetchDevMarketListings,
+  fetchTokenPrice,
+  hostOf,
+  isBlockedFrame,
+  normalizeUrl,
+  searchTokens,
+  type DevMarketListing,
+  type TokenSearchRow,
+} from "./osApps";
+import {
+  flushOsLayoutToCloud,
+  loadOsLayoutFromCloud,
+  markOsLayoutSynced,
+  saveOsLayoutToCloud,
+  type OsCloudLayout,
+} from "./osSync";
 import {
   addToFolder,
   createFolder,
@@ -58,6 +101,7 @@ export interface DesktopProps {
   apps: PlatformApp[];
   desktopApps: PlatformApp[];
   gates: PlatformApp[];
+  userId?: string | null;
   userName: string;
   userSub: string;
   userInitial: string;
@@ -80,6 +124,7 @@ type Drag =
   | { type: "icon"; key: string; startX: number; startY: number; moved: boolean }
   | { type: "win"; id: string; startX: number; startY: number; origX: number; origY: number }
   | { type: "resize"; id: string; startX: number; startY: number; origW: number; origH: number }
+  | { type: "widget"; id: string; startX: number; startY: number; origX: number; origY: number }
   | null;
 
 function useClock() {
@@ -102,7 +147,7 @@ export default function Desktop(props: DesktopProps) {
   const [startOpen, setStartOpen] = useState(false);
   const [startQ, setStartQ] = useState("");
   const [appsQ, setAppsQ] = useState("");
-  const [settingsNav, setSettingsNav] = useState<"system" | "personalization" | "account" | "wallet" | "about">("system");
+  const [settingsNav, setSettingsNav] = useState<"system" | "personalization" | "account" | "wallet" | "lock" | "about">("system");
   const [iconPos, setIconPos] = useState<Record<string, IconPos>>(loadIconPositions);
   const [folders, setFolders] = useState<OsFolder[]>(loadOsFolders);
   const [openFolderId, setOpenFolderId] = useState<string | null>(null);
@@ -121,11 +166,247 @@ export default function Desktop(props: DesktopProps) {
     saveOsSettings(settings);
   }, [settings]);
 
+  /* --- OS wave 2 state --- */
+  const [installed, setInstalled] = useState<InstalledApp[]>(loadInstalledApps);
+  const [deskWidgets, setDeskWidgets] = useState<DeskWidget[]>(loadDeskWidgets);
+  const [packs, setPacks] = useState<ThemePack[]>(loadThemePacks);
+  const [activePackId, setActivePackId] = useState<string>(loadActivePackId);
+  const [dnd, setDnd] = useState<boolean>(loadDnd);
+  const [lockState, setLockState] = useState<LockState>(loadLockState);
+  const [unlocked, setUnlocked] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem("orbitxos:unlocked:v1") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [notifications, setNotifications] = useState<OsNotification[]>(loadOsNotifications);
+  const [alerts, setAlerts] = useState<OsPriceAlert[]>(loadOsAlerts);
+  const [toasts, setToasts] = useState<string[]>([]);
+  const [controlOpen, setControlOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [cmdQ, setCmdQ] = useState("");
+  const [cmdTokens, setCmdTokens] = useState<TokenSearchRow[]>([]);
+  const [snapPreview, setSnapPreview] = useState<"left" | "right" | "max" | null>(null);
+  const [dim, setDim] = useState(0);
+  const [browserTabs, setBrowserTabs] = useState<{ id: string; url: string; title: string }[]>([
+    { id: "tab-1", url: "https://dexscreener.com", title: "DexScreener" },
+  ]);
+  const [browserActiveId, setBrowserActiveId] = useState("tab-1");
+  const [spotTokens, setSpotTokens] = useState<TokenSearchRow[]>([]);
+  const [storeQ, setStoreQ] = useState("");
+  const [storeListings, setStoreListings] = useState<DevMarketListing[]>([]);
+  const [storeFailed, setStoreFailed] = useState(false);
+  const [themeName, setThemeName] = useState("");
+  const [themeWallpaper, setThemeWallpaper] = useState("space");
+  const [themeAccent, setThemeAccent] = useState("#e8b84a");
+  const [themeRadius, setThemeRadius] = useState(18);
+  const [themeImport, setThemeImport] = useState("");
+  const [alertQ, setAlertQ] = useState("");
+  const [alertRows, setAlertRows] = useState<TokenSearchRow[]>([]);
+  const [alertPicked, setAlertPicked] = useState<TokenSearchRow | null>(null);
+  const [alertTarget, setAlertTarget] = useState("");
+  const [alertDir, setAlertDir] = useState<"above" | "below">("above");
+  const [pinInput, setPinInput] = useState("");
+  const [pinConfirm, setPinConfirm] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [browserReload, setBrowserReload] = useState<Record<string, number>>({});
+  const browserFrameRefs = useRef(new Map<string, HTMLIFrameElement>());
+  const [syncStatus, setSyncStatus] = useState<"off" | "synced" | "saving" | "error">("off");
+  const [syncHydrated, setSyncHydrated] = useState(false);
+
+  const locked = lockState.enabled && lockState.pinHash !== "" && !unlocked;
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  useEffect(() => { saveInstalledApps(installed); }, [installed]);
+  useEffect(() => { saveDeskWidgets(deskWidgets); }, [deskWidgets]);
+  useEffect(() => { saveThemePacks(packs); }, [packs]);
+  useEffect(() => { saveActivePackId(activePackId); }, [activePackId]);
+  useEffect(() => { saveDnd(dnd); }, [dnd]);
+  useEffect(() => { saveLockState(lockState); }, [lockState]);
+  useEffect(() => { saveOsNotifications(notifications); }, [notifications]);
+  useEffect(() => { saveOsAlerts(alerts); }, [alerts]);
+
+  const pushNotification = (title: string, body: string, kind: OsNotification["kind"]) => {
+    const n: OsNotification = {
+      id: `n-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      title,
+      body,
+      kind,
+      at: Date.now(),
+      read: false,
+    };
+    setNotifications((prev) => [n, ...prev].slice(0, 100));
+    if (!dnd) {
+      setToasts((prev) => [...prev, n.id]);
+      setTimeout(() => setToasts((prev) => prev.filter((t) => t !== n.id)), 6000);
+    }
+  };
+
+  /* Price-alert poller: checks armed alerts every 30s, notifies once on cross. */
+  useEffect(() => {
+    const check = async () => {
+      const armed = alerts.filter((a) => !a.triggered);
+      if (!armed.length) return;
+      const next = [...alerts];
+      let changed = false;
+      for (const a of armed) {
+        const price = await fetchTokenPrice(a.mint);
+        if (price == null) continue;
+        const crossed = a.direction === "above" ? price >= a.target : price <= a.target;
+        if (crossed) {
+          const idx = next.findIndex((x) => x.id === a.id);
+          if (idx >= 0) next[idx] = { ...next[idx], triggered: true };
+          pushNotification(
+            `${a.symbol} alert hit`,
+            `${a.symbol} crossed $${a.target} (now $${price < 0.01 ? price.toFixed(6) : price.toFixed(4)})`,
+            "alert",
+          );
+          changed = true;
+        }
+      }
+      if (changed) setAlerts(next);
+    };
+    void check();
+    const t = setInterval(check, 30000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alerts]);
+
+  /* Spotlight token search (debounced). */
+  useEffect(() => {
+    const q = startQ.trim();
+    if (q.length < 2) {
+      setSpotTokens([]);
+      return;
+    }
+    const t = setTimeout(async () => setSpotTokens(await searchTokens(q)), 300);
+    return () => clearTimeout(t);
+  }, [startQ]);
+
+  /* Command bar "token <query>" search (debounced). */
+  useEffect(() => {
+    const raw = cmdQ.trim();
+    if (!raw.toLowerCase().startsWith("token ")) {
+      setCmdTokens([]);
+      return;
+    }
+    const q = raw.slice(6).trim();
+    if (q.length < 2) {
+      setCmdTokens([]);
+      return;
+    }
+    const t = setTimeout(async () => setCmdTokens(await searchTokens(q)), 300);
+    return () => clearTimeout(t);
+  }, [cmdQ]);
+
+  /* DevMarket listings for the App Store (public feed, fails soft). */
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const items = await fetchDevMarketListings();
+      if (!alive) return;
+      if (!items.length) setStoreFailed(true);
+      setStoreListings(items);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /* --- Account layout sync --- */
+  const currentLayout = (): OsCloudLayout => ({
+    icons: iconPos,
+    folders,
+    settings,
+    installed,
+    deskWidgets,
+    packs,
+    dnd,
+    alerts,
+    activePackId,
+  });
+
+  useEffect(() => {
+    if (!props.userId) {
+      setSyncStatus("off");
+      setSyncHydrated(true);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      const row = await loadOsLayoutFromCloud();
+      if (!alive) return;
+      if (row) {
+        const meta = loadSyncMeta();
+        if (row.updatedAt > meta.lastSyncAt) {
+          const l = row.layout;
+          if (l.icons) setIconPos(l.icons);
+          if (Array.isArray(l.folders)) setFolders(l.folders);
+          if (l.settings) setSettings((s) => ({ ...s, ...l.settings }));
+          if (Array.isArray(l.installed)) setInstalled(l.installed);
+          if (Array.isArray(l.deskWidgets)) setDeskWidgets(l.deskWidgets);
+          if (Array.isArray(l.packs) && l.packs.length) setPacks(l.packs);
+          if (typeof l.dnd === "boolean") setDnd(l.dnd);
+          if (Array.isArray(l.alerts)) setAlerts(l.alerts);
+          if (typeof l.activePackId === "string" && l.activePackId) setActivePackId(l.activePackId);
+          markOsLayoutSynced(l);
+          saveSyncMeta({ lastSyncAt: row.updatedAt });
+        }
+      }
+      setSyncStatus("synced");
+      setSyncHydrated(true);
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!syncHydrated || !props.userId) return;
+    setSyncStatus("saving");
+    saveOsLayoutToCloud(currentLayout());
+    const t = setTimeout(() => setSyncStatus("synced"), 2200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [iconPos, folders, settings, installed, deskWidgets, packs, dnd, alerts, activePackId, syncHydrated]);
+
+  useEffect(() => {
+    const onHide = () => {
+      if (document.hidden) flushOsLayoutToCloud();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", flushOsLayoutToCloud);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", flushOsLayoutToCloud);
+    };
+  }, []);
+
+  const installedAsApps: PlatformApp[] = useMemo(
+    () =>
+      installed.map((a) => ({
+        key: a.key,
+        name: a.name,
+        caption: a.caption,
+        href: a.href,
+        external: true,
+        tone: "#e8b84a",
+        iconBg: a.iconBg,
+        glyph: <span style={{ fontSize: 18 }}>{a.glyph}</span>,
+      })),
+    [installed],
+  );
+
+  const allApps = useMemo(() => [...apps, ...installedAsApps], [apps, installedAsApps]);
+
   const appByKey = useMemo(() => {
     const m = new Map<string, PlatformApp>();
-    for (const a of apps) m.set(a.key, a);
+    for (const a of allApps) m.set(a.key, a);
     return m;
-  }, [apps]);
+  }, [allApps]);
 
   const centerRect = () => {
     const el = rootRef.current;
@@ -145,7 +426,30 @@ export default function Desktop(props: DesktopProps) {
     setStartOpen(false);
   };
 
+  const openBrowserTab = (url: string, title?: string) => {
+    const tabTitle = title ?? hostOf(url) ?? "Browser";
+    const existing = browserTabs.find((t) => t.url === url);
+    if (existing) {
+      setBrowserActiveId(existing.id);
+    } else {
+      const id = `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
+      setBrowserTabs((prev) => [...prev, { id, url, title: tabTitle }]);
+      setBrowserActiveId(id);
+    }
+    const r = centerRect();
+    dispatch({ type: "open", window: { id: "browser", kind: "browser", title: "Browser", x: r.x, y: r.y, w: r.w, h: r.h } });
+    setActiveWin("browser");
+    setStartOpen(false);
+    setCmdOpen(false);
+  };
+
   const openApp = (app: PlatformApp) => {
+    // Installed store apps always open inside the OrbitX Browser, never a
+    // bare new tab — the OS keeps you inside the OS.
+    if (installed.some((i) => i.key === app.key)) {
+      openBrowserTab(app.href, app.name);
+      return;
+    }
     if (app.external) {
       window.open(app.href, "_blank", "noopener");
       return;
@@ -156,6 +460,80 @@ export default function Desktop(props: DesktopProps) {
     if (r.narrow) dispatch({ type: "toggle-maximize", id });
     setActiveWin(id);
     setStartOpen(false);
+  };
+
+  /** Open a native app at a specific URL (Spotlight token → DEX ?mint=…). */
+  const openAppWithHref = (app: PlatformApp, href: string) => {
+    const id = `app:${app.key}`;
+    const r = centerRect();
+    dispatch({ type: "open", window: { id, kind: "app", appKey: app.key, title: app.name, x: r.x, y: r.y, w: r.w, h: r.h, hrefOverride: href } });
+    if (r.narrow) dispatch({ type: "toggle-maximize", id });
+    setActiveWin(id);
+    setStartOpen(false);
+    setCmdOpen(false);
+  };
+
+  /** Social in a small window pinned above everything else — the voice mini-player. */
+  const openVoiceMiniPlayer = () => {
+    const social = allApps.find((a) => a.key === "social" || a.name.toLowerCase().includes("social"));
+    if (!social) return;
+    const r = centerRect();
+    const w = Math.min(400, r.w);
+    const h = Math.min(560, r.h);
+    dispatch({
+      type: "open",
+      window: {
+        id: `app:${social.key}`,
+        kind: "app",
+        appKey: social.key,
+        title: `${social.name} — Voice`,
+        x: Math.max(8, r.x + r.w - w - 8),
+        y: Math.max(8, r.y),
+        w,
+        h,
+        pinned: true,
+      },
+    });
+    setActiveWin(`app:${social.key}`);
+    setControlOpen(false);
+  };
+
+  const installApp = (a: InstalledApp) => {
+    setInstalled((prev) => (prev.some((i) => i.key === a.key) ? prev : [...prev, a]));
+    pushNotification("App installed", `${a.name} is now on your desktop.`, "system");
+  };
+
+  const uninstallApp = (key: string) => {
+    setInstalled((prev) => prev.filter((i) => i.key !== key));
+    setIconPos((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      saveIconPositions(next);
+      return next;
+    });
+  };
+
+  const applyThemePack = (p: ThemePack) => {
+    setSettings((s) => ({ ...s, wallpaper: p.wallpaper, accent: p.accent }));
+    setActivePackId(p.id);
+    pushNotification("Theme applied", p.name, "system");
+  };
+
+  const activePack = packs.find((p) => p.id === activePackId) ?? packs[0];
+
+  const unlockAttempt = async () => {
+    if ((await hashPin(pinInput)) === lockState.pinHash) {
+      setUnlocked(true);
+      try {
+        sessionStorage.setItem("orbitxos:unlocked:v1", "1");
+      } catch {
+        /* ignore */
+      }
+      setPinInput("");
+      setPinError("");
+    } else {
+      setPinError("Wrong PIN.");
+    }
   };
 
   const closeWin = (id: string) => {
@@ -198,6 +576,17 @@ export default function Desktop(props: DesktopProps) {
         x: Math.min(rect.width - 80, Math.max(-200, d.origX + (e.clientX - d.startX))),
         y: Math.min(rect.height - 110, Math.max(0, d.origY + (e.clientY - d.startY))),
       });
+      // Snap preview: drag to a screen edge to tile, to the top to maximize.
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      if (px <= 14) setSnapPreview("left");
+      else if (px >= rect.width - 14) setSnapPreview("right");
+      else if (py <= 14) setSnapPreview("max");
+      else setSnapPreview(null);
+    } else if (d.type === "widget") {
+      const x = Math.min(92, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
+      const y = Math.min(86, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100));
+      setDeskWidgets((prev) => prev.map((w) => (w.id === d.id ? { ...w, x, y } : w)));
     } else if (d.type === "resize") {
       dispatch({
         type: "resize",
@@ -220,7 +609,40 @@ export default function Desktop(props: DesktopProps) {
   const onRootUp = (e: React.PointerEvent) => {
     const d = dragRef.current;
     dragRef.current = null;
-    if (d?.type !== "icon") return;
+    if (!d) return;
+    if (d.type === "win") {
+      // Drop on a snap edge tiles / maximizes the window.
+      if (snapPreview) {
+        const el = rootRef.current;
+        const rect = el?.getBoundingClientRect();
+        if (rect) {
+          if (snapPreview === "max") {
+            dispatch({ type: "toggle-maximize", id: d.id });
+          } else {
+            const half = Math.floor(rect.width / 2);
+            dispatch({
+              type: "snap",
+              id: d.id,
+              x: snapPreview === "left" ? 0 : half,
+              y: 0,
+              w: half,
+              h: Math.floor(rect.height),
+            });
+          }
+        }
+        setSnapPreview(null);
+      }
+      return;
+    }
+    if (d.type === "widget") {
+      setDeskWidgets((prev) => {
+        saveDeskWidgets(prev);
+        return prev;
+      });
+      return;
+    }
+    if (d.type === "resize") return;
+    if (d.type !== "icon") return;
     if (!d.moved) {
       // Click: folders open their panel, apps open a window.
       if (d.key.startsWith("folder:")) {
@@ -275,15 +697,57 @@ export default function Desktop(props: DesktopProps) {
 
   const startApps = useMemo(() => {
     const q = startQ.trim().toLowerCase();
-    if (!q) return apps;
-    return apps.filter((a) => `${a.name} ${a.caption}`.toLowerCase().includes(q));
-  }, [apps, startQ]);
+    if (!q) return allApps;
+    return allApps.filter((a) => `${a.name} ${a.caption}`.toLowerCase().includes(q));
+  }, [allApps, startQ]);
 
   const appsWinList = useMemo(() => {
     const q = appsQ.trim().toLowerCase();
-    if (!q) return apps;
-    return apps.filter((a) => `${a.name} ${a.caption}`.toLowerCase().includes(q));
-  }, [apps, appsQ]);
+    if (!q) return allApps;
+    return allApps.filter((a) => `${a.name} ${a.caption}`.toLowerCase().includes(q));
+  }, [allApps, appsQ]);
+
+  /* Command bar: typed actions + apps + "token <query>". */
+  const cmdTokenMode = cmdQ.trim().toLowerCase().startsWith("token ");
+  const cmdQTrim = cmdQ.trim();
+  const cmdActions = [
+    {
+      id: "lock",
+      label: "Lock screen",
+      hint: "Lock this device",
+      run: () => {
+        if (!lockState.pinHash) {
+          pushNotification("No PIN set", "Set a PIN in Settings → Lock first.", "system");
+        } else {
+          setUnlocked(false);
+          try {
+            sessionStorage.removeItem("orbitxos:unlocked:v1");
+          } catch {
+            /* ignore */
+          }
+        }
+        setCmdOpen(false);
+      },
+    },
+    { id: "control", label: "Open Control Center", hint: "Panel", run: () => { setCmdOpen(false); setControlOpen(true); } },
+    { id: "notif", label: "Open Notifications", hint: "Panel", run: () => { setCmdOpen(false); setNotifOpen(true); } },
+    { id: "store", label: "Open App Store", hint: "Window", run: () => { setCmdOpen(false); openBuiltin("store", "App Store"); } },
+    { id: "browser", label: "Open Browser", hint: "Window", run: () => { setCmdOpen(false); openBuiltin("browser", "Browser"); } },
+    { id: "themes", label: "Open Theme Store", hint: "Window", run: () => { setCmdOpen(false); openBuiltin("themes", "Theme Store"); } },
+    { id: "voice", label: "Voice mini-player", hint: "Pinned Social window", run: () => { setCmdOpen(false); openVoiceMiniPlayer(); } },
+    { id: "sync", label: "Sync layout now", hint: "Account", run: () => { saveOsLayoutToCloud(currentLayout()); flushOsLayoutToCloud(); setSyncStatus("synced"); setCmdOpen(false); } },
+    { id: "reset", label: "Reset icon layout", hint: "Desktop", run: () => { clearIconPositions(); setIconPos({}); setCmdOpen(false); } },
+    { id: "clear-notif", label: "Clear notifications", hint: "Notifications", run: () => { setNotifications([]); setCmdOpen(false); } },
+  ];
+  const cmdFiltered = cmdTokenMode
+    ? []
+    : cmdQTrim
+      ? cmdActions.filter((c) => c.label.toLowerCase().includes(cmdQTrim.toLowerCase()))
+      : cmdActions;
+  const cmdAppHits =
+    cmdQTrim && !cmdTokenMode
+      ? allApps.filter((a) => `${a.name} ${a.caption}`.toLowerCase().includes(cmdQTrim.toLowerCase())).slice(0, 5)
+      : [];
 
   const clock = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const dateStr = now.toLocaleDateString([], { month: "short", day: "numeric" });
@@ -465,10 +929,410 @@ export default function Desktop(props: DesktopProps) {
         />
       );
     }
+    if (w.kind === "browser") {
+      const activeTab = browserTabs.find((t) => t.id === browserActiveId) ?? browserTabs[0];
+      const blocked = activeTab ? isBlockedFrame(activeTab.url) : false;
+      const navigateActive = (raw: string) => {
+        const clean = normalizeUrl(raw);
+        if (!clean || !activeTab) return;
+        setBrowserTabs((prev) =>
+          prev.map((t) => (t.id === activeTab.id ? { ...t, url: clean, title: hostOf(clean) || "Browser" } : t)),
+        );
+      };
+      const newTab = (url: string, title: string) => {
+        const id = `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
+        setBrowserTabs((prev) => [...prev, { id, url, title }]);
+        setBrowserActiveId(id);
+      };
+      return (
+        <div className="oxos-browser">
+          <div className="oxos-browser__tabs">
+            {browserTabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`oxos-browser__tab${t.id === activeTab?.id ? " is-on" : ""}`}
+                onClick={() => setBrowserActiveId(t.id)}
+              >
+                <span>{t.title}</span>
+                {browserTabs.length > 1 && (
+                  <span
+                    className="oxos-browser__tabx"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setBrowserTabs((prev) => {
+                        const next = prev.filter((x) => x.id !== t.id);
+                        if (t.id === browserActiveId && next.length) setBrowserActiveId(next[next.length - 1].id);
+                        return next;
+                      });
+                    }}
+                  >
+                    ✕
+                  </span>
+                )}
+              </button>
+            ))}
+            <button type="button" className="oxos-browser__tabadd" title="New tab" onClick={() => newTab("https://dexscreener.com", "DexScreener")}>
+              +
+            </button>
+          </div>
+          {activeTab && (
+            <>
+              <div className="oxos-browser__bar">
+                <button
+                  type="button"
+                  className="oxos-browser__nav"
+                  title="Back"
+                  onClick={() => {
+                    try {
+                      browserFrameRefs.current.get(activeTab.id)?.contentWindow?.history.back();
+                    } catch {
+                      /* cross-origin: no-op */
+                    }
+                  }}
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  className="oxos-browser__nav"
+                  title="Forward"
+                  onClick={() => {
+                    try {
+                      browserFrameRefs.current.get(activeTab.id)?.contentWindow?.history.forward();
+                    } catch {
+                      /* cross-origin: no-op */
+                    }
+                  }}
+                >
+                  →
+                </button>
+                <button
+                  type="button"
+                  className="oxos-browser__nav"
+                  title="Reload"
+                  onClick={() => setBrowserReload((prev) => ({ ...prev, [activeTab.id]: (prev[activeTab.id] ?? 0) + 1 }))}
+                >
+                  ↻
+                </button>
+                <input
+                  key={activeTab.id}
+                  className="oxos-input oxos-browser__addr"
+                  defaultValue={activeTab.url}
+                  aria-label="Address"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") navigateActive((e.target as HTMLInputElement).value);
+                  }}
+                />
+                <button type="button" className="oxos-btn oxos-btn--ghost" onClick={() => window.open(activeTab.url, "_blank", "noopener")}>
+                  ↗ Tab
+                </button>
+              </div>
+              <div className="oxos-browser__quick">
+                {EXTERNAL_APPS.slice(0, 8).map((a) => (
+                  <button key={a.key} type="button" onClick={() => navigateActive(a.href)}>
+                    {a.name}
+                  </button>
+                ))}
+              </div>
+              <div className="oxos-browser__view">
+                {blocked ? (
+                  <div className="oxos-browser__blocked">
+                    <h3>{hostOf(activeTab.url)} doesn't allow embedding</h3>
+                    <p>
+                      Some sites (X, Discord, YouTube) refuse to load inside any app. Open it in a full
+                      browser tab instead — your OrbitX desktop stays open underneath.
+                    </p>
+                    <button type="button" className="oxos-btn" onClick={() => window.open(activeTab.url, "_blank", "noopener")}>
+                      Open {hostOf(activeTab.url)} in a new tab
+                    </button>
+                  </div>
+                ) : (
+                  browserTabs.map((t) => (
+                    <iframe
+                      key={`${t.id}-${browserReload[t.id] ?? 0}`}
+                      ref={(el) => {
+                        if (el) browserFrameRefs.current.set(t.id, el);
+                        else browserFrameRefs.current.delete(t.id);
+                      }}
+                      className="oxos-frame"
+                      title={t.title}
+                      src={t.url}
+                      hidden={t.id !== activeTab.id}
+                    />
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+    if (w.kind === "store") {
+      const q = storeQ.trim().toLowerCase();
+      const extFiltered = EXTERNAL_APPS.filter(
+        (a) => !q || `${a.name} ${a.caption}`.toLowerCase().includes(q),
+      );
+      const dmFiltered = storeListings.filter(
+        (l) => !q || `${l.name} ${l.tagline} ${l.tags.join(" ")}`.toLowerCase().includes(q),
+      );
+      const installedKeys = new Set(installed.map((i) => i.key));
+      return (
+        <div className="oxos-store">
+          <p className="oxos-hint">
+            Install apps onto your desktop. OrbitX apps open inside the OS; web apps open in the OrbitX Browser.
+          </p>
+          <input
+            className="oxos-input"
+            value={storeQ}
+            onChange={(e) => setStoreQ(e.target.value)}
+            placeholder="Search the store…"
+          />
+          <h3 className="oxos-h3">Web apps</h3>
+          <div className="oxos-store__grid">
+            {extFiltered.map((a) => {
+              const isIn = installedKeys.has(a.key);
+              return (
+                <div key={a.key} className="oxos-store__card">
+                  <span className="oxos-store__mark" style={{ background: a.iconBg }}>
+                    {a.glyph}
+                  </span>
+                  <span className="oxos-store__meta">
+                    <span>{a.name}</span>
+                    <span>{a.caption}</span>
+                  </span>
+                  {isIn ? (
+                    <button type="button" className="oxos-btn oxos-btn--ghost" onClick={() => uninstallApp(a.key)}>
+                      Installed ✓ — Remove
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="oxos-btn"
+                      onClick={() =>
+                        installApp({ key: a.key, name: a.name, caption: a.caption, href: a.href, iconBg: a.iconBg, glyph: a.glyph, source: "external" })
+                      }
+                    >
+                      Install
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <h3 className="oxos-h3">From DevMarket — community apps &amp; sites</h3>
+          {storeFailed && (
+            <p className="oxos-hint">DevMarket feed is unreachable right now — the web apps above still work.</p>
+          )}
+          <div className="oxos-store__grid">
+            {dmFiltered.map((l) => {
+              const key = `dm-${l.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+              const isIn = installedKeys.has(key);
+              return (
+                <div key={key} className="oxos-store__card">
+                  {l.icon ? (
+                    <img className="oxos-store__mark" src={l.icon} alt="" />
+                  ) : (
+                    <span className="oxos-store__mark" style={{ background: "linear-gradient(145deg,#e8b84a,#8a5a00)" }}>
+                      {l.name[0]}
+                    </span>
+                  )}
+                  <span className="oxos-store__meta">
+                    <span>{l.name}</span>
+                    <span>{l.tagline || l.type}</span>
+                  </span>
+                  {isIn ? (
+                    <button type="button" className="oxos-btn oxos-btn--ghost" onClick={() => uninstallApp(key)}>
+                      Installed ✓ — Remove
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="oxos-btn"
+                      onClick={() =>
+                        installApp({ key, name: l.name, caption: l.tagline || l.type, href: l.url, iconBg: "linear-gradient(145deg,#e8b84a,#8a5a00)", glyph: l.name[0], source: "devmarket" })
+                      }
+                    >
+                      Install
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+            {!dmFiltered.length && !storeFailed && <p className="oxos-hint">Loading community listings…</p>}
+          </div>
+          <h3 className="oxos-h3">OrbitX apps</h3>
+          <div className="oxos-store__grid">
+            {allApps
+              .filter((a) => !installedKeys.has(a.key))
+              .map((a) => (
+                <div key={a.key} className="oxos-store__card">
+                  {<AppMark app={a} className="oxos-store__mark" />}
+                  <span className="oxos-store__meta">
+                    <span>{a.name}</span>
+                    <span>{a.caption}</span>
+                  </span>
+                  <button type="button" className="oxos-btn oxos-btn--ghost" onClick={() => openApp(a)}>
+                    Open
+                  </button>
+                </div>
+              ))}
+          </div>
+        </div>
+      );
+    }
+    if (w.kind === "themes") {
+      return (
+        <div className="oxos-themes">
+          <p className="oxos-hint">
+            Themes change your wallpaper, accent, and icon shape. Make one, share it as JSON, or import a
+            friend's.
+          </p>
+          <h3 className="oxos-h3">Theme store</h3>
+          <div className="oxos-store__grid">
+            {packs.map((p) => (
+              <div key={p.id} className={`oxos-store__card${p.id === activePackId ? " is-on" : ""}`}>
+                <span
+                  className="oxos-store__mark"
+                  style={{ background: p.accent, borderRadius: p.radius, boxShadow: p.ring || undefined }}
+                >
+                  {p.name[0]}
+                </span>
+                <span className="oxos-store__meta">
+                  <span>{p.name}</span>
+                  <span>
+                    by {p.author} · {p.wallpaper} · {p.accent}
+                  </span>
+                </span>
+                <button type="button" className="oxos-btn" onClick={() => applyThemePack(p)}>
+                  {p.id === activePackId ? "Active ✓" : "Apply"}
+                </button>
+              </div>
+            ))}
+          </div>
+          <h3 className="oxos-h3">Create a theme</h3>
+          <div className="oxos-themes__form">
+            <input
+              className="oxos-input"
+              value={themeName}
+              onChange={(e) => setThemeName(e.target.value)}
+              placeholder="Theme name"
+            />
+            <div className="oxos-wallgrid">
+              {OS_WALLPAPERS.map((wp) => (
+                <button
+                  key={wp.id}
+                  type="button"
+                  className={`oxos-wall oxos-wall--${wp.id}${themeWallpaper === wp.id ? " is-on" : ""}`}
+                  onClick={() => setThemeWallpaper(wp.id)}
+                >
+                  {wp.label}
+                </button>
+              ))}
+            </div>
+            <div className="oxos-accentrow">
+              {OS_ACCENTS.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  className={`oxos-accent${themeAccent === a.hex ? " is-on" : ""}`}
+                  style={{ background: a.hex }}
+                  title={a.label}
+                  aria-label={a.label}
+                  onClick={() => setThemeAccent(a.hex)}
+                />
+              ))}
+            </div>
+            <label className="oxos-field">
+              Icon corner radius: {themeRadius}px
+              <input
+                type="range"
+                min={6}
+                max={120}
+                value={themeRadius}
+                onChange={(e) => setThemeRadius(Number(e.target.value))}
+              />
+            </label>
+            <button
+              type="button"
+              className="oxos-btn"
+              disabled={!themeName.trim()}
+              onClick={() => {
+                const p: ThemePack = {
+                  id: `pack-${Date.now().toString(36)}`,
+                  name: themeName.trim(),
+                  wallpaper: themeWallpaper as ThemePack["wallpaper"],
+                  accent: themeAccent,
+                  radius: themeRadius,
+                  ring: "",
+                  author: "You",
+                };
+                setPacks((prev) => [...prev, p]);
+                applyThemePack(p);
+                setThemeName("");
+              }}
+            >
+              Save &amp; apply
+            </button>
+          </div>
+          <h3 className="oxos-h3">Share / import</h3>
+          <div className="oxos-themes__form">
+            <textarea
+              className="oxos-input"
+              rows={3}
+              value={themeImport}
+              onChange={(e) => setThemeImport(e.target.value)}
+              placeholder="Paste a theme JSON here to import it"
+            />
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="oxos-btn oxos-btn--ghost"
+                onClick={() => {
+                  const p = packs.find((x) => x.id === activePackId);
+                  if (p) setThemeImport(JSON.stringify(p, null, 2));
+                }}
+              >
+                Copy active theme JSON
+              </button>
+              <button
+                type="button"
+                className="oxos-btn"
+                onClick={() => {
+                  try {
+                    const raw = JSON.parse(themeImport);
+                    if (raw && typeof raw.name === "string" && typeof raw.accent === "string") {
+                      const p: ThemePack = {
+                        id: `pack-${Date.now().toString(36)}`,
+                        name: raw.name,
+                        wallpaper: (["space", "midnight", "gold", "ocean"].includes(raw.wallpaper)
+                          ? raw.wallpaper
+                          : "space") as ThemePack["wallpaper"],
+                        accent: raw.accent,
+                        radius: typeof raw.radius === "number" ? raw.radius : 18,
+                        ring: typeof raw.ring === "string" ? raw.ring : "",
+                        author: "Imported",
+                      };
+                      setPacks((prev) => [...prev, p]);
+                      applyThemePack(p);
+                      setThemeImport("");
+                    }
+                  } catch {
+                    /* invalid JSON — leave the text for editing */
+                  }
+                }}
+              >
+                Import
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
     // App window: same-origin route inside a frame.
     const app = w.appKey ? appByKey.get(w.appKey) : undefined;
     if (!app) return <p className="oxos-hint">App not found.</p>;
-    return <iframe className="oxos-frame" title={app.name} src={app.href} />;
+    return <iframe className="oxos-frame" title={app.name} src={w.hrefOverride ?? app.href} />;
   };
 
   const settingsBody = () => {
@@ -481,6 +1345,7 @@ export default function Desktop(props: DesktopProps) {
             ["personalization", "Personalization"],
             ["account", "Account"],
             ["wallet", "Wallet"],
+            ["lock", "Lock"],
             ["about", "About"],
           ] as const).map(([id, label]) => (
             <button
@@ -515,6 +1380,27 @@ export default function Desktop(props: DesktopProps) {
               >
                 Reset desktop icon layout
               </button>
+              <h3 className="oxos-h3">Account sync</h3>
+              <p className="oxos-hint">
+                {props.userId
+                  ? syncStatus === "saving"
+                    ? "Saving layout to your account…"
+                    : "Layout syncs to your account — open OrbitX on another device and your desktop follows."
+                  : "Sign in to sync your desktop layout across devices."}
+              </p>
+              {props.userId && (
+                <button
+                  type="button"
+                  className="oxos-btn oxos-btn--ghost"
+                  onClick={() => {
+                    saveOsLayoutToCloud(currentLayout());
+                    flushOsLayoutToCloud();
+                    setSyncStatus("synced");
+                  }}
+                >
+                  Sync now
+                </button>
+              )}
               <p className="oxos-hint">Windows, icons and taskbar stay centered. Drag any icon or window to move it — positions are saved on this device.</p>
             </>
           )}
@@ -550,6 +1436,9 @@ export default function Desktop(props: DesktopProps) {
               <button type="button" className="oxos-btn oxos-btn--ghost" onClick={props.onOpenTheme}>
                 Open Atmosphere theme
               </button>
+              <button type="button" className="oxos-btn oxos-btn--ghost" onClick={() => openBuiltin("themes", "Theme Store")}>
+                Open Theme Store
+              </button>
             </>
           )}
           {settingsNav === "account" && (
@@ -575,6 +1464,95 @@ export default function Desktop(props: DesktopProps) {
               <WalletConnectButton />
             </>
           )}
+          {settingsNav === "lock" && (
+            <>
+              <h3 className="oxos-h3">Device lock</h3>
+              <p className="oxos-hint">
+                A PIN lock for this device only. It never syncs, never leaves the device, and it is not your
+                wallet PIN.
+              </p>
+              {lockState.pinHash ? (
+                <>
+                  <label className="oxos-toggle">
+                    <span>Lock on start</span>
+                    <input
+                      type="checkbox"
+                      checked={lockState.enabled}
+                      onChange={(e) => setLockState((s) => ({ ...s, enabled: e.target.checked }))}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="oxos-btn"
+                    onClick={() => {
+                      setUnlocked(false);
+                      try {
+                        sessionStorage.removeItem("orbitxos:unlocked:v1");
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                  >
+                    Lock now
+                  </button>
+                  <h3 className="oxos-h3">Change PIN</h3>
+                </>
+              ) : (
+                <h3 className="oxos-h3">Set a PIN</h3>
+              )}
+              <input
+                className="oxos-input"
+                type="password"
+                inputMode="numeric"
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value)}
+                placeholder="PIN (4–8 digits)"
+              />
+              <input
+                className="oxos-input"
+                type="password"
+                inputMode="numeric"
+                value={pinConfirm}
+                onChange={(e) => setPinConfirm(e.target.value)}
+                placeholder="Confirm PIN"
+              />
+              {pinError && <p className="oxos-hint" style={{ color: "#f87171" }}>{pinError}</p>}
+              <button
+                type="button"
+                className="oxos-btn"
+                onClick={async () => {
+                  if (pinInput.length < 4 || pinInput !== pinConfirm) {
+                    setPinError("PINs must match and be at least 4 digits.");
+                    return;
+                  }
+                  setLockState({ enabled: true, pinHash: await hashPin(pinInput) });
+                  setUnlocked(true);
+                  try {
+                    sessionStorage.setItem("orbitxos:unlocked:v1", "1");
+                  } catch {
+                    /* ignore */
+                  }
+                  setPinInput("");
+                  setPinConfirm("");
+                  setPinError("");
+                }}
+              >
+                {lockState.pinHash ? "Save new PIN" : "Set PIN & lock on start"}
+              </button>
+              {lockState.pinHash && (
+                <button
+                  type="button"
+                  className="oxos-btn oxos-btn--danger"
+                  onClick={() => {
+                    setLockState({ enabled: false, pinHash: "" });
+                    setUnlocked(true);
+                  }}
+                >
+                  Remove lock
+                </button>
+              )}
+            </>
+          )}
           {settingsNav === "about" && (
             <>
               <h3 className="oxos-h3">OrbitX OS 1.0</h3>
@@ -588,7 +1566,7 @@ export default function Desktop(props: DesktopProps) {
   };
 
   const foldered = useMemo(() => folderedKeys(folders), [folders]);
-  const visibleDesktopApps = desktopApps.filter((a) => !foldered.has(a.key));
+  const visibleDesktopApps = [...desktopApps, ...installedAsApps].filter((a) => !foldered.has(a.key));
   const unplaced = visibleDesktopApps.filter((a) => !iconPos[a.key]);
   const placed = visibleDesktopApps.filter((a) => iconPos[a.key]);
   const unplacedFolders = folders.filter((f) => !iconPos[`folder:${f.id}`]);
@@ -598,7 +1576,13 @@ export default function Desktop(props: DesktopProps) {
     <div
       ref={rootRef}
       className={`oxos${settings.reduceMotion ? " oxos--reduced" : ""}`}
-      style={{ "--os-accent": settings.accent } as React.CSSProperties}
+      style={
+        {
+          "--os-accent": settings.accent,
+          "--os-icon-radius": `${activePack?.radius ?? 18}px`,
+          "--os-icon-ring": activePack?.ring ?? "none",
+        } as React.CSSProperties
+      }
       onPointerMove={onRootMove}
       onPointerUp={onRootUp}
     >
@@ -623,6 +1607,79 @@ export default function Desktop(props: DesktopProps) {
         {placed.map((a) => iconButton(a, true))}
         {placedFolders.map((f) => folderButton(f, true))}
       </div>
+
+      {/* Desk widgets — live, draggable, saved + synced with the account */}
+      {deskWidgets.map((wdg) => (
+        <section
+          key={wdg.id}
+          className="oxos-deskwd"
+          style={{ left: `${wdg.x}%`, top: `${wdg.y}%` }}
+        >
+          <header
+            className="oxos-deskwd__head"
+            onPointerDown={(e) => {
+              dragRef.current = { type: "widget", id: wdg.id, startX: e.clientX, startY: e.clientY, origX: wdg.x, origY: wdg.y };
+            }}
+          >
+            <span>{wdg.type === "ticker" ? "Market" : wdg.type === "trending" ? "Trending" : "My alerts"}</span>
+            <button
+              type="button"
+              title="Remove widget"
+              onClick={() => setDeskWidgets((prev) => prev.filter((x) => x.id !== wdg.id))}
+            >
+              ✕
+            </button>
+          </header>
+          <div className="oxos-deskwd__body">
+            {wdg.type === "ticker" && (
+              <>
+                <div className="oxos-deskwd__row">
+                  <span>SOL</span>
+                  <span>{props.solPrice != null ? fmtUsd(props.solPrice) : "—"}</span>
+                  {props.solChange != null && (
+                    <span className={props.solChange >= 0 ? "up" : "down"}>
+                      {props.solChange >= 0 ? "▲" : "▼"} {Math.abs(props.solChange).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+                <div className="oxos-deskwd__row">
+                  <span>$ORBITX</span>
+                  <span>{props.orbitxPrice != null ? fmtUsd(props.orbitxPrice, 6) : "—"}</span>
+                  {props.orbitxChange != null && (
+                    <span className={props.orbitxChange >= 0 ? "up" : "down"}>
+                      {props.orbitxChange >= 0 ? "▲" : "▼"} {Math.abs(props.orbitxChange).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+            {wdg.type === "trending" &&
+              props.trending.slice(0, 5).map((t) => (
+                <div key={t.mint} className="oxos-deskwd__row">
+                  <span>{t.symbol}</span>
+                  <span>{fmtUsd(t.price)}</span>
+                  <span className={t.change24h >= 0 ? "up" : "down"}>
+                    {t.change24h >= 0 ? "+" : ""}
+                    {t.change24h.toFixed(1)}%
+                  </span>
+                </div>
+              ))}
+            {wdg.type === "alerts" &&
+              (alerts.length === 0 ? (
+                <p className="oxos-hint">No alerts yet — add one from Notifications.</p>
+              ) : (
+                alerts.slice(0, 5).map((a) => (
+                  <div key={a.id} className="oxos-deskwd__row">
+                    <span>
+                      {a.symbol} {a.direction === "above" ? "↑" : "↓"} ${a.target}
+                    </span>
+                    <span>{a.triggered ? "Hit ✓" : "Armed"}</span>
+                  </div>
+                ))
+              ))}
+          </div>
+        </section>
+      ))}
 
       {/* Folder panel — iOS-style folder view */}
       {openFolderId &&
@@ -714,8 +1771,8 @@ export default function Desktop(props: DesktopProps) {
             className={`oxos-window${isActive ? " is-active" : ""}${w.maximized ? " is-max" : ""}`}
             style={
               w.maximized
-                ? { zIndex: w.z }
-                : { left: w.x, top: w.y, width: w.w, height: w.h, zIndex: w.z }
+                ? { zIndex: w.pinned ? 60000 : w.z }
+                : { left: w.x, top: w.y, width: w.w, height: w.h, zIndex: w.pinned ? 60000 : w.z }
             }
             hidden={w.minimized}
             onPointerDown={() => {
@@ -742,6 +1799,14 @@ export default function Desktop(props: DesktopProps) {
                   ⤢
                 </button>
               )}
+              <button
+                type="button"
+                className={`oxos-window__ctl${w.pinned ? " is-on" : ""}`}
+                title={w.pinned ? "Unpin from top" : "Pin on top"}
+                onClick={() => dispatch({ type: "toggle-pin", id: w.id })}
+              >
+                📌
+              </button>
               <button
                 type="button"
                 className="oxos-window__ctl"
@@ -779,6 +1844,9 @@ export default function Desktop(props: DesktopProps) {
           </section>
         );
       })}
+
+      {/* Snap preview while dragging a window to an edge */}
+      {snapPreview && <div className={`oxos-snap oxos-snap--${snapPreview}`} aria-hidden />}
 
       {/* Start menu */}
       {startOpen && (
@@ -822,6 +1890,120 @@ export default function Desktop(props: DesktopProps) {
             ))}
             {!startApps.length && <p className="oxos-hint">No apps match that search.</p>}
           </div>
+          {startQ.trim() && (
+            <>
+              {spotTokens.length > 0 && (
+                <>
+                  <div className="oxos-start__label">Tokens</div>
+                  <div className="oxos-start__list">
+                    {spotTokens.map((t) => (
+                      <button
+                        key={t.mint}
+                        type="button"
+                        className="oxos-start__row"
+                        onClick={() => {
+                          const dex = allApps.find((a) => a.key === "dex");
+                          if (dex) openAppWithHref(dex, `/ORBITX_DEX?mint=${t.mint}`);
+                          else openBrowserTab(`https://dexscreener.com/solana/${t.mint}`, t.symbol);
+                        }}
+                      >
+                        <span className="oxos-start__rowmeta">
+                          <span>{t.symbol}</span>
+                          <span>
+                            {t.name}
+                            {t.priceUsd != null
+                              ? ` · $${t.priceUsd < 0.01 ? t.priceUsd.toFixed(6) : t.priceUsd.toFixed(4)}`
+                              : ""}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              <div className="oxos-start__label">Settings &amp; actions</div>
+              <div className="oxos-start__list">
+                {(
+                  [
+                    ["system", "System settings"],
+                    ["personalization", "Personalization"],
+                    ["account", "Account"],
+                    ["wallet", "Wallet"],
+                    ["lock", "Device lock"],
+                    ["about", "About OrbitX OS"],
+                  ] as const
+                )
+                  .filter(([, label]) => label.toLowerCase().includes(startQ.trim().toLowerCase()))
+                  .map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      className="oxos-start__row"
+                      onClick={() => {
+                        setSettingsNav(id);
+                        openBuiltin("settings", "Settings");
+                      }}
+                    >
+                      <span className="oxos-start__rowmeta">
+                        <span>{label}</span>
+                        <span>Settings</span>
+                      </span>
+                    </button>
+                  ))}
+                {(
+                  [
+                    ["store", "App Store"],
+                    ["browser", "Browser"],
+                    ["themes", "Theme Store"],
+                  ] as const
+                )
+                  .filter(([, label]) => label.toLowerCase().includes(startQ.trim().toLowerCase()))
+                  .map(([kind, label]) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      className="oxos-start__row"
+                      onClick={() => openBuiltin(kind, label)}
+                    >
+                      <span className="oxos-start__rowmeta">
+                        <span>{label}</span>
+                        <span>Open</span>
+                      </span>
+                    </button>
+                  ))}
+                {"control center".includes(startQ.trim().toLowerCase()) && (
+                  <button
+                    type="button"
+                    className="oxos-start__row"
+                    onClick={() => {
+                      setStartOpen(false);
+                      setControlOpen(true);
+                    }}
+                  >
+                    <span className="oxos-start__rowmeta">
+                      <span>Control Center</span>
+                      <span>Panel</span>
+                    </span>
+                  </button>
+                )}
+                {"notifications".includes(startQ.trim().toLowerCase()) && (
+                  <button
+                    type="button"
+                    className="oxos-start__row"
+                    onClick={() => {
+                      setStartOpen(false);
+                      setNotifOpen(true);
+                    }}
+                  >
+                    <span className="oxos-start__rowmeta">
+                      <span>Notifications</span>
+                      <span>Panel</span>
+                    </span>
+                  </button>
+                )}
+              </div>
+            </>
+          )}
           <div className="oxos-start__foot">
             <span className="oxos-start__user">
               <span className="oxos-start__ava">{props.userInitial}</span>
@@ -844,6 +2026,50 @@ export default function Desktop(props: DesktopProps) {
         </button>
         <button type="button" className="oxos-taskbar__btn" title="Search (⌘K)" onClick={() => setStartOpen(true)}>
           🔍
+        </button>
+        <button
+          type="button"
+          className="oxos-taskbar__btn"
+          title="Command bar"
+          onClick={() => {
+            setCmdOpen((v) => !v);
+            setStartOpen(false);
+            setControlOpen(false);
+            setNotifOpen(false);
+          }}
+        >
+          ⌘
+        </button>
+        <button
+          type="button"
+          className="oxos-taskbar__btn"
+          title="Control Center"
+          onClick={() => {
+            setControlOpen((v) => !v);
+            setStartOpen(false);
+            setNotifOpen(false);
+            setCmdOpen(false);
+          }}
+        >
+          ◧
+        </button>
+        <button
+          type="button"
+          className="oxos-taskbar__btn"
+          title="Notifications"
+          onClick={() => {
+            setNotifOpen((v) => !v);
+            setStartOpen(false);
+            setControlOpen(false);
+            setCmdOpen(false);
+          }}
+        >
+          <span style={{ position: "relative" }}>
+            🔔
+            {unreadCount > 0 && (
+              <span className="oxos-taskbar__badge">{unreadCount > 9 ? "9+" : unreadCount}</span>
+            )}
+          </span>
         </button>
         <span className="oxos-taskbar__sep" />
         {gates.map((a) => (
@@ -884,6 +2110,428 @@ export default function Desktop(props: DesktopProps) {
           </span>
         </span>
       </footer>
+
+      {/* Control Center */}
+      {controlOpen && (
+        <div className="oxos-panel oxos-panel--right">
+          <div className="oxos-panel__head">
+            <span>Control Center</span>
+            <button type="button" onClick={() => setControlOpen(false)}>
+              ✕
+            </button>
+          </div>
+          <h3 className="oxos-h3">Wallet</h3>
+          <WalletConnectButton />
+          <h3 className="oxos-h3">Appearance</h3>
+          <div className="oxos-wallgrid">
+            {OS_WALLPAPERS.map((wp) => (
+              <button
+                key={wp.id}
+                type="button"
+                className={`oxos-wall oxos-wall--${wp.id}${settings.wallpaper === wp.id ? " is-on" : ""}`}
+                onClick={() => setSettings((s) => ({ ...s, wallpaper: wp.id }))}
+              >
+                {wp.label}
+              </button>
+            ))}
+          </div>
+          <div className="oxos-accentrow">
+            {OS_ACCENTS.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                className={`oxos-accent${settings.accent === a.hex ? " is-on" : ""}`}
+                style={{ background: a.hex }}
+                title={a.label}
+                aria-label={a.label}
+                onClick={() => setSettings((s) => ({ ...s, accent: a.hex }))}
+              />
+            ))}
+          </div>
+          <button type="button" className="oxos-btn oxos-btn--ghost" onClick={() => { setControlOpen(false); openBuiltin("themes", "Theme Store"); }}>
+            Theme Store
+          </button>
+          <h3 className="oxos-h3">Toggles</h3>
+          <label className="oxos-toggle">
+            <span>Do not disturb</span>
+            <input type="checkbox" checked={dnd} onChange={(e) => setDnd(e.target.checked)} />
+          </label>
+          <label className="oxos-toggle">
+            <span>Show market prices in taskbar</span>
+            <input
+              type="checkbox"
+              checked={settings.showTrayPrices}
+              onChange={(e) => setSettings((s) => ({ ...s, showTrayPrices: e.target.checked }))}
+            />
+          </label>
+          <label className="oxos-toggle">
+            <span>Reduce motion</span>
+            <input
+              type="checkbox"
+              checked={settings.reduceMotion}
+              onChange={(e) => setSettings((s) => ({ ...s, reduceMotion: e.target.checked }))}
+            />
+          </label>
+          <h3 className="oxos-h3">Screen dim</h3>
+          <input type="range" min={0} max={60} value={dim} onChange={(e) => setDim(Number(e.target.value))} />
+          <h3 className="oxos-h3">Desk widgets</h3>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {(
+              [
+                ["ticker", "Market"],
+                ["trending", "Trending"],
+                ["alerts", "Alerts"],
+              ] as const
+            ).map(([t, label]) => (
+              <button
+                key={t}
+                type="button"
+                className="oxos-btn oxos-btn--ghost"
+                onClick={() =>
+                  setDeskWidgets((prev) => [
+                    ...prev,
+                    {
+                      id: `wdg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+                      type: t,
+                      x: 4 + prev.length * 2,
+                      y: 12,
+                    },
+                  ])
+                }
+              >
+                + {label}
+              </button>
+            ))}
+          </div>
+          <h3 className="oxos-h3">Quick actions</h3>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" className="oxos-btn" onClick={openVoiceMiniPlayer}>
+              Voice mini-player
+            </button>
+            <button
+              type="button"
+              className="oxos-btn"
+              onClick={() => {
+                setControlOpen(false);
+                openBuiltin("store", "App Store");
+              }}
+            >
+              App Store
+            </button>
+            <button
+              type="button"
+              className="oxos-btn"
+              onClick={() => {
+                setControlOpen(false);
+                openBuiltin("browser", "Browser");
+              }}
+            >
+              Browser
+            </button>
+            <button
+              type="button"
+              className="oxos-btn oxos-btn--danger"
+              disabled={!lockState.pinHash}
+              onClick={() => {
+                setUnlocked(false);
+                try {
+                  sessionStorage.removeItem("orbitxos:unlocked:v1");
+                } catch {
+                  /* ignore */
+                }
+                setControlOpen(false);
+              }}
+            >
+              Lock
+            </button>
+          </div>
+          <h3 className="oxos-h3">Sync</h3>
+          <p className="oxos-hint">
+            {props.userId
+              ? syncStatus === "saving"
+                ? "Saving…"
+                : "Synced to your account"
+              : "Sign in to sync across devices."}
+          </p>
+          {props.userId && (
+            <button
+              type="button"
+              className="oxos-btn oxos-btn--ghost"
+              onClick={() => {
+                saveOsLayoutToCloud(currentLayout());
+                flushOsLayoutToCloud();
+                setSyncStatus("synced");
+              }}
+            >
+              Sync now
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Notification Center + price alerts */}
+      {notifOpen && (
+        <div className="oxos-panel oxos-panel--right">
+          <div className="oxos-panel__head">
+            <span>Notifications{unreadCount > 0 ? ` (${unreadCount})` : ""}</span>
+            <button type="button" onClick={() => setNotifOpen(false)}>
+              ✕
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              className="oxos-btn oxos-btn--ghost"
+              onClick={() => setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))}
+            >
+              Mark all read
+            </button>
+            <button type="button" className="oxos-btn oxos-btn--ghost" onClick={() => setNotifications([])}>
+              Clear
+            </button>
+          </div>
+          <div className="oxos-notif__list">
+            {notifications.length === 0 && (
+              <p className="oxos-hint">Nothing yet. Price alerts and system notices land here.</p>
+            )}
+            {notifications.map((n) => (
+              <div key={n.id} className={`oxos-notif${n.read ? " is-read" : ""}`}>
+                <span className="oxos-notif__title">{n.title}</span>
+                <span className="oxos-notif__body">{n.body}</span>
+                <span className="oxos-notif__time">
+                  {new Date(n.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+            ))}
+          </div>
+          <h3 className="oxos-h3">Price alerts</h3>
+          <div className="oxos-alert__form">
+            <input
+              className="oxos-input"
+              value={alertQ}
+              placeholder="Search a token…"
+              onChange={async (e) => {
+                const v = e.target.value;
+                setAlertQ(v);
+                setAlertRows(v.trim().length >= 2 ? await searchTokens(v) : []);
+              }}
+            />
+            {alertRows.map((r) => (
+              <button
+                key={r.mint}
+                type="button"
+                className="oxos-row"
+                onClick={() => {
+                  setAlertPicked(r);
+                  setAlertRows([]);
+                  setAlertQ(r.symbol);
+                }}
+              >
+                <span className="oxos-row__meta">
+                  <span className="oxos-row__title">{r.symbol}</span>
+                  <span className="oxos-row__sub">
+                    {r.name}
+                    {r.priceUsd != null
+                      ? ` · $${r.priceUsd < 0.01 ? r.priceUsd.toFixed(6) : r.priceUsd.toFixed(4)}`
+                      : ""}
+                  </span>
+                </span>
+              </button>
+            ))}
+            {alertPicked && (
+              <>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <select
+                    className="oxos-input"
+                    value={alertDir}
+                    onChange={(e) => setAlertDir(e.target.value as "above" | "below")}
+                  >
+                    <option value="above">Price goes above</option>
+                    <option value="below">Price goes below</option>
+                  </select>
+                  <input
+                    className="oxos-input"
+                    type="number"
+                    step="any"
+                    value={alertTarget}
+                    onChange={(e) => setAlertTarget(e.target.value)}
+                    placeholder="Target $"
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="oxos-btn"
+                  disabled={!alertTarget}
+                  onClick={() => {
+                    const target = Number(alertTarget);
+                    if (!Number.isFinite(target)) return;
+                    setAlerts((prev) => [
+                      ...prev,
+                      {
+                        id: `al-${Date.now().toString(36)}`,
+                        mint: alertPicked.mint,
+                        symbol: alertPicked.symbol,
+                        target,
+                        direction: alertDir,
+                        createdAt: Date.now(),
+                        triggered: false,
+                      },
+                    ]);
+                    pushNotification("Alert armed", `${alertPicked.symbol} ${alertDir} $${target}`, "alert");
+                    setAlertPicked(null);
+                    setAlertQ("");
+                    setAlertTarget("");
+                  }}
+                >
+                  Arm alert
+                </button>
+              </>
+            )}
+          </div>
+          <div className="oxos-notif__list">
+            {alerts.map((a) => (
+              <div key={a.id} className="oxos-notif">
+                <span className="oxos-notif__title">
+                  {a.symbol} {a.direction === "above" ? "↑" : "↓"} ${a.target}
+                </span>
+                <span className="oxos-notif__body">{a.triggered ? "Triggered ✓" : "Armed — checking every 30s"}</span>
+                <button
+                  type="button"
+                  className="oxos-btn oxos-btn--ghost"
+                  onClick={() => setAlerts((prev) => prev.filter((x) => x.id !== a.id))}
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Command bar */}
+      {cmdOpen && (
+        <div className="oxos-cmd">
+          <input
+            className="oxos-input"
+            autoFocus
+            value={cmdQ}
+            onChange={(e) => setCmdQ(e.target.value)}
+            placeholder="Type a command… try 'lock', 'store', or 'token bonk'"
+          />
+          <div className="oxos-cmd__list">
+            {cmdTokenMode &&
+              cmdTokens.map((t) => (
+                <button
+                  key={t.mint}
+                  type="button"
+                  className="oxos-start__row"
+                  onClick={() => {
+                    const dex = allApps.find((a) => a.key === "dex");
+                    if (dex) openAppWithHref(dex, `/ORBITX_DEX?mint=${t.mint}`);
+                    else openBrowserTab(`https://dexscreener.com/solana/${t.mint}`, t.symbol);
+                  }}
+                >
+                  <span className="oxos-start__rowmeta">
+                    <span>
+                      {t.symbol} — open in DEX
+                    </span>
+                    <span>
+                      {t.name}
+                      {t.priceUsd != null
+                        ? ` · $${t.priceUsd < 0.01 ? t.priceUsd.toFixed(6) : t.priceUsd.toFixed(4)}`
+                        : ""}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            {cmdTokenMode && cmdQTrim.slice(6).trim().length >= 2 && cmdTokens.length === 0 && (
+              <p className="oxos-hint">Searching tokens…</p>
+            )}
+            {!cmdTokenMode &&
+              cmdFiltered.map((c) => (
+                <button key={c.id} type="button" className="oxos-start__row" onClick={c.run}>
+                  <span className="oxos-start__rowmeta">
+                    <span>{c.label}</span>
+                    <span>{c.hint}</span>
+                  </span>
+                </button>
+              ))}
+            {!cmdTokenMode &&
+              cmdAppHits.map((a) => (
+                <button
+                  key={a.key}
+                  type="button"
+                  className="oxos-start__row"
+                  onClick={() => {
+                    setCmdOpen(false);
+                    openApp(a);
+                  }}
+                >
+                  {<AppMark app={a} className="oxos-start__rowmark" />}
+                  <span className="oxos-start__rowmeta">
+                    <span>{a.name}</span>
+                    <span>{a.caption}</span>
+                  </span>
+                </button>
+              ))}
+            {!cmdTokenMode && !cmdFiltered.length && !cmdAppHits.length && (
+              <p className="oxos-hint">No commands match that.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Toasts */}
+      <div className="oxos-toasts">
+        {toasts.map((id) => {
+          const n = notifications.find((x) => x.id === id);
+          if (!n) return null;
+          return (
+            <button
+              key={id}
+              type="button"
+              className="oxos-toast"
+              onClick={() => {
+                setToasts((prev) => prev.filter((t) => t !== id));
+                setNotifOpen(true);
+              }}
+            >
+              <span className="oxos-toast__title">{n.title}</span>
+              <span className="oxos-toast__body">{n.body}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Screen dimmer (Control Center slider; never blocks clicks) */}
+      {dim > 0 && <div className="oxos-dim" style={{ opacity: dim / 100 }} aria-hidden />}
+
+      {/* Lock screen */}
+      {locked && (
+        <div className="oxos-lock">
+          <div className="oxos-lock__card">
+            <div className="oxos-lock__mark">◈</div>
+            <h2>OrbitX OS</h2>
+            <p>Enter your device PIN to unlock.</p>
+            <input
+              className="oxos-input"
+              type="password"
+              inputMode="numeric"
+              autoFocus
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value)}
+              placeholder="PIN"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void unlockAttempt();
+              }}
+            />
+            {pinError && <p className="oxos-hint" style={{ color: "#f87171" }}>{pinError}</p>}
+            <button type="button" className="oxos-btn" onClick={() => void unlockAttempt()}>
+              Unlock
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

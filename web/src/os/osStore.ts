@@ -112,3 +112,164 @@ export function loadOsFolders(): StoredFolder[] {
 export function saveOsFolders(folders: StoredFolder[]) {
   writeJson(FOLDERS_KEY, folders);
 }
+
+/* ------------------------------------------------------------------ */
+/* OS wave 2 — notifications, alerts, desk widgets, installed apps,   */
+/* theme packs, lock screen, do-not-disturb, sync bookkeeping.        */
+/* ------------------------------------------------------------------ */
+
+export interface OsNotification {
+  id: string;
+  title: string;
+  body: string;
+  kind: "price" | "alert" | "social" | "system";
+  at: number;
+  read: boolean;
+}
+
+export interface OsPriceAlert {
+  id: string;
+  mint: string;
+  symbol: string;
+  target: number;
+  direction: "above" | "below";
+  createdAt: number;
+  triggered: boolean;
+}
+
+export type DeskWidgetType = "ticker" | "trending" | "alerts";
+
+export interface DeskWidget {
+  id: string;
+  type: DeskWidgetType;
+  x: number; // percentages
+  y: number;
+}
+
+export interface InstalledApp {
+  key: string;
+  name: string;
+  caption: string;
+  href: string;
+  iconBg: string;
+  glyph: string;
+  source: "external" | "devmarket";
+}
+
+export interface ThemePack {
+  id: string;
+  name: string;
+  wallpaper: OsWallpaperId;
+  accent: string;
+  /** Icon tile corner radius (px) — the "icon pack" half of a theme. */
+  radius: number;
+  /** Icon tile ring/glow (css box-shadow value, "" for none). */
+  ring: string;
+  author: string;
+}
+
+export const DEFAULT_THEME_PACKS: ThemePack[] = [
+  { id: "orbit-gold", name: "Orbit Gold", wallpaper: "space", accent: "#e8b84a", radius: 18, ring: "", author: "OrbitX" },
+  { id: "neon-night", name: "Neon Night", wallpaper: "midnight", accent: "#c084fc", radius: 24, ring: "0 0 0 1px rgba(192,132,252,.45), 0 0 18px rgba(192,132,252,.25)", author: "OrbitX" },
+  { id: "ocean-trader", name: "Ocean Trader", wallpaper: "ocean", accent: "#2dd4bf", radius: 999, ring: "", author: "OrbitX" },
+];
+
+const NOTIFICATIONS_KEY = "orbitxos:notifications:v1";
+const ALERTS_KEY = "orbitxos:alerts:v1";
+const DESK_WIDGETS_KEY = "orbitxos:desk-widgets:v1";
+const INSTALLED_KEY = "orbitxos:installed:v1";
+const PACKS_KEY = "orbitxos:packs:v1";
+const LOCK_KEY = "orbitxos:lock:v1";
+const DND_KEY = "orbitxos:dnd:v1";
+const SYNC_META_KEY = "orbitxos:sync-meta:v1";
+const ACTIVE_PACK_KEY = "orbitxos:active-pack:v1";
+
+export function loadOsNotifications(): OsNotification[] {
+  const saved = readJson<OsNotification[]>(NOTIFICATIONS_KEY);
+  return Array.isArray(saved) ? saved.filter((n) => n && typeof n.id === "string") : [];
+}
+export function saveOsNotifications(n: OsNotification[]) {
+  writeJson(NOTIFICATIONS_KEY, n.slice(0, 100));
+}
+
+export function loadOsAlerts(): OsPriceAlert[] {
+  const saved = readJson<OsPriceAlert[]>(ALERTS_KEY);
+  return Array.isArray(saved) ? saved.filter((a) => a && typeof a.mint === "string") : [];
+}
+export function saveOsAlerts(a: OsPriceAlert[]) {
+  writeJson(ALERTS_KEY, a);
+}
+
+export function loadDeskWidgets(): DeskWidget[] {
+  const saved = readJson<DeskWidget[]>(DESK_WIDGETS_KEY);
+  if (!Array.isArray(saved)) return [];
+  return saved.filter(
+    (w) => w && (w.type === "ticker" || w.type === "trending" || w.type === "alerts"),
+  );
+}
+export function saveDeskWidgets(w: DeskWidget[]) {
+  writeJson(DESK_WIDGETS_KEY, w);
+}
+
+export function loadInstalledApps(): InstalledApp[] {
+  const saved = readJson<InstalledApp[]>(INSTALLED_KEY);
+  return Array.isArray(saved) ? saved.filter((a) => a && typeof a.key === "string" && typeof a.href === "string") : [];
+}
+export function saveInstalledApps(a: InstalledApp[]) {
+  writeJson(INSTALLED_KEY, a);
+}
+
+export function loadThemePacks(): ThemePack[] {
+  const saved = readJson<ThemePack[]>(PACKS_KEY);
+  return Array.isArray(saved) && saved.length ? saved : DEFAULT_THEME_PACKS;
+}
+export function saveThemePacks(p: ThemePack[]) {
+  writeJson(PACKS_KEY, p);
+}
+
+export interface LockState {
+  enabled: boolean;
+  pinHash: string; // sha-256 hex of the PIN, device-local only
+}
+export function loadLockState(): LockState {
+  const saved = readJson<LockState>(LOCK_KEY);
+  return saved && typeof saved.pinHash === "string" ? saved : { enabled: false, pinHash: "" };
+}
+export function saveLockState(s: LockState) {
+  writeJson(LOCK_KEY, s);
+}
+
+export function loadDnd(): boolean {
+  return readJson<boolean>(DND_KEY) === true;
+}
+export function saveDnd(v: boolean) {
+  writeJson(DND_KEY, v);
+}
+
+export function loadSyncMeta(): { lastSyncAt: number } {
+  const saved = readJson<{ lastSyncAt: number }>(SYNC_META_KEY);
+  return saved && typeof saved.lastSyncAt === "number" ? saved : { lastSyncAt: 0 };
+}
+export function saveSyncMeta(m: { lastSyncAt: number }) {
+  writeJson(SYNC_META_KEY, m);
+}
+
+export function loadActivePackId(): string {
+  const saved = readJson<string>(ACTIVE_PACK_KEY);
+  return typeof saved === "string" && saved ? saved : "orbit-gold";
+}
+export function saveActivePackId(id: string) {
+  writeJson(ACTIVE_PACK_KEY, id);
+}
+
+/** SHA-256 hex of a short PIN (WebCrypto; falls back to a plain hash). */
+export async function hashPin(pin: string): Promise<string> {
+  try {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`orbitx-os-pin:${pin}`));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    let h = 0;
+    for (const c of pin) h = (h * 31 + c.charCodeAt(0)) | 0;
+    return `fallback:${h}`;
+  }
+}

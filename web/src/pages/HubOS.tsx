@@ -243,6 +243,7 @@ export default function HubOS() {
       apps={allApps}
       desktopApps={desktopApps}
       gates={gates}
+      userId={user?.id ?? null}
       userName={userName}
       userSub={userSub}
       userInitial={userInitial}

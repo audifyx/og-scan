@@ -14,7 +14,10 @@ export type OsWindowKind =
   | "apps"
   | "pulse"
   | "widgets"
-  | "widget-library";
+  | "widget-library"
+  | "browser"
+  | "store"
+  | "themes";
 
 export interface OsWindow {
   /** Built-ins use their kind as id; apps use `app:<key>`. */
@@ -29,6 +32,10 @@ export interface OsWindow {
   z: number;
   minimized: boolean;
   maximized: boolean;
+  /** Pinned windows render above every normal window (mini-player). */
+  pinned?: boolean;
+  /** App windows opened to a specific URL (e.g. DEX with ?mint=…). */
+  hrefOverride?: string;
 }
 
 export interface OsWindowsState {
@@ -45,8 +52,10 @@ export type OsWindowsAction =
   | { type: "minimize"; id: string }
   | { type: "restore"; id: string }
   | { type: "toggle-maximize"; id: string }
+  | { type: "toggle-pin"; id: string }
   | { type: "move"; id: string; x: number; y: number }
-  | { type: "resize"; id: string; w: number; h: number };
+  | { type: "resize"; id: string; w: number; h: number }
+  | { type: "snap"; id: string; x: number; y: number; w: number; h: number };
 
 export function osWindowsReducer(
   state: OsWindowsState,
@@ -102,6 +111,22 @@ export function osWindowsReducer(
         ...state,
         windows: state.windows.map((w) =>
           w.id === action.id ? { ...w, maximized: !w.maximized } : w,
+        ),
+      };
+    case "toggle-pin":
+      return {
+        ...state,
+        windows: state.windows.map((w) =>
+          w.id === action.id ? { ...w, pinned: !w.pinned } : w,
+        ),
+      };
+    case "snap":
+      return {
+        ...state,
+        windows: state.windows.map((w) =>
+          w.id === action.id
+            ? { ...w, x: action.x, y: action.y, w: action.w, h: action.h, maximized: false }
+            : w,
         ),
       };
     case "move":
