@@ -26,6 +26,11 @@ function useMenuApps(): PlatformApp[] {
 /* Hide on marketing / auth / embeds — show FAB everywhere else in the app. */
 // App wheel shows on every route — no hide lists.
 
+/** Quick-access FAB visibility. Hidden per user request 2026-10-25
+ *  ("no longer need it" — for now). Set true to bring the gold OBX
+ *  button back; nothing else needs to change. */
+const FAB_VISIBLE = false;
+
 const POS_KEY = "orbitx.platformFab.pos.v2";
 const FAB_SIZE = 58;
 
@@ -194,7 +199,7 @@ export function PlatformDock() {
     setOpen((o) => !o);
   }, []);
 
-  if (!visibleOn(pathname)) return null;
+  if (!FAB_VISIBLE || !visibleOn(pathname)) return null;
 
   const vw = typeof window !== "undefined" ? window.innerWidth : 400;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
