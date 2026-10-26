@@ -150,22 +150,38 @@ function fmtUsd(n: number | null, digits = 2): string {
  */
 function XEmbed({ handle }: { handle: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    setFailed(false);
     const w = window as unknown as { twttr?: { widgets: { load: (el?: HTMLElement) => void } } };
     if (w.twttr?.widgets) {
       w.twttr.widgets.load(ref.current ?? undefined);
-      return;
-    }
-    // Load widgets.js once; on load it scans the document and converts the
-    // anchor below into a timeline. If it never loads (offline), the anchor
-    // itself remains as a link that opens in a new tab.
-    if (!document.querySelector('script[src="https://platform.twitter.com/widgets.js"]')) {
+    } else if (
+      // Load widgets.js once; on load it scans the document and converts the
+      // anchor below into a timeline. If it never loads (offline), the anchor
+      // itself remains as a link that opens in a new tab.
+      !document.querySelector('script[src="https://platform.twitter.com/widgets.js"]')
+    ) {
       const s = document.createElement("script");
       s.src = "https://platform.twitter.com/widgets.js";
       s.async = true;
       document.head.appendChild(s);
     }
+    // widgets.js gives no error callback, so detect failure plainly: if no
+    // timeline iframe appears, say so instead of leaving a blank box. The
+    // observer clears a false positive the moment a late iframe lands.
+    const t = window.setTimeout(() => {
+      if (ref.current && !ref.current.querySelector("iframe")) setFailed(true);
+    }, 8000);
+    const obs = new MutationObserver(() => {
+      if (ref.current?.querySelector("iframe")) setFailed(false);
+    });
+    if (ref.current) obs.observe(ref.current, { childList: true, subtree: true });
+    return () => {
+      window.clearTimeout(t);
+      obs.disconnect();
+    };
   }, [handle]);
 
   return (
@@ -182,6 +198,13 @@ function XEmbed({ handle }: { handle: string }) {
       >
         Tweets by @{handle}
       </a>
+      {failed && (
+        <p className="oxos-xembed__fail">
+          Couldn't load @{handle}'s timeline — the account may not exist, be protected, or X's widget
+          script was blocked (ad-blockers and Brave shields block it). Try another handle, or open the
+          full app.
+        </p>
+      )}
     </div>
   );
 }

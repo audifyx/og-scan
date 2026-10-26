@@ -1318,6 +1318,7 @@
 .oxos-xview__row .oxos-input { flex: 1; min-width: 0; }
 .oxos-xembed { flex: 1; min-height: 0; }
 .oxos-xembed iframe { width: 100% !important; }
+.oxos-xembed__fail { color: rgba(244, 244, 245, 0.7); font-size: 13px; margin: 12px 0 0; }
 
 /* App Store + Theme Store. */
 .oxos-store, .oxos-themes {
