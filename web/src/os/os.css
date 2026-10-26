@@ -1303,6 +1303,22 @@
 .oxos-browser__blocked h3 { margin: 0; }
 .oxos-browser__blocked p { margin: 0; color: rgba(244, 244, 245, 0.65); font-size: 13px; }
 
+/* Embedded X timeline (official widgets.js) for x.com / twitter.com tabs. */
+.oxos-xview {
+  height: 100%;
+  overflow: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.oxos-xview h3 { margin: 0; }
+.oxos-xview p { margin: 0; color: rgba(244, 244, 245, 0.65); font-size: 13px; }
+.oxos-xview__row { display: flex; gap: 8px; }
+.oxos-xview__row .oxos-input { flex: 1; min-width: 0; }
+.oxos-xembed { flex: 1; min-height: 0; }
+.oxos-xembed iframe { width: 100% !important; }
+
 /* App Store + Theme Store. */
 .oxos-store, .oxos-themes {
   padding: 16px;

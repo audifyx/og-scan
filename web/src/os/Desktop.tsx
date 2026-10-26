@@ -141,6 +141,51 @@ function fmtUsd(n: number | null, digits = 2): string {
   return `$${n < 0.01 && n > 0 ? n.toFixed(6) : n.toFixed(digits)}`;
 }
 
+/**
+ * Official X timeline embed (platform.twitter.com/widgets.js).
+ * Full x.com can never load in an iframe — X sends X-Frame-Options: DENY
+ * and frame-ancestors 'none' — so this is the real embed path: read any
+ * public profile's timeline inside the OS. Posting, DMs and login stay in
+ * the full app, one tap away in a new tab.
+ */
+function XEmbed({ handle }: { handle: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const w = window as unknown as { twttr?: { widgets: { load: (el?: HTMLElement) => void } } };
+    if (w.twttr?.widgets) {
+      w.twttr.widgets.load(ref.current ?? undefined);
+      return;
+    }
+    // Load widgets.js once; on load it scans the document and converts the
+    // anchor below into a timeline. If it never loads (offline), the anchor
+    // itself remains as a link that opens in a new tab.
+    if (!document.querySelector('script[src="https://platform.twitter.com/widgets.js"]')) {
+      const s = document.createElement("script");
+      s.src = "https://platform.twitter.com/widgets.js";
+      s.async = true;
+      document.head.appendChild(s);
+    }
+  }, [handle]);
+
+  return (
+    <div ref={ref} className="oxos-xembed">
+      <a
+        key={handle}
+        className="twitter-timeline"
+        data-theme="dark"
+        data-chrome="noheader noborders transparent"
+        data-height="600"
+        href={`https://twitter.com/${handle}`}
+        target="_blank"
+        rel="noopener"
+      >
+        Tweets by @{handle}
+      </a>
+    </div>
+  );
+}
+
 export default function Desktop(props: DesktopProps) {
   const { apps, desktopApps, gates } = props;
   const [ws, dispatch] = useReducer(osWindowsReducer, EMPTY_OS_WINDOWS);
@@ -194,6 +239,8 @@ export default function Desktop(props: DesktopProps) {
     { id: "tab-1", url: "https://dexscreener.com", title: "DexScreener" },
   ]);
   const [browserActiveId, setBrowserActiveId] = useState("tab-1");
+  const [xHandle, setXHandle] = useState("orbitx_wrld");
+  const [xHandleInput, setXHandleInput] = useState("orbitx_wrld");
   const [spotTokens, setSpotTokens] = useState<TokenSearchRow[]>([]);
   const [storeQ, setStoreQ] = useState("");
   const [storeListings, setStoreListings] = useState<DevMarketListing[]>([]);
@@ -938,6 +985,16 @@ export default function Desktop(props: DesktopProps) {
         setBrowserTabs((prev) =>
           prev.map((t) => (t.id === activeTab.id ? { ...t, url: clean, title: hostOf(clean) || "Browser" } : t)),
         );
+        // X profile URLs (x.com/<handle>) retarget the embedded timeline.
+        const host = hostOf(clean);
+        if (host === "x.com" || host === "twitter.com") {
+          const seg = clean.split("?")[0].replace(/^https?:\/\/[^/]+\//, "").split("/")[0] ?? "";
+          const reserved = new Set(["home", "explore", "notifications", "messages", "search", "settings", "i", "intent"]);
+          if (/^[A-Za-z0-9_]{1,15}$/.test(seg) && !reserved.has(seg.toLowerCase())) {
+            setXHandle(seg);
+            setXHandleInput(seg);
+          }
+        }
       };
       const newTab = (url: string, title: string) => {
         const id = `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
@@ -1037,16 +1094,60 @@ export default function Desktop(props: DesktopProps) {
               </div>
               <div className="oxos-browser__view">
                 {blocked ? (
-                  <div className="oxos-browser__blocked">
-                    <h3>{hostOf(activeTab.url)} doesn't allow embedding</h3>
-                    <p>
-                      Some sites (X, Discord, YouTube) refuse to load inside any app. Open it in a full
-                      browser tab instead — your OrbitX desktop stays open underneath.
-                    </p>
-                    <button type="button" className="oxos-btn" onClick={() => window.open(activeTab.url, "_blank", "noopener")}>
-                      Open {hostOf(activeTab.url)} in a new tab
-                    </button>
-                  </div>
+                  (() => {
+                    const h = hostOf(activeTab.url);
+                    if (h !== "x.com" && h !== "twitter.com") {
+                      return (
+                        <div className="oxos-browser__blocked">
+                          <h3>{hostOf(activeTab.url)} doesn't allow embedding</h3>
+                          <p>
+                            Some sites (Discord, YouTube) refuse to load inside any app. Open it in a full
+                            browser tab instead — your OrbitX desktop stays open underneath.
+                          </p>
+                          <button type="button" className="oxos-btn" onClick={() => window.open(activeTab.url, "_blank", "noopener")}>
+                            Open {hostOf(activeTab.url)} in a new tab
+                          </button>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="oxos-xview">
+                        <h3>X, embedded in OrbitX</h3>
+                        <p>
+                          X blocks its full app from loading inside any app, so this is the official X
+                          timeline embed — read any public profile right here. For posting, DMs and
+                          your own feed, open the full app in a new tab.
+                        </p>
+                        <div className="oxos-xview__row">
+                          <input
+                            className="oxos-input"
+                            value={xHandleInput}
+                            onChange={(e) => setXHandleInput(e.target.value)}
+                            placeholder="@handle"
+                            aria-label="X handle"
+                          />
+                          <button
+                            type="button"
+                            className="oxos-btn"
+                            onClick={() => {
+                              const clean = xHandleInput.trim().replace(/^@/, "");
+                              if (/^[A-Za-z0-9_]{1,15}$/.test(clean)) setXHandle(clean);
+                            }}
+                          >
+                            Show
+                          </button>
+                          <button
+                            type="button"
+                            className="oxos-btn oxos-btn--ghost"
+                            onClick={() => window.open(activeTab.url, "_blank", "noopener")}
+                          >
+                            Open full X ↗
+                          </button>
+                        </div>
+                        <XEmbed handle={xHandle} />
+                      </div>
+                    );
+                  })()
                 ) : (
                   browserTabs.map((t) => (
                     <iframe
