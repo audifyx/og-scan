@@ -65,6 +65,21 @@ import {
   saveOsLayouts,
   loadOsTasks,
   saveOsTasks,
+  loadOsRecent,
+  saveOsRecent,
+  loadOsFavorites,
+  saveOsFavorites,
+  loadOsWidgetPresets,
+  saveOsWidgetPresets,
+  loadOsTokenHistory,
+  saveOsTokenHistory,
+  loadOsSession,
+  saveOsSession,
+  loadOsThemeHistory,
+  saveOsThemeHistory,
+  type RecentEntry,
+  type SessionEntry,
+  type WidgetPreset,
   loadOsCalEvents,
   saveOsCalEvents,
   loadOsClosed,
@@ -119,9 +134,19 @@ import {
   folderedKeys,
   removeFromFolder,
   renameFolder,
+  setFolderColor,
   ungroupFolder,
   type OsFolder,
 } from "./osFolders";
+import {
+  DesktopCtxMenu,
+  LiveWallpaper,
+  ThemeMock,
+  WindowOptionsMenu,
+  playBootChime,
+  playUiBlip,
+  wallpaperForSeason,
+} from "./osWave6";
 import { AppMark } from "./AppMark";
 import "./os.css";
 
@@ -333,10 +358,13 @@ function OrbitxPulse() {
 }
 
 /** Notes — list + editor. State lives in Desktop (persistence + sync). */
-function NotesApp({ notes, onChange }: { notes: OsNote[]; onChange: (n: OsNote[]) => void }) {
+function NotesApp({ notes, onChange, openNoteId }: { notes: OsNote[]; onChange: (n: OsNote[]) => void; openNoteId?: string | null }) {
   const [q, setQ] = useState("");
   const [folderFilter, setFolderFilter] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
+  useEffect(() => {
+    if (openNoteId) setActiveId(openNoteId);
+  }, [openNoteId]);
   const active = notes.find((n) => n.id === activeId) ?? null;
   const folders = [...new Set(notes.map((n) => n.folder).filter((f): f is string => !!f))].sort();
   const filtered = notes.filter(
@@ -586,7 +614,21 @@ export default function Desktop(props: DesktopProps) {
   const [cmdOpen, setCmdOpen] = useState(false);
   const [cmdQ, setCmdQ] = useState("");
   const [cmdTokens, setCmdTokens] = useState<TokenSearchRow[]>([]);
-  const [snapPreview, setSnapPreview] = useState<"left" | "right" | "max" | null>(null);
+  const [snapPreview, setSnapPreview] = useState<"left" | "right" | "max" | "tl" | "tr" | "bl" | "br" | null>(null);
+  const [winMenuId, setWinMenuId] = useState<string | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const [jumpNoteId, setJumpNoteId] = useState<string | null>(null);
+  const [startJump, setStartJump] = useState<string | null>(null);
+  const [recent, setRecent] = useState<RecentEntry[]>(loadOsRecent);
+  const [favorites, setFavorites] = useState<string[]>(loadOsFavorites);
+  const [widgetPresets, setWidgetPresets] = useState<WidgetPreset[]>(loadOsWidgetPresets);
+  const [presetName, setPresetName] = useState("");
+  const [tokenHistory, setTokenHistory] = useState<{ mint: string; symbol: string }[]>(loadOsTokenHistory);
+  const [themeHistory, setThemeHistory] = useState<ThemePack[]>(loadOsThemeHistory);
+  const [ruleTarget, setRuleTarget] = useState("notes");
+  const [ruleMaximized, setRuleMaximized] = useState(false);
+  const [ruleDesktop, setRuleDesktop] = useState("");
+  const sessionRestored = useRef(false);
   const [dim, setDim] = useState(0);
   const [browserTabs, setBrowserTabs] = useState<{ id: string; url: string; title: string; private?: boolean }[]>(() => loadBrowserTabs() ?? [
     { id: "tab-1", url: "https://dexscreener.com", title: "DexScreener" },
@@ -602,6 +644,9 @@ export default function Desktop(props: DesktopProps) {
   const [themeWallpaper, setThemeWallpaper] = useState("space");
   const [themeAccent, setThemeAccent] = useState("#e8b84a");
   const [themeRadius, setThemeRadius] = useState(18);
+  const [themeShape, setThemeShape] = useState<"rounded" | "circle" | "hex">("rounded");
+  const [themeFont, setThemeFont] = useState<"system" | "serif" | "mono">("system");
+  const [themeFontScale, setThemeFontScale] = useState<"s" | "m" | "l">("m");
   const [themeImport, setThemeImport] = useState("");
   const [alertQ, setAlertQ] = useState("");
   const [alertRows, setAlertRows] = useState<TokenSearchRow[]>([]);
@@ -669,6 +714,13 @@ export default function Desktop(props: DesktopProps) {
   const isPhone = viewportW < 768;
   const activeDesktop = desktops.find((d) => d.id === activeDesktopId) ?? desktops[0];
   const visibleWindows = ws.windows.filter((w) => w.pinned || !w.desktopId || w.desktopId === activeDesktop?.id);
+  // Tab groups (idea bank #1): only the most recently focused member of a
+  // group renders; the others stay open (taskbar can focus them back).
+  const groupMaxZ = new Map<string, number>();
+  for (const w of visibleWindows) {
+    if (w.tabGroupId) groupMaxZ.set(w.tabGroupId, Math.max(groupMaxZ.get(w.tabGroupId) ?? 0, w.z));
+  }
+  const renderWindows = visibleWindows.filter((w) => !w.tabGroupId || groupMaxZ.get(w.tabGroupId) === w.z);
 
   const pushNotification = (title: string, body: string, kind: OsNotification["kind"]) => {
     const n: OsNotification = {
@@ -864,12 +916,58 @@ export default function Desktop(props: DesktopProps) {
     return { x: Math.max(0, Math.round((vw - w) / 2)), y: Math.max(8, Math.round((vh - 84 - h) / 2)), w, h, narrow };
   };
 
+  /** Window rule for a target (builtin kind or `app:<key>`), if any. */
+  const ruleFor = (target: string) => (settings.windowRules ?? []).find((r) => r.target === target);
+
+  /** Recently used (idea bank #51): most recent first, cap 8. */
+  const recordRecent = (id: string, label: string) => {
+    setRecent((prev) => {
+      const next = [{ id, label }, ...prev.filter((r) => r.id !== id)].slice(0, 8);
+      saveOsRecent(next);
+      return next;
+    });
+  };
+
+  /** Recent token searches (idea bank #54 jump lists: DEX recent tokens). */
+  const recordToken = (mint: string, symbol: string) => {
+    setTokenHistory((prev) => {
+      const next = [{ mint, symbol }, ...prev.filter((t) => t.mint !== mint)].slice(0, 8);
+      saveOsTokenHistory(next);
+      return next;
+    });
+  };
+
+  const toggleFavorite = (key: string) => {
+    setFavorites((prev) => {
+      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+      saveOsFavorites(next);
+      return next;
+    });
+  };
+
+  /** New note from the desktop (context menu / double-click, #16/#85). */
+  const newDesktopNote = () => {
+    const n: OsNote = { id: `note-${Date.now().toString(36)}`, title: "", body: "", updatedAt: Date.now() };
+    setNotes((prev) => [n, ...prev]);
+    setJumpNoteId(n.id);
+    openBuiltin("notes", "Notes");
+  };
+
+  /** New empty folder from the desktop context menu (#16). */
+  const newDesktopFolder = () => {
+    const id = `folder-${Date.now().toString(36)}`;
+    setFolders((prev) => [...prev, { id, name: "Folder", appKeys: [] }]);
+    setOpenFolderId(id);
+  };
+
   const openBuiltin = (kind: OsWindowKind, title: string) => {
     const r = centerRect();
-    dispatch({ type: "open", window: { id: kind, kind, title, x: r.x, y: r.y, w: r.w, h: r.h, desktopId: activeDesktopId } });
-    if (r.narrow) dispatch({ type: "toggle-maximize", id: kind });
+    const rule = ruleFor(kind);
+    dispatch({ type: "open", window: { id: kind, kind, title, x: r.x, y: r.y, w: r.w, h: r.h, desktopId: rule?.desktopId ?? activeDesktopId } });
+    if (r.narrow || rule?.maximized) dispatch({ type: "toggle-maximize", id: kind });
     setActiveWin(kind);
     setStartOpen(false);
+    recordRecent(kind, title);
   };
 
   const openBrowserTab = (url: string, title?: string) => {
@@ -883,13 +981,17 @@ export default function Desktop(props: DesktopProps) {
       setBrowserActiveId(id);
     }
     const r = centerRect();
-    dispatch({ type: "open", window: { id: "browser", kind: "browser", title: "Browser", x: r.x, y: r.y, w: r.w, h: r.h, desktopId: activeDesktopId } });
+    const rule = ruleFor("browser");
+    dispatch({ type: "open", window: { id: "browser", kind: "browser", title: "Browser", x: r.x, y: r.y, w: r.w, h: r.h, desktopId: rule?.desktopId ?? activeDesktopId } });
+    if (rule?.maximized) dispatch({ type: "toggle-maximize", id: "browser" });
     setActiveWin("browser");
     setStartOpen(false);
     setCmdOpen(false);
+    recordRecent("browser", "Browser");
   };
 
   const openApp = (app: PlatformApp) => {
+    recordRecent(app.key, app.name);
     // Installed store apps always open inside the OrbitX Browser, never a
     // bare new tab — the OS keeps you inside the OS.
     if (installed.some((i) => i.key === app.key)) {
@@ -902,21 +1004,111 @@ export default function Desktop(props: DesktopProps) {
     }
     const id = `app:${app.key}`;
     const r = centerRect();
-    dispatch({ type: "open", window: { id, kind: "app", appKey: app.key, title: app.name, x: r.x, y: r.y, w: r.w, h: r.h, desktopId: activeDesktopId } });
-    if (r.narrow) dispatch({ type: "toggle-maximize", id });
+    const rule = ruleFor(`app:${app.key}`);
+    dispatch({ type: "open", window: { id, kind: "app", appKey: app.key, title: app.name, x: r.x, y: r.y, w: r.w, h: r.h, desktopId: rule?.desktopId ?? activeDesktopId } });
+    if (r.narrow || rule?.maximized) dispatch({ type: "toggle-maximize", id });
     setActiveWin(id);
     setStartOpen(false);
   };
 
   /** Open a native app at a specific URL (Spotlight token → DEX ?mint=…). */
   const openAppWithHref = (app: PlatformApp, href: string) => {
+    recordRecent(app.key, app.name);
     const id = `app:${app.key}`;
     const r = centerRect();
-    dispatch({ type: "open", window: { id, kind: "app", appKey: app.key, title: app.name, x: r.x, y: r.y, w: r.w, h: r.h, hrefOverride: href, desktopId: activeDesktopId } });
-    if (r.narrow) dispatch({ type: "toggle-maximize", id });
+    const rule = ruleFor(`app:${app.key}`);
+    dispatch({ type: "open", window: { id, kind: "app", appKey: app.key, title: app.name, x: r.x, y: r.y, w: r.w, h: r.h, hrefOverride: href, desktopId: rule?.desktopId ?? activeDesktopId } });
+    if (r.narrow || rule?.maximized) dispatch({ type: "toggle-maximize", id });
     setActiveWin(id);
     setStartOpen(false);
     setCmdOpen(false);
+  };
+
+  // Session restore (idea bank #8): reopen the last session's windows on
+  // load. Saves only the window set (not drag geometry) so pointer drags
+  // don't spam localStorage; restore re-centers each window.
+  const sessionSig = useRef("");
+  useEffect(() => {
+    const sig = ws.windows
+      .map((w) => `${w.id}|${w.kind}|${w.maximized ? 1 : 0}|${w.desktopId ?? ""}`)
+      .join(";");
+    if (sig === sessionSig.current) return;
+    sessionSig.current = sig;
+    saveOsSession(
+      ws.windows.map((w) => ({ id: w.id, kind: w.kind, appKey: w.appKey, title: w.title, maximized: w.maximized, desktopId: w.desktopId })),
+    );
+  }, [ws.windows]);
+  useEffect(() => {
+    if (sessionRestored.current) return;
+    sessionRestored.current = true;
+    if (settings.sessionRestore === false) return;
+    const saved = loadOsSession();
+    for (const e of saved) {
+      const r = centerRect();
+      if (e.kind === "app" && e.appKey) {
+        const a = appByKey.get(e.appKey);
+        if (!a || a.external || installed.some((i) => i.key === a.key)) continue;
+        dispatch({ type: "open", window: { id: e.id, kind: "app", appKey: e.appKey, title: e.title, x: r.x, y: r.y, w: r.w, h: r.h, desktopId: e.desktopId } });
+        if (e.maximized) dispatch({ type: "toggle-maximize", id: e.id });
+      } else if (e.kind !== "app") {
+        dispatch({ type: "open", window: { id: e.id, kind: e.kind as OsWindowKind, title: e.title, x: r.x, y: r.y, w: r.w, h: r.h, desktopId: e.desktopId } });
+        if (e.maximized) dispatch({ type: "toggle-maximize", id: e.id });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Boot chime (idea bank #84): first click after load (sticky activation
+  // makes the AudioContext legal); the gate click itself counts.
+  useEffect(() => {
+    if (!settings.bootChime) return;
+    const h = () => {
+      playBootChime();
+      window.removeEventListener("pointerdown", h);
+    };
+    window.addEventListener("pointerdown", h);
+    return () => window.removeEventListener("pointerdown", h);
+  }, [settings.bootChime]);
+  // Seasonal theme (idea bank #946): wallpaper follows the season on load.
+  useEffect(() => {
+    if (!settings.seasonalTheme) return;
+    const want = wallpaperForSeason(new Date());
+    if (settings.wallpaper !== want) setSettings((prev) => ({ ...prev, wallpaper: want }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.seasonalTheme]);
+
+  /** Arrange all open windows (idea bank #5: snap layouts menu). */
+  const arrangeWindows = (mode: "halves" | "grid" | "stack") => {
+    const el = rootRef.current;
+    const rect = el?.getBoundingClientRect();
+    const vw = rect?.width ?? window.innerWidth;
+    const vh = rect?.height ?? window.innerHeight;
+    const wins = visibleWindows.filter((w) => !w.minimized);
+    if (!wins.length) return;
+    if (mode === "stack") {
+      wins.forEach((w, i) => {
+        dispatch({ type: "snap", id: w.id, x: 24 + i * 32, y: 24 + i * 32, w: Math.min(640, vw - 64), h: Math.min(480, vh - 140) });
+      });
+      return;
+    }
+    if (mode === "halves") {
+      const half = Math.floor(vw / 2);
+      wins.forEach((w, i) => {
+        dispatch({ type: "snap", id: w.id, x: i % 2 === 0 ? 0 : half, y: 0, w: half, h: vh });
+      });
+      return;
+    }
+    const cols = Math.ceil(Math.sqrt(wins.length));
+    const rows = Math.ceil(wins.length / cols);
+    wins.forEach((w, i) => {
+      dispatch({
+        type: "snap",
+        id: w.id,
+        x: Math.floor((i % cols) * vw / cols),
+        y: Math.floor(Math.floor(i / cols) * vh / rows),
+        w: Math.floor(vw / cols),
+        h: Math.floor(vh / rows),
+      });
+    });
   };
 
   /** Social in a small window pinned above everything else — the voice mini-player. */
@@ -965,8 +1157,21 @@ export default function Desktop(props: DesktopProps) {
   const applyThemePack = (p: ThemePack) => {
     if (!suppressPrevRef.current) prevPackIdRef.current = activePackId;
     suppressPrevRef.current = false;
-    setSettings((s) => ({ ...s, wallpaper: p.wallpaper, accent: p.accent, accentGrad: null }));
+    setSettings((s) => ({
+      ...s,
+      wallpaper: p.wallpaper,
+      accent: p.accent,
+      accentGrad: null,
+      ...(p.shape ? { iconShape: p.shape } : {}),
+      ...(p.fontFamily ? { fontFamily: p.fontFamily } : {}),
+      ...(p.fontScale ? { uiScale: p.fontScale } : {}),
+    }));
     setActivePackId(p.id);
+    setThemeHistory((prev) => {
+      const next = [p, ...prev.filter((x) => x.id !== p.id)].slice(0, 10);
+      saveOsThemeHistory(next);
+      return next;
+    });
     pushNotification("Theme applied", p.name, "system");
   };
 
@@ -1060,12 +1265,17 @@ export default function Desktop(props: DesktopProps) {
         x: Math.min(rect.width - 80, Math.max(-200, d.origX + (e.clientX - d.startX))),
         y: Math.min(rect.height - 110, Math.max(0, d.origY + (e.clientY - d.startY))),
       });
-      // Snap preview: drag to a screen edge to tile, to the top to maximize.
+      // Snap preview: corners tile quarters (#4), edges tile halves, top maximizes.
       const px = e.clientX - rect.left;
       const py = e.clientY - rect.top;
-      if (px <= 14) setSnapPreview("left");
-      else if (px >= rect.width - 14) setSnapPreview("right");
-      else if (py <= 14) setSnapPreview("max");
+      const edge = 14;
+      if (px <= edge && py <= edge) setSnapPreview("tl");
+      else if (px >= rect.width - edge && py <= edge) setSnapPreview("tr");
+      else if (px <= edge && py >= rect.height - edge) setSnapPreview("bl");
+      else if (px >= rect.width - edge && py >= rect.height - edge) setSnapPreview("br");
+      else if (px <= edge) setSnapPreview("left");
+      else if (px >= rect.width - edge) setSnapPreview("right");
+      else if (py <= edge) setSnapPreview("max");
       else setSnapPreview(null);
     } else if (d.type === "widget") {
       const x = Math.min(92, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
@@ -1102,6 +1312,17 @@ export default function Desktop(props: DesktopProps) {
         if (rect) {
           if (snapPreview === "max") {
             dispatch({ type: "toggle-maximize", id: d.id });
+          } else if (snapPreview === "tl" || snapPreview === "tr" || snapPreview === "bl" || snapPreview === "br") {
+            const halfW = Math.floor(rect.width / 2);
+            const halfH = Math.floor(rect.height / 2);
+            dispatch({
+              type: "snap",
+              id: d.id,
+              x: snapPreview === "tr" || snapPreview === "br" ? halfW : 0,
+              y: snapPreview === "bl" || snapPreview === "br" ? halfH : 0,
+              w: halfW,
+              h: halfH,
+            });
           } else {
             const half = Math.floor(rect.width / 2);
             dispatch({
@@ -1229,6 +1450,9 @@ export default function Desktop(props: DesktopProps) {
     { id: "voice", label: "Voice mini-player", hint: "Pinned Social window", run: () => { setCmdOpen(false); openVoiceMiniPlayer(); } },
     { id: "sync", label: "Sync layout now", hint: "Account", run: () => { saveOsLayoutToCloud(currentLayout()); flushOsLayoutToCloud(); setSyncStatus("synced"); setCmdOpen(false); } },
     { id: "reset", label: "Reset icon layout", hint: "Desktop", run: () => { clearIconPositions(); setIconPos({}); setCmdOpen(false); } },
+    { id: "arrange-halves", label: "Arrange windows: side by side", hint: "Tile open windows", run: () => { setCmdOpen(false); arrangeWindows("halves"); } },
+    { id: "arrange-grid", label: "Arrange windows: grid", hint: "Tile open windows", run: () => { setCmdOpen(false); arrangeWindows("grid"); } },
+    { id: "arrange-stack", label: "Arrange windows: stack", hint: "Cascade open windows", run: () => { setCmdOpen(false); arrangeWindows("stack"); } },
     { id: "clear-notif", label: "Clear notifications", hint: "Notifications", run: () => { setNotifications([]); setCmdOpen(false); } },
   ];
   // Calculator (#73): a bare arithmetic query shows its result as the
@@ -1255,6 +1479,11 @@ export default function Desktop(props: DesktopProps) {
     cmdQTrim && !cmdTokenMode
       ? allApps.filter((a) => `${a.name} ${a.caption}`.toLowerCase().includes(cmdQTrim.toLowerCase())).slice(0, 5)
       : [];
+  // Window search (idea bank #9): jump to any open window by title.
+  const cmdWindowHits =
+    cmdQTrim && !cmdTokenMode
+      ? ws.windows.filter((w) => w.title.toLowerCase().includes(cmdQTrim.toLowerCase())).slice(0, 5)
+      : [];
 
   const clock = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const dateStr = now.toLocaleDateString([], { month: "short", day: "numeric" });
@@ -1263,8 +1492,19 @@ export default function Desktop(props: DesktopProps) {
     return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
   })();
 
+  const iconBadge = (key: string): number => {
+    if (key === "tasks") return tasks.filter((t) => !t.done).length;
+    if (key === "calendar") {
+      const today = isoDay(new Date());
+      return calEvents.filter((e) => e.date === today).length;
+    }
+    if (key === "social") return notifications.filter((n) => n.kind === "social" && !n.read).length;
+    return 0;
+  };
+
   const iconButton = (app: PlatformApp, placed: boolean) => {
     const pos = iconPos[app.key];
+    const badge = iconBadge(app.key);
     return (
       <button
         key={app.key}
@@ -1282,6 +1522,7 @@ export default function Desktop(props: DesktopProps) {
         title={`${app.name} — drag to move, click to open, drop onto another app to folder them`}
       >
         {<AppMark app={app} className="oxos-icon__mark" />}
+        {badge > 0 && <span className="oxos-icon__badge">{badge > 99 ? "99+" : badge}</span>}
         <span className="oxos-icon__label">{app.name}</span>
       </button>
     );
@@ -1295,24 +1536,25 @@ export default function Desktop(props: DesktopProps) {
         key={f.id}
         type="button"
         className="oxos-icon oxos-folder"
+        style={placed && pos ? { left: `${pos.x}%`, top: `${pos.y}%` } : undefined}
         ref={(el) => {
           if (el) iconEls.current.set(`folder:${f.id}`, el);
           else iconEls.current.delete(`folder:${f.id}`);
         }}
-        style={placed && pos ? { left: `${pos.x}%`, top: `${pos.y}%` } : undefined}
         onPointerDown={(e) => {
           dragRef.current = { type: "icon", key: `folder:${f.id}`, startX: e.clientX, startY: e.clientY, moved: false };
         }}
         onContextMenu={(e) => e.preventDefault()}
         title={`${f.name} — drag to move, click to open, drop apps onto it to add them`}
       >
-        <span className="oxos-folder__grid">
+        <span className="oxos-folder__grid" style={f.color ? { background: f.color } : undefined}>
           {members.slice(0, 4).map((m) => (
             <span key={m.key} className="oxos-folder__mini" style={{ background: m.iconBg }}>
               {m.glyph}
             </span>
           ))}
         </span>
+        {members.length > 0 && <span className="oxos-icon__badge">{members.length}</span>}
         <span className="oxos-icon__label">{f.name}</span>
       </button>
     );
@@ -1440,7 +1682,7 @@ export default function Desktop(props: DesktopProps) {
       return <OrbitxPulse />;
     }
     if (w.kind === "notes") {
-      return <NotesApp notes={notes} onChange={setNotes} />;
+      return <NotesApp notes={notes} onChange={setNotes} openNoteId={jumpNoteId} />;
     }
     if (w.kind === "files") {
       return <FilesApp files={files} onChange={setFiles} />;
@@ -1923,6 +2165,7 @@ export default function Desktop(props: DesktopProps) {
                 >
                   {p.name[0]}
                 </span>
+                <ThemeMock wallpaper={p.wallpaper} accent={p.accent} radius={p.radius} shape={p.shape} />
                 <span className="oxos-store__meta">
                   <span>{p.name}</span>
                   <span>
@@ -1935,6 +2178,38 @@ export default function Desktop(props: DesktopProps) {
               </div>
             ))}
           </div>
+          <h3 className="oxos-h3">Wallpapers</h3>
+          <p className="oxos-hint">Apply a wallpaper without changing your accent (community wallpapers, #96).</p>
+          <div className="oxos-wallgrid">
+            {OS_WALLPAPERS.map((wp) => (
+              <button
+                key={wp.id}
+                type="button"
+                className={`oxos-wall oxos-wall--${wp.id}${settings.wallpaper === wp.id ? " is-on" : ""}`}
+                style={wp.id === "live" ? { background: "#0b0d1a" } : undefined}
+                onClick={() => setSettings((prev) => ({ ...prev, wallpaper: wp.id }))}
+              >
+                {wp.label}
+              </button>
+            ))}
+          </div>
+          {themeHistory.length > 0 && (
+            <>
+              <h3 className="oxos-h3">Recent themes</h3>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {themeHistory.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="oxos-btn oxos-btn--ghost"
+                    onClick={() => applyThemePack(p)}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <h3 className="oxos-h3">Create a theme</h3>
           <div className="oxos-themes__form">
             <input
@@ -1949,6 +2224,7 @@ export default function Desktop(props: DesktopProps) {
                   key={wp.id}
                   type="button"
                   className={`oxos-wall oxos-wall--${wp.id}${themeWallpaper === wp.id ? " is-on" : ""}`}
+                  style={wp.id === "live" ? { background: "#0b0d1a" } : undefined}
                   onClick={() => setThemeWallpaper(wp.id)}
                 >
                   {wp.label}
@@ -1978,6 +2254,60 @@ export default function Desktop(props: DesktopProps) {
                 onChange={(e) => setThemeRadius(Number(e.target.value))}
               />
             </label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span className="oxos-hint">Icon shape:</span>
+              {(
+                [
+                  ["rounded", "Rounded"],
+                  ["circle", "Circle"],
+                  ["hex", "Hexagon"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`oxos-btn oxos-btn--ghost${themeShape === id ? " is-on" : ""}`}
+                  onClick={() => setThemeShape(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span className="oxos-hint">Font:</span>
+              {(
+                [
+                  ["system", "System"],
+                  ["serif", "Serif"],
+                  ["mono", "Mono"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`oxos-btn oxos-btn--ghost${themeFont === id ? " is-on" : ""}`}
+                  onClick={() => setThemeFont(id)}
+                >
+                  {label}
+                </button>
+              ))}
+              {(
+                [
+                  ["s", "S"],
+                  ["m", "M"],
+                  ["l", "L"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`oxos-btn oxos-btn--ghost${themeFontScale === id ? " is-on" : ""}`}
+                  onClick={() => setThemeFontScale(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <button
               type="button"
               className="oxos-btn"
@@ -1991,6 +2321,9 @@ export default function Desktop(props: DesktopProps) {
                   radius: themeRadius,
                   ring: "",
                   author: "You",
+                  shape: themeShape,
+                  fontFamily: themeFont,
+                  fontScale: themeFontScale,
                 };
                 setPacks((prev) => [...prev, p]);
                 applyThemePack(p);
@@ -2030,13 +2363,16 @@ export default function Desktop(props: DesktopProps) {
                       const p: ThemePack = {
                         id: `pack-${Date.now().toString(36)}`,
                         name: raw.name,
-                        wallpaper: (["space", "midnight", "gold", "ocean"].includes(raw.wallpaper)
+                        wallpaper: (["space", "midnight", "gold", "ocean", "live"].includes(raw.wallpaper)
                           ? raw.wallpaper
                           : "space") as ThemePack["wallpaper"],
                         accent: raw.accent,
                         radius: typeof raw.radius === "number" ? raw.radius : 18,
                         ring: typeof raw.ring === "string" ? raw.ring : "",
                         author: "Imported",
+                        shape: ["rounded", "circle", "hex"].includes(raw.shape) ? raw.shape : undefined,
+                        fontFamily: ["system", "serif", "mono"].includes(raw.fontFamily) ? raw.fontFamily : undefined,
+                        fontScale: ["s", "m", "l"].includes(raw.fontScale) ? raw.fontScale : undefined,
                       };
                       setPacks((prev) => [...prev, p]);
                       applyThemePack(p);
@@ -2211,6 +2547,64 @@ export default function Desktop(props: DesktopProps) {
               >
                 Reset desktop icon layout
               </button>
+              <label className="oxos-toggle">
+                <span>Restore last session on load</span>
+                <input type="checkbox" checked={settings.sessionRestore !== false} onChange={(e) => set({ sessionRestore: e.target.checked })} />
+              </label>
+              <h3 className="oxos-h3">Window rules</h3>
+              <p className="oxos-hint">Decide how an app opens: maximized, or on a specific desktop.</p>
+              {(settings.windowRules ?? []).map((r) => (
+                <div key={r.target} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <span>{r.target}</span>
+                  <span className="oxos-hint">
+                    {r.maximized ? "maximized" : "windowed"}
+                    {r.desktopId ? ` · ${(desktops.find((d) => d.id === r.desktopId)?.name ?? "desktop")}` : " · current desktop"}
+                  </span>
+                  <button
+                    type="button"
+                    className="oxos-btn oxos-btn--ghost"
+                    onClick={() => set({ windowRules: (settings.windowRules ?? []).filter((x) => x.target !== r.target) })}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <select className="oxos-input" value={ruleTarget} onChange={(e) => setRuleTarget(e.target.value)} aria-label="Rule target">
+                  {["settings", "apps", "pulse", "widgets", "browser", "store", "themes", "feed", "notes", "files", "tasks", "calendar", "shortcuts"].map((k) => (
+                    <option key={k} value={k}>
+                      {k}
+                    </option>
+                  ))}
+                  {allApps.map((a) => (
+                    <option key={`app:${a.key}`} value={`app:${a.key}`}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+                <label className="oxos-toggle">
+                  <span>Maximized</span>
+                  <input type="checkbox" checked={ruleMaximized} onChange={(e) => setRuleMaximized(e.target.checked)} />
+                </label>
+                <select className="oxos-input" value={ruleDesktop} onChange={(e) => setRuleDesktop(e.target.value)} aria-label="Rule desktop">
+                  <option value="">Current desktop</option>
+                  {desktops.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="oxos-btn"
+                  onClick={() => {
+                    const rule = { target: ruleTarget, maximized: ruleMaximized || undefined, desktopId: ruleDesktop || undefined };
+                    set({ windowRules: [...(settings.windowRules ?? []).filter((x) => x.target !== ruleTarget), rule] });
+                  }}
+                >
+                  Add rule
+                </button>
+              </div>
               <h3 className="oxos-h3">Account sync</h3>
               <p className="oxos-hint">
                 {props.userId
@@ -2244,6 +2638,7 @@ export default function Desktop(props: DesktopProps) {
                     key={wp.id}
                     type="button"
                     className={`oxos-wall oxos-wall--${wp.id}${settings.wallpaper === wp.id ? " is-on" : ""}`}
+                    style={wp.id === "live" ? { background: "#0b0d1a" } : undefined}
                     onClick={() => set({ wallpaper: wp.id })}
                   >
                     {wp.label}
@@ -2487,6 +2882,54 @@ export default function Desktop(props: DesktopProps) {
                 value={settings.widgetOpacity ?? 100}
                 onChange={(e) => set({ widgetOpacity: Number(e.target.value) })}
               />
+              <h3 className="oxos-h3">Icon shape</h3>
+              <div style={{ display: "flex", gap: 8 }}>
+                {(
+                  [
+                    ["rounded", "Rounded"],
+                    ["circle", "Circle"],
+                    ["hex", "Hexagon"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`oxos-btn oxos-btn--ghost${(settings.iconShape ?? "rounded") === id ? " is-on" : ""}`}
+                    onClick={() => set({ iconShape: id })}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <h3 className="oxos-h3">Motion &amp; sound</h3>
+              <label className="oxos-toggle">
+                <span>Animate wallpaper (slow drift)</span>
+                <input type="checkbox" checked={!!settings.wallAnim} onChange={(e) => set({ wallAnim: e.target.checked })} />
+              </label>
+              <label className="oxos-toggle">
+                <span>Boot chime</span>
+                <input type="checkbox" checked={settings.bootChime !== false} onChange={(e) => set({ bootChime: e.target.checked })} />
+              </label>
+              <label className="oxos-toggle">
+                <span>UI sounds (soft click)</span>
+                <input type="checkbox" checked={!!settings.uiSounds} onChange={(e) => set({ uiSounds: e.target.checked })} />
+              </label>
+              <h3 className="oxos-h3">Accessibility</h3>
+              <label className="oxos-toggle">
+                <span>High contrast</span>
+                <input type="checkbox" checked={!!settings.highContrast} onChange={(e) => set({ highContrast: e.target.checked })} />
+              </label>
+              <label className="oxos-toggle">
+                <span>Seasonal wallpaper (auto by season)</span>
+                <input type="checkbox" checked={!!settings.seasonalTheme} onChange={(e) => set({ seasonalTheme: e.target.checked })} />
+              </label>
+              <button
+                type="button"
+                className="oxos-btn oxos-btn--ghost"
+                onClick={() => set({ highContrast: true, uiScale: "l", fontFamily: "system" })}
+              >
+                Accessibility preset: high contrast + large text
+              </button>
             </>
           )}
           {settingsNav === "account" && (
@@ -2599,6 +3042,26 @@ export default function Desktop(props: DesktopProps) {
                   Remove lock
                 </button>
               )}
+              <h3 className="oxos-h3">Lock screen</h3>
+              <input
+                className="oxos-input"
+                value={settings.lockMessage ?? ""}
+                onChange={(e) => set({ lockMessage: e.target.value })}
+                placeholder="Lock message (optional)"
+              />
+              <p className="oxos-hint">Lock wallpaper (static wallpapers only).</p>
+              <div className="oxos-wallgrid">
+                {OS_WALLPAPERS.filter((wp) => wp.id !== "live").map((wp) => (
+                  <button
+                    key={wp.id}
+                    type="button"
+                    className={`oxos-wall oxos-wall--${wp.id}${(settings.lockWallpaper ?? "space") === wp.id ? " is-on" : ""}`}
+                    onClick={() => set({ lockWallpaper: wp.id })}
+                  >
+                    {wp.label}
+                  </button>
+                ))}
+              </div>
             </>
           )}
           {settingsNav === "about" && (
@@ -2631,7 +3094,7 @@ export default function Desktop(props: DesktopProps) {
   return (
     <div
       ref={rootRef}
-      className={`oxos${settings.reduceMotion ? " oxos--reduced" : ""}${settings.themeMode === "light" ? " oxos--light" : ""}${settings.focusMode ? " oxos--focus" : ""}${settings.taskbarStyle === "bar" ? " oxos--taskbar-bar" : ""}${settings.windowBorder === "sharp" ? " oxos--sharp" : settings.windowBorder === "neon" ? " oxos--neon" : ""}${settings.showIconLabels === false ? " oxos--no-labels" : ""}${settings.uiScale === "s" ? " oxos--font-s" : settings.uiScale === "l" ? " oxos--font-l" : ""}`}
+      className={`oxos${settings.reduceMotion ? " oxos--reduced" : ""}${settings.themeMode === "light" ? " oxos--light" : ""}${settings.focusMode ? " oxos--focus" : ""}${settings.taskbarStyle === "bar" ? " oxos--taskbar-bar" : ""}${settings.windowBorder === "sharp" ? " oxos--sharp" : settings.windowBorder === "neon" ? " oxos--neon" : ""}${settings.showIconLabels === false ? " oxos--no-labels" : ""}${settings.uiScale === "s" ? " oxos--font-s" : settings.uiScale === "l" ? " oxos--font-l" : ""}${settings.iconShape === "circle" ? " oxos--shape-circle" : settings.iconShape === "hex" ? " oxos--shape-hex" : ""}${settings.wallAnim ? " oxos--wall-anim" : ""}${settings.highContrast ? " oxos--contrast" : ""}`}
       style={
         {
           "--os-accent": settings.accent,
@@ -2650,6 +3113,20 @@ export default function Desktop(props: DesktopProps) {
       }
       onPointerMove={onRootMove}
       onPointerUp={onRootUp}
+      onClick={(e) => {
+        if (settings.uiSounds && (e.target as HTMLElement).closest("button")) playUiBlip();
+      }}
+      onContextMenu={(e) => {
+        const t = e.target as HTMLElement;
+        if (t.closest(".oxos-window, .oxos-panel, .oxos-taskbar, .oxos-start, .oxos-deskwd, .oxos-folderpanel, .oxos-phone, .oxos-lock")) return;
+        e.preventDefault();
+        setCtxMenu({ x: e.clientX, y: e.clientY });
+      }}
+      onDoubleClick={(e) => {
+        const t = e.target as HTMLElement;
+        if (t.closest(".oxos-window, .oxos-panel, .oxos-taskbar, .oxos-start, .oxos-deskwd, .oxos-folderpanel, .oxos-phone, .oxos-lock")) return;
+        newDesktopNote();
+      }}
     >
       <style>{aiWidgetCSS}</style>
 
@@ -2657,6 +3134,10 @@ export default function Desktop(props: DesktopProps) {
       {settings.wallpaper === "space" ? (
         <div className="oxos-wallpaper" aria-hidden>
           <HubSpaceBackground />
+        </div>
+      ) : settings.wallpaper === "live" ? (
+        <div className="oxos-wallpaper" aria-hidden>
+          <LiveWallpaper />
         </div>
       ) : (
         <div className={`oxos-wallpaper oxos-wallpaper--${settings.wallpaper}`} aria-hidden />
@@ -2840,6 +3321,19 @@ export default function Desktop(props: DesktopProps) {
                   ))}
                 </div>
                 <div className="oxos-folderpanel__foot">
+                  <div className="oxos-accentrow" title="Folder color">
+                    {["", "#e8b84a", "#c084fc", "#2dd4bf", "#f87171", "#60a5fa"].map((c) => (
+                      <button
+                        key={c || "default"}
+                        type="button"
+                        className={`oxos-accent${(folder.color ?? "") === c ? " is-on" : ""}`}
+                        style={{ background: c || "rgba(255,255,255,0.15)" }}
+                        title={c ? `Folder color ${c}` : "Default folder color"}
+                        aria-label={c ? `Folder color ${c}` : "Default folder color"}
+                        onClick={() => setFolders((prev) => setFolderColor(prev, folder.id, c || undefined))}
+                      />
+                    ))}
+                  </div>
                   <button
                     type="button"
                     className="oxos-btn oxos-btn--ghost"
@@ -2996,8 +3490,8 @@ export default function Desktop(props: DesktopProps) {
         />
       )}
 
-      {/* Windows (current desktop + pinned) */}
-      {visibleWindows.map((w) => {
+      {/* Windows (current desktop + pinned; tab groups show one member) */}
+      {renderWindows.map((w) => {
         const isActive = activeWin === w.id;
         const app = w.appKey ? appByKey.get(w.appKey) : undefined;
         return (
@@ -3005,25 +3499,72 @@ export default function Desktop(props: DesktopProps) {
             key={w.id}
             className={`oxos-window${isActive ? " is-active" : ""}${w.maximized ? " is-max" : ""}`}
             style={
-              w.maximized
+              (w.maximized
                 ? { zIndex: w.pinned ? 60000 : w.z }
-                : { left: w.x, top: w.y, width: w.w, height: w.h, zIndex: w.pinned ? 60000 : w.z }
+                : { left: w.x, top: w.y, width: w.w, height: w.h, zIndex: w.pinned ? 60000 : w.z }) as React.CSSProperties
             }
+            // Per-window accent (#936) + opacity (#3) via CSS vars.
+            ref={(el) => {
+              if (el) {
+                if (w.accent) el.style.setProperty("--os-accent", w.accent);
+                else el.style.removeProperty("--os-accent");
+                if (w.opacity != null) el.style.setProperty("--os-win-opacity", String(w.opacity));
+                else el.style.removeProperty("--os-win-opacity");
+              }
+            }}
             hidden={w.minimized}
             onPointerDown={() => {
               dispatch({ type: "focus", id: w.id });
               setActiveWin(w.id);
             }}
           >
+            {w.tabGroupId &&
+              visibleWindows.filter((x) => x.tabGroupId === w.tabGroupId).length > 1 && (
+                <div className="oxos-tabs">
+                  {visibleWindows
+                    .filter((x) => x.tabGroupId === w.tabGroupId)
+                    .map((g) => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        className={`oxos-tabs__tab${g.id === w.id ? " is-on" : ""}`}
+                        onClick={() => {
+                          dispatch({ type: "focus", id: g.id });
+                          setActiveWin(g.id);
+                        }}
+                      >
+                        {g.title}
+                        <span
+                          title="Close tab"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            closeWin(g.id);
+                          }}
+                        >
+                          ✕
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              )}
             <header
               className="oxos-window__bar"
               onPointerDown={(e) => {
                 if ((e.target as HTMLElement).closest("button")) return;
+                setWinMenuId(null);
                 dragRef.current = { type: "win", id: w.id, startX: e.clientX, startY: e.clientY, origX: w.x, origY: w.y };
               }}
             >
               {app && <AppMark app={app} className="oxos-window__mark" />}
               <span className="oxos-window__title">{w.title}</span>
+              <button
+                type="button"
+                className={`oxos-window__ctl${winMenuId === w.id ? " is-on" : ""}`}
+                title="Window options: accent, transparency, tabs"
+                onClick={() => setWinMenuId(winMenuId === w.id ? null : w.id)}
+              >
+                ⋯
+              </button>
               {app && !app.external && (
                 <button
                   type="button"
@@ -3067,6 +3608,28 @@ export default function Desktop(props: DesktopProps) {
                 ✕
               </button>
             </header>
+            {winMenuId === w.id && (
+              <WindowOptionsMenu
+                w={{ id: w.id, title: w.title, accent: w.accent, opacity: w.opacity, tabGroupId: w.tabGroupId }}
+                others={visibleWindows.filter((x) => x.id !== w.id)}
+                onAccent={(accent) => dispatch({ type: "accent", id: w.id, accent })}
+                onOpacity={(opacity) => dispatch({ type: "opacity", id: w.id, opacity })}
+                onGroup={(otherId) => {
+                  const other = ws.windows.find((x) => x.id === otherId);
+                  const gid = other?.tabGroupId ?? w.tabGroupId ?? `tab-${Date.now().toString(36)}`;
+                  dispatch({ type: "tabgroup", id: w.id, tabGroupId: gid });
+                  if (!other?.tabGroupId) {
+                    dispatch({ type: "tabgroup", id: otherId, tabGroupId: gid });
+                  } else if (w.tabGroupId && other.tabGroupId !== w.tabGroupId) {
+                    for (const m of ws.windows.filter((x) => x.tabGroupId === w.tabGroupId)) {
+                      dispatch({ type: "tabgroup", id: m.id, tabGroupId: other.tabGroupId });
+                    }
+                  }
+                }}
+                onUngroup={() => dispatch({ type: "tabgroup", id: w.id, tabGroupId: null })}
+                onClose={() => setWinMenuId(null)}
+              />
+            )}
             <div className="oxos-window__body">{windowBody(w)}</div>
             {!w.maximized && (
               <span
@@ -3112,19 +3675,187 @@ export default function Desktop(props: DesktopProps) {
               </button>
             ))}
           </div>
+          {favorites.length > 0 && (
+            <>
+              <div className="oxos-start__label">Favorites</div>
+              <div className="oxos-start__list">
+                {favorites
+                  .map((k) => allApps.find((a) => a.key === k))
+                  .filter(Boolean)
+                  .map((a) => (
+                    <button key={a!.key} type="button" className="oxos-start__row" onClick={() => openApp(a!)}>
+                      {<AppMark app={a!} className="oxos-start__rowmark" />}
+                      <span className="oxos-start__rowmeta">
+                        <span>{a!.name}</span>
+                        <span>{a!.caption}</span>
+                      </span>
+                    </button>
+                  ))}
+              </div>
+            </>
+          )}
+          {recent.length > 0 && (
+            <>
+              <div className="oxos-start__label">Recent</div>
+              <div className="oxos-start__list">
+                {recent.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    className="oxos-start__row"
+                    onClick={() => {
+                      const builtin = ["settings", "apps", "pulse", "widgets", "widget-library", "browser", "store", "themes", "feed", "notes", "files", "tasks", "calendar", "shortcuts"].includes(r.id);
+                      if (builtin) openBuiltin(r.id as OsWindowKind, r.label);
+                      else {
+                        const a = appByKey.get(r.id);
+                        if (a) openApp(a);
+                      }
+                    }}
+                  >
+                    <span className="oxos-start__rowmeta">
+                      <span>{r.label}</span>
+                      <span>Recent</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {folders.length > 0 && (
+            <>
+              <div className="oxos-start__label">Folders</div>
+              <div className="oxos-start__list">
+                {folders.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    className="oxos-start__row"
+                    onClick={() => {
+                      setOpenFolderId(f.id);
+                      setStartOpen(false);
+                    }}
+                  >
+                    <span className="oxos-start__rowmeta">
+                      <span>{f.name}</span>
+                      <span>{f.appKeys.length} app{f.appKeys.length === 1 ? "" : "s"}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <div className="oxos-start__label">All apps</div>
           <div className="oxos-start__list">
             {startApps.map((a) => (
-              <button key={a.key} type="button" className="oxos-start__row" onClick={() => openApp(a)}>
-                {<AppMark app={a} className="oxos-start__rowmark" />}
-                <span className="oxos-start__rowmeta">
-                  <span>{a.name}</span>
-                  <span>{a.caption}</span>
-                </span>
-              </button>
+              <div key={a.key} className="oxos-start__rowwrap">
+                <button type="button" className="oxos-start__row" onClick={() => openApp(a)}>
+                  {<AppMark app={a} className="oxos-start__rowmark" />}
+                  <span className="oxos-start__rowmeta">
+                    <span>{a.name}</span>
+                    <span>{a.caption}</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="oxos-start__star"
+                  title={favorites.includes(a.key) ? "Remove from favorites" : "Pin to favorites"}
+                  onClick={() => toggleFavorite(a.key)}
+                >
+                  {favorites.includes(a.key) ? "★" : "☆"}
+                </button>
+              </div>
             ))}
             {!startApps.length && <p className="oxos-hint">No apps match that search.</p>}
           </div>
+          {!startQ.trim() && (tokenHistory.length > 0 || browserTabs.length > 0 || notes.length > 0) && (
+            <>
+              <div className="oxos-start__label">Jump lists</div>
+              <div className="oxos-start__list">
+                {tokenHistory.length > 0 && (
+                  <button type="button" className="oxos-start__row" onClick={() => setStartJump(startJump === "dex" ? null : "dex")}>
+                    <span className="oxos-start__rowmeta">
+                      <span>DEX — recent tokens</span>
+                      <span>{startJump === "dex" ? "Hide" : "Show"}</span>
+                    </span>
+                  </button>
+                )}
+                {startJump === "dex" &&
+                  tokenHistory.map((t) => (
+                    <button
+                      key={t.mint}
+                      type="button"
+                      className="oxos-start__row"
+                      onClick={() => {
+                        const dex = allApps.find((a) => a.key === "dex");
+                        if (dex) openAppWithHref(dex, `/ORBITX_DEX?mint=${t.mint}`);
+                        else openBrowserTab(`https://dexscreener.com/solana/${t.mint}`, t.symbol);
+                      }}
+                    >
+                      <span className="oxos-start__rowmeta">
+                        <span>{t.symbol}</span>
+                        <span>Open in DEX</span>
+                      </span>
+                    </button>
+                  ))}
+                {browserTabs.length > 0 && (
+                  <button type="button" className="oxos-start__row" onClick={() => setStartJump(startJump === "browser" ? null : "browser")}>
+                    <span className="oxos-start__rowmeta">
+                      <span>Browser — recent tabs</span>
+                      <span>{startJump === "browser" ? "Hide" : "Show"}</span>
+                    </span>
+                  </button>
+                )}
+                {startJump === "browser" &&
+                  browserTabs.slice(-5).map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className="oxos-start__row"
+                      onClick={() => {
+                        setBrowserActiveId(t.id);
+                        const r = centerRect();
+                        dispatch({ type: "open", window: { id: "browser", kind: "browser", title: "Browser", x: r.x, y: r.y, w: r.w, h: r.h, desktopId: activeDesktopId } });
+                        setActiveWin("browser");
+                        setStartOpen(false);
+                      }}
+                    >
+                      <span className="oxos-start__rowmeta">
+                        <span>{t.title}</span>
+                        <span>Open tab</span>
+                      </span>
+                    </button>
+                  ))}
+                {notes.length > 0 && (
+                  <button type="button" className="oxos-start__row" onClick={() => setStartJump(startJump === "notes" ? null : "notes")}>
+                    <span className="oxos-start__rowmeta">
+                      <span>Notes — recent</span>
+                      <span>{startJump === "notes" ? "Hide" : "Show"}</span>
+                    </span>
+                  </button>
+                )}
+                {startJump === "notes" &&
+                  [...notes]
+                    .sort((a, b) => b.updatedAt - a.updatedAt)
+                    .slice(0, 3)
+                    .map((n) => (
+                      <button
+                        key={n.id}
+                        type="button"
+                        className="oxos-start__row"
+                        onClick={() => {
+                          setJumpNoteId(n.id);
+                          openBuiltin("notes", "Notes");
+                        }}
+                      >
+                        <span className="oxos-start__rowmeta">
+                          <span>{n.title || "Untitled"}</span>
+                          <span>Open note</span>
+                        </span>
+                      </button>
+                    ))}
+              </div>
+            </>
+          )}
           {startQ.trim() && (
             <>
               {spotTokens.length > 0 && (
@@ -3137,6 +3868,7 @@ export default function Desktop(props: DesktopProps) {
                         type="button"
                         className="oxos-start__row"
                         onClick={() => {
+                          recordToken(t.mint, t.symbol);
                           const dex = allApps.find((a) => a.key === "dex");
                           if (dex) openAppWithHref(dex, `/ORBITX_DEX?mint=${t.mint}`);
                           else openBrowserTab(`https://dexscreener.com/solana/${t.mint}`, t.symbol);
@@ -3460,7 +4192,16 @@ export default function Desktop(props: DesktopProps) {
         <span className="oxos-taskbar__tray">
           {settings.showTrayPrices && (props.solPrice != null || props.orbitxPrice != null) && (
             <span className="oxos-tray__prices">
-              {props.solPrice != null && <span>SOL {fmtUsd(props.solPrice)}</span>}
+              {props.solPrice != null && (
+                <span>
+                  SOL {fmtUsd(props.solPrice)}
+                  {props.solChange != null && (
+                    <span className={props.solChange >= 0 ? "up" : "down"}>
+                      {" "}{props.solChange >= 0 ? "▲" : "▼"} {Math.abs(props.solChange).toFixed(1)}%
+                    </span>
+                  )}
+                </span>
+              )}
               {props.orbitxPrice != null && <span>$ORBITX {fmtUsd(props.orbitxPrice, 6)}</span>}
             </span>
           )}
@@ -3480,6 +4221,27 @@ export default function Desktop(props: DesktopProps) {
             </button>
           </div>
           <MiniCal />
+          <p className="oxos-hint">Screen dim: {dim}%</p>
+          <input type="range" min={0} max={60} value={dim} onChange={(e) => setDim(Number(e.target.value))} />
+          <p className="oxos-hint">Text size</p>
+          <div style={{ display: "flex", gap: 8 }}>
+            {(
+              [
+                ["s", "S"],
+                ["m", "M"],
+                ["l", "L"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={`oxos-btn oxos-btn--ghost${(settings.uiScale ?? "m") === id ? " is-on" : ""}`}
+                onClick={() => setSettings((prev) => ({ ...prev, uiScale: id }))}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             className="oxos-btn oxos-btn--ghost"
@@ -3511,6 +4273,7 @@ export default function Desktop(props: DesktopProps) {
                 key={wp.id}
                 type="button"
                 className={`oxos-wall oxos-wall--${wp.id}${settings.wallpaper === wp.id ? " is-on" : ""}`}
+                style={wp.id === "live" ? { background: "#0b0d1a" } : undefined}
                 onClick={() => setSettings((s) => ({ ...s, wallpaper: wp.id }))}
               >
                 {wp.label}
@@ -3692,6 +4455,39 @@ export default function Desktop(props: DesktopProps) {
                     {d.id === activeDesktop?.id ? " ✓" : ""}
                   </button>
                   <span className="oxos-desk__count">{wins.length} window{wins.length === 1 ? "" : "s"}</span>
+                  {wins.length > 0 && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="oxos-btn oxos-btn--ghost"
+                        onClick={() => {
+                          for (const w of wins) dispatch({ type: "close", id: w.id });
+                        }}
+                      >
+                        Close all
+                      </button>
+                      <select
+                        className="oxos-input"
+                        defaultValue=""
+                        aria-label="Move all windows to another desktop"
+                        onChange={(e) => {
+                          const target = e.target.value;
+                          if (!target) return;
+                          for (const w of wins) dispatch({ type: "desktop", id: w.id, desktopId: target });
+                          e.target.value = "";
+                        }}
+                      >
+                        <option value="">Move all to…</option>
+                        {desktops
+                          .filter((x) => x.id !== d.id)
+                          .map((x) => (
+                            <option key={x.id} value={x.id}>
+                              {x.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="oxos-desk__wins">
                     {wins.map((w) => (
                       <div key={w.id} className="oxos-desk__win">
@@ -4002,6 +4798,7 @@ export default function Desktop(props: DesktopProps) {
                   type="button"
                   className="oxos-start__row"
                   onClick={() => {
+                    recordToken(t.mint, t.symbol);
                     const dex = allApps.find((a) => a.key === "dex");
                     if (dex) openAppWithHref(dex, `/ORBITX_DEX?mint=${t.mint}`);
                     else openBrowserTab(`https://dexscreener.com/solana/${t.mint}`, t.symbol);
@@ -4071,7 +4868,26 @@ export default function Desktop(props: DesktopProps) {
                   </span>
                 </button>
               ))}
-            {!cmdTokenMode && !cmdFiltered.length && !cmdAppHits.length && (
+            {!cmdTokenMode &&
+              cmdWindowHits.map((w) => (
+                <button
+                  key={w.id}
+                  type="button"
+                  className="oxos-start__row"
+                  onClick={() => {
+                    setCmdOpen(false);
+                    if (w.minimized) dispatch({ type: "restore", id: w.id });
+                    else dispatch({ type: "focus", id: w.id });
+                    setActiveWin(w.id);
+                  }}
+                >
+                  <span className="oxos-start__rowmeta">
+                    <span>{w.title}</span>
+                    <span>Window — jump to it</span>
+                  </span>
+                </button>
+              ))}
+            {!cmdTokenMode && !cmdFiltered.length && !cmdAppHits.length && !cmdWindowHits.length && (
               <p className="oxos-hint">No commands match that.</p>
             )}
           </div>
@@ -4103,12 +4919,32 @@ export default function Desktop(props: DesktopProps) {
       {/* Screen dimmer (Control Center slider; never blocks clicks) */}
       {dim > 0 && <div className="oxos-dim" style={{ opacity: dim / 100 }} aria-hidden />}
 
+      {/* Desktop right-click menu (#16) */}
+      {ctxMenu && (
+        <DesktopCtxMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          onNewNote={newDesktopNote}
+          onNewFolder={newDesktopFolder}
+          onWallpaper={() => {
+            setSettingsNav("personalization");
+            openBuiltin("settings", "Settings");
+          }}
+          onSettings={() => openBuiltin("settings", "Settings")}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
+
       {/* Lock screen */}
       {locked && (
-        <div className="oxos-lock">
+        <div className={`oxos-lock${settings.lockWallpaper && settings.lockWallpaper !== "space" && settings.lockWallpaper !== "live" ? " oxos-lock--wall" : ""}`}>
+          {settings.lockWallpaper && settings.lockWallpaper !== "space" && settings.lockWallpaper !== "live" && (
+            <div className={`oxos-lock__wall oxos-wallpaper--${settings.lockWallpaper}`} aria-hidden />
+          )}
           <div className="oxos-lock__card">
             <div className="oxos-lock__mark">◈</div>
             <h2>OrbitX OS</h2>
+            {settings.lockMessage && <p className="oxos-lock__msg">{settings.lockMessage}</p>}
             <p>Enter your device PIN to unlock.</p>
             <input
               className="oxos-input"

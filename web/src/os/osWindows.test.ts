@@ -70,6 +70,23 @@ describe("osWindowsReducer", () => {
     expect(s.windows[0].h).toBe(800);
   });
 
+  it("accent, opacity, tabgroup, and desktop actions update one window", () => {
+    let s = osWindowsReducer(EMPTY_OS_WINDOWS, {
+      type: "open",
+      window: win("notes", "Notes"),
+    });
+    s = osWindowsReducer(s, { type: "accent", id: "notes", accent: "#c084fc" });
+    expect(s.windows[0].accent).toBe("#c084fc");
+    s = osWindowsReducer(s, { type: "opacity", id: "notes", opacity: 0.6 });
+    expect(s.windows[0].opacity).toBe(0.6);
+    s = osWindowsReducer(s, { type: "opacity", id: "notes", opacity: 5 });
+    expect(s.windows[0].opacity).toBe(1);
+    s = osWindowsReducer(s, { type: "tabgroup", id: "notes", tabGroupId: "tab-1" });
+    expect(s.windows[0].tabGroupId).toBe("tab-1");
+    s = osWindowsReducer(s, { type: "desktop", id: "notes", desktopId: "desk-2" });
+    expect(s.windows[0].desktopId).toBe("desk-2");
+  });
+
   it("open keeps hrefOverride and pinned on the window", () => {
     const s = osWindowsReducer(EMPTY_OS_WINDOWS, {
       type: "open",

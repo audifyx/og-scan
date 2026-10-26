@@ -4,7 +4,7 @@
  * window resizes; settings hold wallpaper / accent / motion preferences.
  */
 
-export type OsWallpaperId = "space" | "midnight" | "gold" | "ocean";
+export type OsWallpaperId = "space" | "midnight" | "gold" | "ocean" | "live";
 
 export interface OsSettings {
   wallpaper: OsWallpaperId;
@@ -27,6 +27,30 @@ export interface OsSettings {
   accentGrad: string | null;
   widgetSize: "s" | "m" | "l";
   widgetOpacity: number;
+  /* --- OS wave 6: home look & feel --- */
+  iconShape: "rounded" | "circle" | "hex";
+  wallAnim: boolean;
+  bootChime: boolean;
+  highContrast: boolean;
+  seasonalTheme: boolean;
+  uiSounds: boolean;
+  lockMessage: string;
+  lockWallpaper: OsWallpaperId;
+  /* --- OS wave 6: home behavior --- */
+  sessionRestore: boolean;
+  dndSchedule: boolean;
+  dndStart: string; // "HH:MM"
+  dndEnd: string; // "HH:MM"
+  windowRules: OsWindowRule[];
+}
+
+/** One window rule (idea bank #6): how a target opens. */
+export interface OsWindowRule {
+  /** Builtin kind ("notes", "browser", …) or `app:<key>`. */
+  target: string;
+  maximized?: boolean;
+  /** Undefined = current desktop. */
+  desktopId?: string;
 }
 
 export const OS_ACCENTS: { id: string; label: string; hex: string }[] = [
@@ -37,6 +61,7 @@ export const OS_ACCENTS: { id: string; label: string; hex: string }[] = [
 ];
 
 export const OS_WALLPAPERS: { id: OsWallpaperId; label: string }[] = [
+  { id: "live", label: "Live Chart" },
   { id: "space", label: "Deep Space" },
   { id: "midnight", label: "Midnight" },
   { id: "gold", label: "Gold Hour" },
@@ -63,6 +88,19 @@ export const DEFAULT_OS_SETTINGS: OsSettings = {
   accentGrad: null,
   widgetSize: "m",
   widgetOpacity: 100,
+  iconShape: "rounded",
+  wallAnim: false,
+  bootChime: true,
+  highContrast: false,
+  seasonalTheme: false,
+  uiSounds: false,
+  lockMessage: "",
+  lockWallpaper: "space",
+  sessionRestore: true,
+  dndSchedule: false,
+  dndStart: "22:00",
+  dndEnd: "07:00",
+  windowRules: [],
 };
 
 const SETTINGS_KEY = "orbitxos:settings:v1";
@@ -156,6 +194,8 @@ export interface OsNotification {
   kind: "price" | "alert" | "social" | "system";
   at: number;
   read: boolean;
+  /** Snoozed until (idea bank #59); hidden from the center until then. */
+  snoozedUntil?: number;
 }
 
 export interface OsPriceAlert {
@@ -168,13 +208,29 @@ export interface OsPriceAlert {
   triggered: boolean;
 }
 
-export type DeskWidgetType = "ticker" | "trending" | "alerts" | "countdown" | "quote";
+export type DeskWidgetType =
+  | "ticker"
+  | "trending"
+  | "alerts"
+  | "countdown"
+  | "quote"
+  | "token"
+  | "chart"
+  | "market"
+  | "tasks"
+  | "note";
 
 export interface DeskWidget {
   id: string;
   type: DeskWidgetType;
   x: number; // percentages
   y: number;
+  /** Token/chart widgets (idea bank #1003/#1004): Solana mint. */
+  mint?: string;
+  /** Note widget (idea bank #1008): pinned note id. */
+  noteId?: string;
+  /** Expanded widget (idea bank #1053): wider card. */
+  expanded?: boolean;
   /** Countdown widget (idea bank #1009). */
   label?: string;
   targetDate?: string; // YYYY-MM-DD
@@ -200,6 +256,11 @@ export interface ThemePack {
   /** Icon tile ring/glow (css box-shadow value, "" for none). */
   ring: string;
   author: string;
+  /** Icon shape carried by the pack (idea bank #937). */
+  shape?: "rounded" | "circle" | "hex";
+  /** Font pairing carried by the pack (idea bank #938). */
+  fontFamily?: "system" | "serif" | "mono";
+  fontScale?: "s" | "m" | "l";
 }
 
 export const DEFAULT_THEME_PACKS: ThemePack[] = [
@@ -280,6 +341,74 @@ export interface OsClosedWindow {
 const TASKS_KEY = "orbitxos:tasks:v1";
 const CAL_EVENTS_KEY = "orbitxos:events:v1";
 const CLOSED_KEY = "orbitxos:closed:v1";
+
+export interface RecentEntry {
+  id: string; // app key, builtin kind, or "browser"
+  label: string;
+}
+
+const RECENT_KEY = "orbitxos:recent:v1";
+const FAVORITES_KEY = "orbitxos:favorites:v1";
+const WIDGET_PRESETS_KEY = "orbitxos:widget-presets:v1";
+const TOKEN_HISTORY_KEY = "orbitxos:token-history:v1";
+const SESSION_KEY = "orbitxos:session:v1";
+
+export function loadOsRecent(): RecentEntry[] {
+  const saved = readJson<RecentEntry[]>(RECENT_KEY);
+  return Array.isArray(saved) ? saved.filter((r) => r && typeof r.id === "string") : [];
+}
+export function saveOsRecent(r: RecentEntry[]) {
+  writeJson(RECENT_KEY, r.slice(0, 8));
+}
+export function loadOsFavorites(): string[] {
+  const saved = readJson<string[]>(FAVORITES_KEY);
+  return Array.isArray(saved) ? saved.filter((k) => typeof k === "string") : [];
+}
+export function saveOsFavorites(f: string[]) {
+  writeJson(FAVORITES_KEY, f);
+}
+export interface WidgetPreset {
+  name: string;
+  widgets: DeskWidget[];
+}
+export function loadOsWidgetPresets(): WidgetPreset[] {
+  const saved = readJson<WidgetPreset[]>(WIDGET_PRESETS_KEY);
+  return Array.isArray(saved) ? saved : [];
+}
+export function saveOsWidgetPresets(p: WidgetPreset[]) {
+  writeJson(WIDGET_PRESETS_KEY, p);
+}
+export function loadOsTokenHistory(): { mint: string; symbol: string }[] {
+  const saved = readJson<{ mint: string; symbol: string }[]>(TOKEN_HISTORY_KEY);
+  return Array.isArray(saved) ? saved : [];
+}
+export function saveOsTokenHistory(h: { mint: string; symbol: string }[]) {
+  writeJson(TOKEN_HISTORY_KEY, h.slice(0, 8));
+}
+export interface SessionEntry {
+  id: string;
+  kind: string;
+  appKey?: string;
+  title: string;
+  maximized?: boolean;
+  desktopId?: string;
+}
+export function loadOsSession(): SessionEntry[] {
+  const saved = readJson<SessionEntry[]>(SESSION_KEY);
+  return Array.isArray(saved) ? saved : [];
+}
+export function saveOsSession(e: SessionEntry[]) {
+  writeJson(SESSION_KEY, e.slice(0, 24));
+}
+
+const THEME_HISTORY_KEY = "orbitxos:theme-history:v1";
+export function loadOsThemeHistory(): ThemePack[] {
+  const saved = readJson<ThemePack[]>(THEME_HISTORY_KEY);
+  return Array.isArray(saved) ? saved : [];
+}
+export function saveOsThemeHistory(p: ThemePack[]) {
+  writeJson(THEME_HISTORY_KEY, p.slice(0, 10));
+}
 
 export function loadOsTasks(): OsTask[] {
   const saved = readJson<OsTask[]>(TASKS_KEY);

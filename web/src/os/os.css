@@ -1595,3 +1595,167 @@
 
 /* Swatch labels sit on dark art in both modes; beat `.oxos button` (0,1,1). */
 .oxos button.oxos-wall { color: #fff; }
+
+/* ================= OS wave 6: home look & feel ================= */
+
+/* Per-window opacity (#3) — focus dim still wins for inactive windows. */
+.oxos-window { opacity: var(--os-win-opacity, 1); }
+
+/* Tab strip (#1): group members as tabs above the window bar. */
+.oxos-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px 0;
+  flex-wrap: wrap;
+}
+.oxos-tabs__tab {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.oxos-tabs__tab.is-on { background: var(--os-accent); color: #000; font-weight: 700; }
+.oxos-tabs__tab span { opacity: 0.7; }
+
+/* Window options popover (#936 accent, #3 transparency, #1 tabs). */
+.oxos-winmenu {
+  position: absolute;
+  top: 44px;
+  right: 8px;
+  z-index: 50;
+  min-width: 220px;
+  background: rgba(var(--os-panel-rgb), 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+.oxos-winmenu__label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.7; }
+
+/* Desktop right-click menu (#16). */
+.oxos-ctxmenu__backdrop { position: fixed; inset: 0; z-index: 79999; }
+.oxos-ctxmenu {
+  position: fixed;
+  z-index: 80000;
+  min-width: 200px;
+  background: #12121c;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+.oxos-ctxmenu button {
+  background: transparent;
+  border: 0;
+  color: #fff;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.oxos-ctxmenu button:hover { background: rgba(255, 255, 255, 0.1); }
+
+/* Snap quarters (#4). */
+.oxos-snap--tl { left: 0; top: 0; width: 50%; height: 50%; }
+.oxos-snap--tr { right: 0; top: 0; width: 50%; height: 50%; }
+.oxos-snap--bl { left: 0; bottom: 0; width: 50%; height: 50%; }
+.oxos-snap--br { right: 0; bottom: 0; width: 50%; height: 50%; }
+
+/* Icon shapes (#95) + badges (#88) + folder count (#91). */
+.oxos-icon { position: relative; }
+.oxos--shape-circle .oxos-icon__mark,
+.oxos--shape-circle .oxos-folder__grid { border-radius: 50% !important; }
+.oxos--shape-hex .oxos-icon__mark,
+.oxos--shape-hex .oxos-folder__grid {
+  border-radius: 4px !important;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+}
+.oxos-icon__badge {
+  position: absolute;
+  top: 0;
+  right: 4px;
+  z-index: 2;
+  background: #ef4444;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  min-width: 16px;
+  text-align: center;
+}
+
+/* Start: favorites star + row wrap (#52). */
+.oxos-start__rowwrap { display: flex; gap: 4px; align-items: stretch; }
+.oxos-start__rowwrap .oxos-start__row { flex: 1; }
+.oxos-start__star {
+  width: 36px;
+  background: transparent;
+  border: 0;
+  color: var(--os-accent);
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Live chart wallpaper (#13). */
+.oxos-livewall {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 32px 24px 96px;
+  background: radial-gradient(120% 90% at 50% 0%, rgba(232, 184, 74, 0.14), transparent 60%), #050508;
+}
+.oxos-livewall__chart { flex: 1; display: flex; align-items: center; justify-content: center; }
+.oxos-livewall__chart svg { width: 100%; max-width: 900px; height: auto; }
+.oxos-livewall__meta { display: flex; gap: 12px; align-items: baseline; font-size: 20px; font-weight: 700; }
+.oxos-livewall__live { color: #e8b84a; font-size: 12px; letter-spacing: 0.12em; }
+.oxos-livewall .up { color: #34d399; }
+.oxos-livewall .down { color: #f87171; }
+
+/* Animated wallpaper (#933): slow drift. */
+@keyframes oxos-wall-drift {
+  from { transform: scale(1); }
+  to { transform: scale(1.05); }
+}
+.oxos--wall-anim .oxos-wallpaper { animation: oxos-wall-drift 26s ease-in-out infinite alternate; }
+
+/* High contrast (#99). */
+.oxos--contrast { --os-text-rgb: 255, 255, 255; }
+.oxos--contrast .oxos-window,
+.oxos--contrast .oxos-panel,
+.oxos--contrast .oxos-taskbar { border: 2px solid rgba(255, 255, 255, 0.9); }
+.oxos--contrast .oxos-icon__label { font-weight: 700; text-shadow: 0 0 4px #000, 0 1px 2px #000; }
+
+/* Theme preview mock (#949). */
+.oxos-thememock {
+  height: 64px;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 8px;
+}
+.oxos-thememock__icons { display: flex; gap: 6px; padding: 10px; }
+.oxos-thememock__icon { width: 18px; height: 18px; display: block; }
+.oxos-thememock__bar { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; }
+
+/* Lock screen message + wallpaper (#65/#944) + entrance (#84). */
+@keyframes oxos-lock-in { from { opacity: 0; } to { opacity: 1; } }
+.oxos-lock { animation: oxos-lock-in 0.3s ease; }
+.oxos-lock--wall { background: rgba(3, 3, 8, 0.55); }
+.oxos-lock__wall { position: absolute; inset: 0; }
+.oxos-lock__card { position: relative; z-index: 1; }
+.oxos-lock__msg { color: var(--os-accent); font-weight: 600; }

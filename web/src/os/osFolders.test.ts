@@ -5,6 +5,7 @@ import {
   folderedKeys,
   removeFromFolder,
   renameFolder,
+  setFolderColor,
   ungroupFolder,
 } from "./osFolders";
 
@@ -33,6 +34,13 @@ describe("osFolders", () => {
     folders = removeFromFolder(folders, "f1", "dex");
     folders = removeFromFolder(folders, "f1", "trade");
     expect(folders).toEqual([]);
+  });
+
+  it("sets a folder color", () => {
+    const folders = createFolder([], "f1", "city", "dex");
+    const colored = setFolderColor(folders, "f1", "#c084fc");
+    expect(colored[0].color).toBe("#c084fc");
+    expect(setFolderColor(colored, "f1", undefined)[0].color).toBeUndefined();
   });
 
   it("ungroups and renames", () => {

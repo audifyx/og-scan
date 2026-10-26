@@ -40,6 +40,12 @@ export interface OsWindow {
   maximized: boolean;
   /** Pinned windows render above every normal window (mini-player). */
   pinned?: boolean;
+  /** Per-window accent override (idea bank #936); null/undefined = OS accent. */
+  accent?: string | null;
+  /** Per-window opacity 0.3–1 (idea bank #3); undefined = opaque. */
+  opacity?: number;
+  /** Tab group id (idea bank #1); windows sharing one show as tabs. */
+  tabGroupId?: string | null;
   /** App windows opened to a specific URL (e.g. DEX with ?mint=…). */
   hrefOverride?: string;
   /** Virtual desktop this window lives on (undefined = all desktops). */
@@ -63,7 +69,11 @@ export type OsWindowsAction =
   | { type: "toggle-pin"; id: string }
   | { type: "move"; id: string; x: number; y: number }
   | { type: "resize"; id: string; w: number; h: number }
-  | { type: "snap"; id: string; x: number; y: number; w: number; h: number };
+  | { type: "snap"; id: string; x: number; y: number; w: number; h: number }
+  | { type: "accent"; id: string; accent: string | null }
+  | { type: "opacity"; id: string; opacity: number }
+  | { type: "tabgroup"; id: string; tabGroupId: string | null }
+  | { type: "desktop"; id: string; desktopId: string | undefined };
 
 export function osWindowsReducer(
   state: OsWindowsState,
@@ -126,6 +136,36 @@ export function osWindowsReducer(
         ...state,
         windows: state.windows.map((w) =>
           w.id === action.id ? { ...w, pinned: !w.pinned } : w,
+        ),
+      };
+    case "accent":
+      return {
+        ...state,
+        windows: state.windows.map((w) =>
+          w.id === action.id ? { ...w, accent: action.accent } : w,
+        ),
+      };
+    case "opacity":
+      return {
+        ...state,
+        windows: state.windows.map((w) =>
+          w.id === action.id
+            ? { ...w, opacity: Math.min(1, Math.max(0.3, action.opacity)) }
+            : w,
+        ),
+      };
+    case "tabgroup":
+      return {
+        ...state,
+        windows: state.windows.map((w) =>
+          w.id === action.id ? { ...w, tabGroupId: action.tabGroupId } : w,
+        ),
+      };
+    case "desktop":
+      return {
+        ...state,
+        windows: state.windows.map((w) =>
+          w.id === action.id ? { ...w, desktopId: action.desktopId } : w,
         ),
       };
     case "snap":

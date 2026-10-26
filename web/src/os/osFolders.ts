@@ -8,6 +8,8 @@ export interface OsFolder {
   id: string;
   name: string;
   appKeys: string[];
+  /** Folder tile color (idea bank #90); undefined = default glass. */
+  color?: string;
 }
 
 /** Create a folder from two desktop apps. Caller supplies the id. */
@@ -58,6 +60,14 @@ export function ungroupFolder(
   const target = folders.find((f) => f.id === folderId);
   if (!target) return { folders, freed: [] };
   return { folders: folders.filter((f) => f.id !== folderId), freed: target.appKeys };
+}
+
+export function setFolderColor(
+  folders: OsFolder[],
+  folderId: string,
+  color: string | undefined,
+): OsFolder[] {
+  return folders.map((f) => (f.id === folderId ? { ...f, color } : f));
 }
 
 export function renameFolder(
