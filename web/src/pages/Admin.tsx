@@ -46,7 +46,6 @@ const ToolsSection = lazy(() => import("@/components/admin/sections/ToolsSection
 const OrgAffiliates = lazy(() => import("@/components/admin/sections/OrgAffiliates").then((m) => ({ default: m.OrgAffiliates })));
 const AffiliateManagement = lazy(() => import("@/components/admin/sections/AffiliateManagement").then((m) => ({ default: m.AffiliateManagement })));
 const OnChainCostSection = lazy(() => import("@/components/admin/sections/OnChainCostSection").then((m) => ({ default: m.OnChainCostSection })));
-const DexAdsSection = lazy(() => import("@/components/admin/sections/DexAdsSection").then((m) => ({ default: m.DexAdsSection })));
 
 const Fallback = () => (
   <div className="flex h-64 items-center justify-center">
@@ -250,11 +249,6 @@ const SECTION_META: Record<AdminSection, { eyebrow: string; title: string; descr
     title: "Affiliates",
     description: "Review and manage affiliate accounts, approvals, and network activity.",
   },
-  dex_ads: {
-    eyebrow: "DEX monetization",
-    title: "DEX ads & boosts",
-    description: "Place ads into DEX slots, set token boost tiers, approve listings, and manage saved filters. A saved ad appears in its slot automatically.",
-  },
 };
 
 export default function Admin() {
@@ -384,8 +378,6 @@ export default function Admin() {
         return <NotificationsManager />;
       case "announcements":
         return <AnnouncementManager />;
-      case "dex_ads":
-        return <DexAdsSection />;
       case "advanced_analytics":
         return <AdvancedAnalytics />;
       case "api":

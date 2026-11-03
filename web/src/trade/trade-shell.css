@@ -1,5 +1,3 @@
-@import "./terminal-theme.css";
-
 /* OrbitX Terminal shell — black / white / gold / silver.
  * Gold #e8b84a is the primary accent, silver #c9d1d9 the secondary.
  * (Was liquid-glass blue/cyan; rethemed, structure unchanged.) */
@@ -10,7 +8,7 @@
   --tx-mono: "JetBrains Mono", ui-monospace, monospace;
   --tx-hand: "Caveat", "Segoe Script", "Bradley Hand", cursive;
 
-  /* Black / white / gold / silver (mirrors terminal-theme.css tokens) */
+  /* Black / white / gold / silver theme tokens */
   --tx-bg: #050505;
   --tx-ink: #f4f4f2;
   --tx-muted: rgba(244, 244, 242, 0.55);

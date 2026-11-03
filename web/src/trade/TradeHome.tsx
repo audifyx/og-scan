@@ -1,20 +1,10 @@
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, RefreshCw, Search, X } from "lucide-react";
 import { fetchScreener, searchCoins, type MarketCoin } from "./tradeApi";
-import { fmtPct, fmtUsd } from "./tradeFmt";
+import { fmtNum, fmtPct, fmtUsd } from "./tradeFmt";
 import TokenAvatar from "./TokenAvatar";
-import TerminalHeader from "./TerminalHeader";
-import DexAdSlot from "./DexAdSlot";
-import DexFilters from "./DexFilters";
-import DexTrending from "./DexTrending";
-import DexBoosts from "./DexBoosts";
-import DexListings from "./DexListings";
-import TokenCard from "./TokenCard";
-import { scoreToken } from "./tokenScore";
-import { applyDexFilters, DEFAULT_DEX_FILTERS, type DexFilterState } from "./dexFeed";
 import "./trade-home.css";
-import "./terminal-mobile.css";
 
 type Cat = "discover" | "pump" | "curated";
 
@@ -55,6 +45,12 @@ function chgClass(n: number) {
   return "th__chg--flat";
 }
 
+function pctClass(n: number) {
+  if (n > 0) return "th__chg--up";
+  if (n < 0) return "th__chg--down";
+  return "th__chg--flat";
+}
+
 function CoinLogo({ coin, size = "card" }: { coin: MarketCoin; size?: "card" | "feat" }) {
   const px = size === "feat" ? 44 : 36;
   return (
@@ -80,8 +76,6 @@ export default function TradeHome() {
   const [results, setResults] = useState<MarketCoin[]>([]);
   const [searching, setSearching] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
-  const [filters, setFilters] = useState<DexFilterState>(DEFAULT_DEX_FILTERS);
-  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     setTab(TABS[cat][0].id);
@@ -120,28 +114,9 @@ export default function TradeHome() {
   }, [q]);
 
   const searchingMode = q.trim().length >= 2;
-  const rawList = searchingMode ? results : coins;
-  const list = applyDexFilters(rawList, filters);
+  const list = searchingMode ? results : coins;
   const subTabs = TABS[cat];
   const featured = !searchingMode && !loading ? coins.slice(0, 3) : [];
-  // The "Trending" sub-tab renders DexTrending's computed ranking (same
-  // ogdex feed, ranked by 24h volume + txns + price move) instead of the
-  // plain feed list. The fetchScreener("trending") call above still runs —
-  // it feeds the spotlight tiles.
-  const isTrendingView = cat === "discover" && tab === "trending" && !searchingMode;
-
-  // Honest score from the coin's own mapped fields (Jupiter audit +
-  // liquidity/volume/txns). Unknown inputs earn 0 and are disclosed by
-  // TokenCard as "partial data" — never invented.
-  const scoreFor = (c: MarketCoin) =>
-    scoreToken({
-      liquidityUsd: c.liquidity,
-      top10Pct: c.top10Pct,
-      mintRevoked: c.mintRevoked,
-      freezeRevoked: c.freezeRevoked,
-      volume24hUsd: c.volume24h,
-      txns24h: c.txns24h,
-    });
 
   const openCoin = (mint: string) => {
     try {
@@ -156,23 +131,28 @@ export default function TradeHome() {
   const displayName = (c: MarketCoin) => c.name?.trim() || "Unknown token";
 
   return (
-    <div className="th orbitx-terminal">
+    <div className="th">
       <div className="th__glow" />
       <div className="th__noise" aria-hidden />
 
       <div className="th__top">
-        <TerminalHeader
-          countLabel={
-            loading || searching
-              ? "Syncing…"
-              : searchingMode
-                ? `${list.length} results`
-                : `${list.length} coins in ${subTabs.find((t) => t.id === tab)?.label || "feed"}`
-          }
-          live
-          isLoading={loading || searching}
-          stats={[{ label: "Feed", value: subTabs.find((t) => t.id === tab)?.label ?? "—" }]}
-        />
+        <div className="th__brand-row">
+          <div>
+            <p className="th__kicker">OrbitX Trade</p>
+            <h1 className="th__title">Markets</h1>
+            <p className="th__subtitle">
+              {loading || searching
+                ? "Syncing…"
+                : searchingMode
+                  ? `${list.length} results`
+                  : `${list.length} coins in ${subTabs.find((t) => t.id === tab)?.label || "feed"}`}
+            </p>
+          </div>
+          <div className="th__live" aria-live="polite">
+            <span className="th__live-dot" />
+            Live
+          </div>
+        </div>
 
         {featured.length > 0 && (
           <section className="th__spotlight" aria-label="Top in feed">
@@ -275,48 +255,16 @@ export default function TradeHome() {
           ) : null}
         </div>
 
-        {/* Mobile filter sheet (terminal-mobile.css): slides up ≤767px,
-            renders inline as a normal panel ≥768px. */}
-        <button type="button" className="term-filter-open" onClick={() => setFiltersOpen(true)}>
-          Filters
-        </button>
-        <div
-          className="term-filter-backdrop"
-          data-open={filtersOpen}
-          onClick={() => setFiltersOpen(false)}
-        />
-        <section
-          className="term-filter-sheet"
-          data-open={filtersOpen}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Filters"
-        >
-          <div className="term-filter-sheet__grabber" />
-          <DexFilters value={filters} onChange={setFilters} />
-          <button
-            type="button"
-            className="term-filter-sheet__close"
-            onClick={() => setFiltersOpen(false)}
-          >
-            Done
-          </button>
-        </section>
+        <div className="th__cols">
+          <span>#</span>
+          <span>Token</span>
+          <span>Mcap</span>
+          <span>24h</span>
+        </div>
       </div>
 
       <div className="th__list">
-        <DexAdSlot placement="home-top" className="th__ad-top" />
-        {isTrendingView ? (
-          <>
-            <DexAdSlot placement="trending" className="th__ad-top" />
-            <DexTrending
-              coins={coins}
-              loading={loading}
-              error={loadErr || null}
-              onSelect={(c) => openCoin(c.mint)}
-            />
-          </>
-        ) : loading && !list.length ? (
+        {loading && !list.length ? (
           <div className="th__loading">
             <Loader2 className="th__spin" />
             <p>Loading markets…</p>
@@ -345,22 +293,35 @@ export default function TradeHome() {
         ) : (
           <div className="th__cards">
             {list.map((c, i) => (
-              <Fragment key={c.mint}>
-                <TokenCard coin={c} score={scoreFor(c)} onSelect={openCoin} />
-                {i === 4 ? <DexAdSlot placement="home-feed" /> : null}
-              </Fragment>
+              <button key={c.mint} type="button" className="th__card" onClick={() => openCoin(c.mint)}>
+                <span className="th__rank">{i + 1}</span>
+                <CoinLogo coin={c} />
+                <div className="th__main">
+                  <div className="th__row1">
+                    <span className="th__sym">{displaySym(c)}</span>
+                    <span className="th__name">{displayName(c)}</span>
+                  </div>
+                  <div className="th__row2">
+                    <span>{fmtUsd(c.price)}</span>
+                    <span className="th__chip">Vol {fmtUsd(c.volume24h)}</span>
+                    {c.liquidity > 0 && <span className="th__chip">Liq {fmtUsd(c.liquidity)}</span>}
+                    {c.holders != null && c.holders > 0 ? (
+                      <span className="th__chip">H {fmtNum(c.holders)}</span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="th__stats">
+                  <p className="th__mcap">{fmtUsd(c.mcap)}</p>
+                  <span className={`th__pct ${pctClass(c.change24h)}`}>{fmtPct(c.change24h)}</span>
+                </div>
+              </button>
             ))}
           </div>
         )}
 
-        <div className="th__sections">
-          <DexBoosts onSelectMint={openCoin} />
-          <DexListings onSelect={(c) => openCoin(c.mint)} />
-        </div>
-
         <footer className="th__footer">
-          <p className="th__footer-brand">OrbitX Terminal</p>
-          <p className="th__footer-copy">Live Solana market data · data only</p>
+          <p className="th__footer-brand">OrbitX Trade</p>
+          <p className="th__footer-copy">Live Solana markets · non-custodial desk</p>
           <p className="th__footer-meta">
             {searchingMode ? "Search" : subTabs.find((t) => t.id === tab)?.label || "Feed"} · updated live
           </p>

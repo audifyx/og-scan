@@ -16,6 +16,7 @@ import CreatorFeeClaimPanel from "./more/CreatorFeeClaimPanel";
 import TokenBurnerPanel from "./more/TokenBurnerPanel";
 import UnwrapWsolPanel from "./more/UnwrapWsolPanel";
 import AdvancedToolHost from "./more/AdvancedToolHost";
+import ActiveTradingWalletChip from "./ActiveTradingWalletChip";
 
 const FEATURED_ICONS: Record<string, typeof Coins> = {
   "rent-refund": Coins,
@@ -93,6 +94,11 @@ export default function TradeMore() {
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+          {active.kind === "panel" && (
+            <div className="mb-3">
+              <ActiveTradingWalletChip />
+            </div>
+          )}
           {active.kind === "panel" && <PanelFor id={active.id} />}
           {active.kind === "advanced" && active.advancedKey && (
             <AdvancedToolHost toolKey={active.advancedKey} />

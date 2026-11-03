@@ -35,7 +35,6 @@ export const DESK_NAV: DeskNavGroup[] = [
       { id: "transactions", label: "Transactions", icon: "Activity", short: "Tx" },
       { id: "jupiter", label: "Jupiter Transactions", icon: "Rocket" },
       { id: "wallets", label: "Wallets", icon: "Wallet" },
-      { id: "dex_ads", label: "DEX Ads & Boosts", icon: "Zap", short: "Ads" },
     ],
   },
   {
