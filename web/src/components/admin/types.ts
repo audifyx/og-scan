@@ -188,7 +188,8 @@ export type AdminSection =
   | "admin_apps" | "moderation" | "lobbies" | "tokens" | "spaces"
   | "support" | "chat" | "notifications" | "alerts" | "wallets"
   | "media" | "tools" | "affiliates" | "org_affiliates"
-  | "announcements" | "advanced_analytics" | "activity" | "api";
+  | "announcements" | "advanced_analytics" | "activity" | "api"
+  | "dex_ads";
 
 export interface AdminSectionDef {
   id: AdminSection;

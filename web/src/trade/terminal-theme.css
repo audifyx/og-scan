@@ -1,0 +1,308 @@
+/* OrbitX Terminal — design tokens + display type.
+ * Black / white / gold / silver. Gold #e8b84a is the primary accent,
+ * silver is the secondary. Caveat is DISPLAY / ACCENT text only
+ * (wordmark, featured labels, headings) — never body copy, never the
+ * OS font controls. Loaded in web/index.html next to the other
+ * Google Fonts faces; fallback is a system cursive stack.
+ *
+ * Scoped to `.orbitx-terminal` / `.txth-*` so nothing leaks into the
+ * OS shell or other apps. TradeHome / TradeApp opt in by adding the
+ * `orbitx-terminal` class (see TerminalHeader mount contract).
+ */
+
+.orbitx-terminal,
+.txth {
+  --txth-bg: #050505;
+  --txth-bg-2: #0a0a09;
+  --txth-surface: #101010;
+  --txth-surface-2: #161615;
+  --txth-ink: #f4f4f2;
+  --txth-ink-2: #e8e8e4;
+  --txth-muted: rgba(244, 244, 242, 0.55);
+  --txth-faint: rgba(244, 244, 242, 0.22);
+  --txth-line: rgba(232, 184, 74, 0.18);
+  --txth-line-strong: rgba(232, 184, 74, 0.42);
+  --txth-gold: #e8b84a;
+  --txth-gold-soft: rgba(232, 184, 74, 0.12);
+  --txth-gold-dim: #b8933a;
+  --txth-silver: #c9d1d9;
+  --txth-silver-dim: #8b98a5;
+  --txth-silver-line: rgba(201, 209, 217, 0.16);
+  --txth-up: #2fd673;
+  --txth-down: #ff5c6c;
+  --txth-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --txth-body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --txth-mono: "JetBrains Mono", ui-monospace, monospace;
+  --txth-hand: "Caveat", "Segoe Script", "Bradley Hand", cursive;
+
+  background: var(--txth-bg);
+  color: var(--txth-ink);
+  font-family: var(--txth-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Handwriting display classes (accent only) ─────────────────── */
+
+.txth__hand {
+  font-family: var(--txth-hand);
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.txth__wordmark {
+  font-family: var(--txth-hand);
+  font-weight: 700;
+  font-size: clamp(30px, 7vw, 38px);
+  line-height: 0.9;
+  letter-spacing: 0;
+  color: var(--txth-gold);
+}
+
+.txth__wordmark-solid {
+  font-family: var(--txth-display);
+  font-weight: 750;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--txth-ink);
+}
+
+.txth__hand-label {
+  font-family: var(--txth-hand);
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--txth-silver);
+}
+
+/* ── Terminal header ───────────────────────────────────────────── */
+
+.txth__header {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  padding: 10px 16px 0;
+}
+
+.txth__brand-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.txth__brand {
+  min-width: 0;
+}
+
+.txth__kicker {
+  margin: 0 0 2px;
+  font-family: var(--txth-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--txth-muted);
+}
+
+.txth__title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.txth__title {
+  margin: 0;
+  font-family: var(--txth-display);
+  font-size: clamp(24px, 6vw, 30px);
+  font-weight: 750;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.txth__subtitle {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--txth-muted);
+  line-height: 1.35;
+}
+
+.txth__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--txth-line-strong);
+  background: var(--txth-gold-soft);
+  font-family: var(--txth-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--txth-gold);
+}
+
+.txth__live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--txth-up);
+  box-shadow: 0 0 0 3px rgba(47, 214, 115, 0.22);
+  animation: txth-live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes txth-live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
+
+/* Stats summary strip — data-only chips under the brand row. */
+.txth__stats-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.txth__stats-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.txth__stat {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--txth-silver-line);
+  background: rgba(255, 255, 255, 0.03);
+  text-align: left;
+}
+
+.txth__stat-label {
+  display: block;
+  font-family: var(--txth-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--txth-faint);
+}
+
+.txth__stat-value {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--txth-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--txth-ink);
+}
+
+.txth__stat-value--gold {
+  color: var(--txth-gold);
+}
+
+.txth__stat-delta--up {
+  color: var(--txth-up);
+}
+
+.txth__stat-delta--down {
+  color: var(--txth-down);
+}
+
+/* Search slot — same geometry as the old .th__search so the swap is 1:1. */
+.txth__search-wrap {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.txth__search-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  color: var(--txth-faint);
+  pointer-events: none;
+}
+
+.txth__search {
+  width: 100%;
+  height: 46px;
+  padding: 0 44px;
+  border-radius: 14px;
+  border: 1px solid var(--txth-line);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--txth-ink);
+  font-family: var(--txth-body);
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.txth__search::placeholder {
+  color: rgba(244, 244, 242, 0.28);
+}
+
+.txth__search:focus {
+  border-color: var(--txth-line-strong);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.txth__search-clear {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--txth-muted);
+  cursor: pointer;
+}
+
+/* ── Corrected list column header ────────────────────────────────
+ * Geometry MUST match the card row it labels: same horizontal
+ * padding (12px) and gap (11px) as .th__card, and ONE right-hand
+ * column — the card stacks Mcap + 24h vertically inside a single
+ * .th__stats block, so a 4-column header (separate Mcap / 24h)
+ * can never align. See the stats-header diagnosis in the worker
+ * report: .th__cols is the broken pattern this replaces.
+ * Width 84px matches the patched .th__stats fixed width.
+ */
+.txth__cols {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 12px 10px;
+  font-family: var(--txth-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--txth-faint);
+}
+
+.txth__cols span:nth-child(1) { width: 28px; flex-shrink: 0; }
+.txth__cols span:nth-child(2) { flex: 1; min-width: 0; }
+.txth__cols span:nth-child(3) { width: 84px; flex-shrink: 0; text-align: right; }
+
+/* Gold hairline divider + silver secondary rule. */
+.txth__rule {
+  height: 1px;
+  border: 0;
+  margin: 0 0 12px;
+  background: linear-gradient(90deg, var(--txth-gold), var(--txth-silver-line) 55%, transparent);
+}

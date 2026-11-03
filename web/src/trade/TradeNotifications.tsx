@@ -3,9 +3,8 @@
  */
 
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
-import { Bell, Loader2, Zap, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Bell, Loader2, ArrowLeft } from "lucide-react";
 import { fetchMarketSignals, type MarketCoin } from "./tradeApi";
 import { fmtPct, fmtUsd } from "./tradeFmt";
 
@@ -19,7 +18,6 @@ function reasonFor(c: MarketCoin): string {
 
 export default function TradeNotifications() {
   const navigate = useNavigate();
-  const { connected } = useActiveTradingWallet();
   const [rows, setRows] = useState<MarketCoin[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -49,15 +47,6 @@ export default function TradeNotifications() {
             <p className="text-[11px] text-white/70">Live market signals from OrbitX screener</p>
           </div>
         </div>
-        {!connected && (
-          <Link
-            to="/trade/profile"
-            className="mt-3 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.08] px-3 py-2.5 text-[12px] text-white/60"
-          >
-            <Zap className="h-4 w-4" />
-            Connect wallet in Profile for personal trade alerts
-          </Link>
-        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">

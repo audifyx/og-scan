@@ -11,6 +11,20 @@ export type MarketCoin = {
   liquidity: number;
   pairAddress?: string;
   holders?: number;
+  /** Chain id (e.g. "solana") when the source reports it. */
+  chain?: string;
+  /** DEX id from DexScreener (e.g. "raydium", "pumpfun") when known. */
+  dexId?: string;
+  /** Pair/token creation time (ISO) when the source reports it — used for age filters. */
+  createdAt?: string | null;
+  /** 24h transaction count when the source reports it. */
+  txns24h?: number;
+  /** Top-10 holder share (0–100) from the Jupiter audit block when reported. */
+  top10Pct?: number | null;
+  /** True when the mint authority is revoked, false when still live, null when the audit is absent. */
+  mintRevoked?: boolean | null;
+  /** True when the freeze authority is revoked, false when still live, null when the audit is absent. */
+  freezeRevoked?: boolean | null;
 };
 
 function poolId(row: any): string | undefined {
@@ -36,6 +50,21 @@ function pickHolderCount(row: any): number | undefined {
 export function mapCoinRow(row: any): MarketCoin | null {
   const mint = String(row?.mint || row?.contract_address || "").trim();
   if (!mint) return null;
+  // 24h txns = 24h buys + sells (normToken copies the 24h stats window to
+  // the top level; fall back to the nested windows when present).
+  const buys = row.numBuys ?? row.stats?.["24h"]?.numBuys ?? row.stats24h?.numBuys;
+  const sells = row.numSells ?? row.stats?.["24h"]?.numSells ?? row.stats24h?.numSells;
+  const txns24h = buys != null || sells != null ? (Number(buys) || 0) + (Number(sells) || 0) : undefined;
+  // Audit (Jupiter): top-10 share as published — pool-account treatment is
+  // Jupiter's, not adjusted here. normToken coerces absent authority flags
+  // to false, so an audit block with NO signal at all (no top-10, no dev
+  // fields) means "no audit data" → authorities stay null (unknown), not
+  // "live". With a real audit block, false means the authority is live.
+  const audit = row.audit || {};
+  const top10Raw = audit.topHoldersPercentage != null ? Number(audit.topHoldersPercentage) : null;
+  const top10Pct = top10Raw != null && Number.isFinite(top10Raw) ? top10Raw : null;
+  const hasAudit =
+    top10Pct != null || audit.devBalancePercentage != null || audit.devMints != null;
   return {
     mint,
     symbol: row.symbol || "???",
@@ -49,6 +78,16 @@ export function mapCoinRow(row: any): MarketCoin | null {
     liquidity: Number(row.liquidity) || 0,
     pairAddress: poolId(row),
     holders: pickHolderCount(row),
+    // The ogdex screener feed is chain=solana (Jupiter v2, Solana only) —
+    // chain is truthful here, not a default. dexId is NOT reported by this
+    // feed, so it stays undefined (the DEX filter only applies to
+    // DexScreener-sourced data, e.g. DexTrending's self-fetch).
+    chain: "solana",
+    createdAt: row.createdAt ?? row.firstPool?.createdAt ?? null,
+    txns24h,
+    top10Pct,
+    mintRevoked: hasAudit ? audit.mintAuthorityDisabled === true : null,
+    freezeRevoked: hasAudit ? audit.freezeAuthorityDisabled === true : null,
   };
 }
 

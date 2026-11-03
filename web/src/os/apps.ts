@@ -34,7 +34,7 @@ export interface OsAppDef {
 
 export const OS_APPS: OsAppDef[] = [
   { id: "city", name: "OrbitX City", blurb: "Enter the 3D crypto city", href: "/Orbitxcity", accent: "#17ff4d", category: "world" },
-  { id: "dex", name: "Trading Terminal", blurb: "OrbitX DEX · live execution", href: "/intel/trade", accent: "#3de7ff", category: "trade" },
+  { id: "dex", name: "OrbitX Terminal", blurb: "OrbitX Terminal · live market data", href: "/intel/trade", accent: "#e8b84a", category: "trade" },
   { id: "scanner", name: "Token Scanner", blurb: "Forensic OG score & risk", href: "/intel/scan", accent: "#f5c542", category: "trade" },
   { id: "launchpad", name: "Launchpad", blurb: "Fair launch console", href: "/intel/launch", accent: "#ff6b35", category: "trade" },
   { id: "nft", name: "NFT Market", blurb: "Create, trade, collect", href: "/nft", accent: "#a78bfa", category: "trade" },

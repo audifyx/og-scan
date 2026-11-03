@@ -70,7 +70,15 @@ export async function listFeatured(limit = 12): Promise<OrbitxToken[]> {
         lp_signature: null,
         mint_signature: null,
         metadata_uri: null,
-        logo_url: "/og-icon.svg",
+        // Real ORBITX token image from DexScreener (info.imageUrl for
+        // 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9, verified HTTP 200
+        // 2026-11-03). Previously "/og-icon.svg" — the generic app icon,
+        // not the token artwork. The on-chain metadata image (ipfs.io)
+        // is not a reliable fallback: it 403s from this environment.
+        // Banner (DexScreener info.header) has no column on orbitx_tokens;
+        // banner surfaces already read it live from DexScreener pair data.
+        logo_url:
+          "https://cdn.dexscreener.com/cms/images/1GvHc-xHlACmNJ7q?width=800&height=800&quality=95&format=auto",
         is_vamp: false,
         fee_route: "orbitx_buyback",
         cluster: "mainnet-beta",

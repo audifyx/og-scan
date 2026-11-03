@@ -43,6 +43,7 @@ import {
   Wallet,
   Wrench,
   X,
+  Zap,
 } from "lucide-react";
 import type { AdminSection } from "./types";
 import { DESK_MOBILE_TABS, DESK_NAV } from "./deskNav";
@@ -79,6 +80,7 @@ const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   UserCheck,
   Users,
   Wallet,
+  Zap,
 };
 
 type Pulse = { users: number; posts24: number; liveSpaces: number; online: number } | null;

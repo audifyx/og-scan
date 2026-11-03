@@ -57,6 +57,15 @@
     --og-ink: var(--background);
     --og-grid: var(--border);
 
+    /* OrbitX Terminal — black / white / gold / silver (display only) */
+    --term-gold: #e8b84a;
+    --term-gold-hsl: 42 79% 60%;
+    --term-silver: #c9d1d9;
+    --term-silver-dim: #8b98a5;
+    --term-ink: #f4f4f2;
+    --term-bg: #050505;
+    --term-hand: "Caveat", "Segoe Script", "Bradley Hand", cursive;
+
     /* ── Glass system tokens ── */
     --glass-white:      rgba(255, 255, 255, 0.06);
     --glass-white-md:   rgba(255, 255, 255, 0.10);
