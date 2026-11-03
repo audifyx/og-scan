@@ -205,7 +205,7 @@ export const PlatformGlyph = {
 };
 
 export const PLATFORM_APPS: PlatformApp[] = [
-  { key: "dex", name: "OrbitX DEX", caption: "Scanner & trade", href: "/ORBITX_DEX", tone: "#2F80FF", iconBg: "linear-gradient(145deg, #5BA8FF 0%, #1A6CFF 48%, #0037A3 100%)", glyph: PlatformGlyph.dex, iconSrc: "/icons/dex.png", dock: true },
+  { key: "dex", name: "OrbitX Terminal", caption: "Live market data", href: "/intel/trade", tone: "#e8b84a", iconBg: "linear-gradient(145deg, #f5d47a 0%, #e8b84a 48%, #8a6d1f 100%)", glyph: PlatformGlyph.dex, iconSrc: "/icons/dex.png", dock: true },
   { key: "trade", name: "Trade", caption: "Phantom buy & sell", href: "/trade", tone: "#AB9FF2", iconBg: "linear-gradient(145deg, #C9BFFF 0%, #AB9FF2 46%, #6B5FD4 100%)", glyph: PlatformGlyph.trade, iconSrc: "/icons/trade.png" },
   { key: "shop", name: "Shop", caption: "Credits + burn access", href: "/shop", tone: "#2DD4BF", iconBg: "linear-gradient(145deg, #5EEAD4 0%, #14B8A6 48%, #115E59 100%)", glyph: PlatformGlyph.shop, iconSrc: "/icons/shop.png", dock: true },
   { key: "supercomputer", name: "Super Computer", caption: "One MCP · every channel", href: "/supercomputer", tone: "#5EEAD4", iconBg: "linear-gradient(145deg, #99F6E4 0%, #2DD4BF 48%, #0F766E 100%)", glyph: PlatformGlyph.ai, iconSrc: "/icons/supercomputer.png", dock: true },
