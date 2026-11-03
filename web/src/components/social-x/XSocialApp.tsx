@@ -14,6 +14,7 @@ import {
   ArrowDownRight, Users, Bookmark, LogOut, Settings, Coins, Image as ImageIcon, Smile,
   Sparkles, Zap, Shield, Wallet, ChevronRight, Check, BarChart3, ExternalLink,
   Gift, ArrowLeftRight, TrendingDown, Siren, Lock, Gem, CandlestickChart,
+  Flame, Rocket, Skull, Vote,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { validateUploadFile, safeExtForMime, compressImageFile, supabaseTransformUrl } from "@/lib/safeUpload";
@@ -33,6 +34,12 @@ import {
   fetchRugFlaggers, hasFlagged, RUG_SIREN_THRESHOLD, CallPnlBadge,
   type TradeMode,
 } from "./social-trade";
+import {
+  createPoll, castPollVote, pollTotal, pollPercentages, myPollVote,
+  toggleReaction, myReaction, reactionCounts, REACTION_KINDS,
+  MAX_POLL_OPTION_LEN,
+  type SocialPoll, type SocialReactionKind,
+} from "@/lib/socialEngagement";
 
 /* ── Lazy heavy tabs (reuse existing pages — zero functionality lost) ── */
 const ChatHub = lazy(() => import("@/pages/SocialHub"));
@@ -52,12 +59,16 @@ interface Post {
   content: string; likes_count: number | null; liked_by: string[] | null; created_at: string; reply_to?: string | null; repost_of?: string | null;
   gate_meta?: GateMeta | null; nft_mint?: string | null; nft_price_usd?: number | null;
 }
-/** Token gate for a "Holders only" post (social_messages.gate_meta JSONB). */
+/** Token gate for a "Holders only" post (social_messages.gate_meta JSONB).
+ *  The same JSONB also carries engagement extras — polls (#203) and
+ *  reactions (#215) — so both ship with no migration. */
 interface GateMeta {
   kind?: string | null;
-  mint: string;
+  mint?: string;
   symbol?: string | null;
-  min_amount: number;
+  min_amount?: number;
+  poll?: SocialPoll | null;
+  reactions?: Partial<Record<SocialReactionKind, string[]>> | null;
 }
 interface Suggestion { user_id: string; username: string | null; display_name: string | null; avatar_url: string | null; is_official_account?: boolean | null; bio?: string | null; }
 interface Ticker { mint: string; symbol: string | null; priceUsd: number | null; change24h: number | null; }
@@ -597,6 +608,9 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [gateOn, setGateOn] = useState(false);
   const [gateToken, setGateToken] = useState<CoinLite | null>(null);
   const [gateMin, setGateMin] = useState("1");
+  /* Polls (#203) — composer attaches 2–4 options; the post text is the question. */
+  const [pollOn, setPollOn] = useState(false);
+  const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
   const [gatePickerOpen, setGatePickerOpen] = useState(false);
   const [gateStatus, setGateStatus] = useState<Record<string, { loading: boolean; allowed: boolean }>>({});
   const gateCheckedRef = useRef<Set<string>>(new Set());
@@ -715,7 +729,13 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "social_messages", filter: `channel=eq.${FEED_CHANNEL}` },
         (p) => { const row = p.new as Post; if (row.reply_to) return; setPosts((prev) => prev.some((x) => x.id === row.id) ? prev : [row, ...prev]); if (tabRef.current === "home" && row.user_id !== uidRef.current && (feedScrollRef.current?.scrollTop ?? 0) > 300) setNewPosts((n) => n + 1); })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "social_messages", filter: `channel=eq.${FEED_CHANNEL}` },
-        (p) => { const row = p.new as Post; setPosts((prev) => prev.map((x) => x.id === row.id ? { ...x, likes_count: row.likes_count, liked_by: row.liked_by, content: row.content } : x)); })
+        (p) => {
+          const row = p.new as Post;
+          // gate_meta only arrives when it changed — never merge undefined over local state.
+          const metaPatch = row.gate_meta !== undefined ? { gate_meta: row.gate_meta } : {};
+          setPosts((prev) => prev.map((x) => x.id === row.id ? { ...x, likes_count: row.likes_count, liked_by: row.liked_by, content: row.content, ...metaPatch } : x));
+          setDetailPost((prev) => (prev && prev.id === row.id ? { ...prev, likes_count: row.likes_count, liked_by: row.liked_by, content: row.content, ...metaPatch } : prev));
+        })
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "social_messages" },
         (p) => { const row = p.old as { id?: string }; if (row?.id) setPosts((prev) => prev.filter((x) => x.id !== row.id)); })
       .subscribe();
@@ -775,7 +795,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     if (ids.length === 0) { setBookmarkPosts([]); return; }
     setBmLoading(true);
     supabase.from("social_messages")
-      .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at")
+      .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,gate_meta")
       .in("id", ids)
       .then(({ data }) => {
         const rows = ((data as Post[]) || []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -888,18 +908,21 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     const gate_meta: GateMeta | null = gateOn && gateToken
       ? { kind: "token_holders", mint: gateToken.mint, symbol: gateToken.symbol || null, min_amount: Math.max(0, Number(gateMin) || 0) }
       : null;
+    // Polls (#203): options ride in the same gate_meta JSONB as the gate.
+    const poll = pollOn ? createPoll(pollOptions) : null;
+    const meta: GateMeta | null = poll ? { ...(gate_meta ?? {}), poll } : gate_meta;
     setPosting(true); setText("");
     const imgsSnapshot = pendingImages;
     setPendingImages([]);
-    const optimistic: Post = { id: `tmp-${Date.now()}`, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url || null, content, likes_count: 0, liked_by: [], created_at: new Date().toISOString(), gate_meta };
+    const optimistic: Post = { id: `tmp-${Date.now()}`, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url || null, content, likes_count: 0, liked_by: [], created_at: new Date().toISOString(), gate_meta: meta };
     setPosts((prev) => [optimistic, ...prev]);
     const payload: Record<string, unknown> = { channel: FEED_CHANNEL, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url, content, likes_count: 0, liked_by: [] };
-    if (gate_meta) payload.gate_meta = gate_meta;
+    if (meta) payload.gate_meta = meta;
     let res = await supabase.from("social_messages")
       .insert(payload)
       .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at").single();
-    if (res.error && gate_meta && /gate_meta/i.test(res.error.message || "")) {
-      // Pre-migration: gate_meta column doesn't exist yet — post without the gate.
+    if (res.error && meta && /gate_meta/i.test(res.error.message || "")) {
+      // Pre-migration: gate_meta column doesn't exist yet — post without the gate/poll.
       delete payload.gate_meta;
       res = await supabase.from("social_messages")
         .insert(payload)
@@ -907,8 +930,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     }
     const { data, error } = res;
     if (error) { toast.error("Could not post. Try again."); setPosts((prev) => prev.filter((p) => p.id !== optimistic.id)); setText(base); setPendingImages(imgsSnapshot); }
-    else if (data) setPosts((prev) => prev.map((p) => p.id === optimistic.id ? ({ ...(data as Post), gate_meta } as Post) : p));
-    if (!error) { setGateOn(false); setGateToken(null); setGateMin("1"); }
+    else if (data) setPosts((prev) => prev.map((p) => p.id === optimistic.id ? ({ ...(data as Post), gate_meta: meta } as Post) : p));
+    if (!error) { setGateOn(false); setGateToken(null); setGateMin("1"); setPollOn(false); setPollOptions(["", ""]); }
     setPosting(false);
     setComposeOpen(false);
   };
@@ -923,14 +946,14 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     (async () => {
       let thePost = existing;
       if (!thePost) {
-        const { data } = await supabase.from("social_messages").select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,reply_to").eq("id", openPostId).single();
+        const { data } = await supabase.from("social_messages").select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,reply_to,gate_meta").eq("id", openPostId).single();
         if (!cancelled && data) { thePost = data as Post; setDetailPost(data as Post); }
       }
       if (thePost?.reply_to) {
         const { data: par } = await supabase.from("social_messages").select("id,username").eq("id", thePost.reply_to).single();
         if (!cancelled && par) setDetailParent({ id: (par as { id: string }).id, username: (par as { username: string | null }).username });
       }
-      const { data: reps } = await supabase.from("social_messages").select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,reply_to").eq("reply_to", openPostId).order("created_at", { ascending: true }).limit(100);
+      const { data: reps } = await supabase.from("social_messages").select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,reply_to,gate_meta").eq("reply_to", openPostId).order("created_at", { ascending: true }).limit(100);
       if (!cancelled) { setDetailReplies((reps as Post[]) || []); setDetailLoading(false); }
     })();
     return () => { cancelled = true; };
@@ -1050,7 +1073,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     const ids = [...new Set(posts.filter((p) => p.repost_of).map((p) => p.repost_of as string))].filter((id) => !repostOriginals[id]);
     if (ids.length === 0) return;
     let cancelled = false;
-    supabase.from("social_messages").select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,repost_of").in("id", ids)
+    supabase.from("social_messages").select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,repost_of,gate_meta").in("id", ids)
       .then(({ data }) => {
         if (cancelled) return;
         const m: Record<string, Post> = {};
@@ -1084,6 +1107,37 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, liked_by: nextLikedBy, likes_count: nextLikedBy.length } : p));
     const { error } = await supabase.from("social_messages").update({ likes_count: nextLikedBy.length, liked_by: nextLikedBy }).eq("id", post.id);
     if (error) setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, liked_by: likedBy, likes_count: likedBy.length } : p));
+  };
+
+  /* ── Polls (#203) + reactions (#215) — persisted in gate_meta, same
+   *  optimistic-update + rollback pattern as toggleLike. ── */
+  const updateGateMeta = async (post: Post, next: GateMeta | null) => {
+    const prev = post.gate_meta ?? null;
+    setPosts((prevPosts) => prevPosts.map((p) => (p.id === post.id ? { ...p, gate_meta: next } : p)));
+    setRepostOriginals((prevMap) => (prevMap[post.id] ? { ...prevMap, [post.id]: { ...prevMap[post.id], gate_meta: next } } : prevMap));
+    setDetailPost((prevDetail) => (prevDetail && prevDetail.id === post.id ? { ...prevDetail, gate_meta: next } : prevDetail));
+    const { error } = await supabase.from("social_messages").update({ gate_meta: next }).eq("id", post.id);
+    if (error) {
+      setPosts((prevPosts) => prevPosts.map((p) => (p.id === post.id ? { ...p, gate_meta: prev } : p)));
+      setRepostOriginals((prevMap) => (prevMap[post.id] ? { ...prevMap, [post.id]: { ...prevMap[post.id], gate_meta: prev } } : prevMap));
+      setDetailPost((prevDetail) => (prevDetail && prevDetail.id === post.id ? { ...prevDetail, gate_meta: prev } : prevDetail));
+      toast.error("Could not save. Try again.");
+    }
+  };
+
+  const castVote = async (post: Post, optionIndex: number) => {
+    if (!requireAuth("vote")) return;
+    if (post.id.startsWith("tmp-") || !post.gate_meta?.poll) return;
+    const nextPoll = castPollVote(post.gate_meta.poll, user.id, optionIndex);
+    if (nextPoll === post.gate_meta.poll) return;
+    void updateGateMeta(post, { ...(post.gate_meta ?? {}), poll: nextPoll });
+  };
+
+  const reactToPost = async (post: Post, kind: SocialReactionKind) => {
+    if (!requireAuth("react")) return;
+    if (post.id.startsWith("tmp-")) return;
+    const next = toggleReaction(post.gate_meta?.reactions ?? null, user.id, kind);
+    void updateGateMeta(post, { ...(post.gate_meta ?? {}), reactions: next });
   };
 
   const toggleBookmark = (p: Post) => {
@@ -1411,6 +1465,30 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             </div>
           </div>
         )}
+        {pollOn && (
+          <div className="osc-poll-edit">
+            <div className="osc-poll-edit__title">Poll — your post text is the question</div>
+            {pollOptions.map((opt, i) => (
+              <div key={i} className="osc-poll-edit__row">
+                <input
+                  value={opt}
+                  onChange={(e) => setPollOptions((prev) => prev.map((o, j) => (j === i ? e.target.value.slice(0, MAX_POLL_OPTION_LEN) : o)))}
+                  placeholder={`Option ${i + 1}`}
+                  maxLength={MAX_POLL_OPTION_LEN}
+                  className="osc-poll-edit__input"
+                />
+                {pollOptions.length > 2 && (
+                  <button type="button" onClick={() => setPollOptions((prev) => prev.filter((_, j) => j !== i))} className="osc-poll-edit__remove" aria-label="Remove option">
+                    <XIcon className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+            {pollOptions.length < 4 && (
+              <button type="button" onClick={() => setPollOptions((prev) => [...prev, ""])} className="osc-poll-edit__add">+ Add option</button>
+            )}
+          </div>
+        )}
         <div className="mt-2 flex items-center justify-between border-t border-white/[0.08] pt-2.5">
           <span className="relative flex items-center gap-0.5">
             <button type="button" onClick={() => composerFileRef.current?.click()} disabled={uploadingImg} className="grid h-11 w-11 place-items-center rounded-full text-[#3b82f6] transition hover:bg-[#3b82f6]/10 disabled:opacity-50" title="Add image">
@@ -1450,6 +1528,9 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             <button type="button" onClick={() => setGateOn((v) => !v)} className={cn("grid h-11 w-11 place-items-center rounded-full transition", gateOn ? "bg-[#f0c75e]/15 text-[#f0c75e]" : "text-[#3b82f6] hover:bg-[#3b82f6]/10")} title="Holders only — gate this post to token holders">
               <Lock className="h-[18px] w-[18px]" />
             </button>
+            <button type="button" onClick={() => { setPollOn((v) => { if (v) setPollOptions(["", ""]); return !v; }); }} className={cn("grid h-11 w-11 place-items-center rounded-full transition", pollOn ? "bg-[#f0c75e]/15 text-[#f0c75e]" : "text-[#3b82f6] hover:bg-[#3b82f6]/10")} title="Add a poll — 2 to 4 options">
+              <Vote className="h-[18px] w-[18px]" />
+            </button>
             {emojiOpen && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setEmojiOpen(false)} />
@@ -1466,7 +1547,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               <span className="ml-1 text-[12px] font-bold text-orange-400">{MAX_LEN - text.length}</span>
             )}
           </span>
-          <button type="button" disabled={(!text.trim() && pendingImages.length === 0) || posting || (gateOn && !gateToken)} onClick={() => submit()} className="osc-btn-primary" title={gateOn && !gateToken ? "Pick a token for the holders-only gate" : undefined}>
+          <button type="button" disabled={(!text.trim() && pendingImages.length === 0) || posting || (gateOn && !gateToken) || (pollOn && !createPoll(pollOptions))} onClick={() => submit()} className="osc-btn-primary" title={gateOn && !gateToken ? "Pick a token for the holders-only gate" : pollOn && !createPoll(pollOptions) ? "Add at least 2 poll options" : undefined}>
             {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Post"}
           </button>
         </div>
@@ -1631,6 +1712,59 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     );
   };
 
+  /* ── Polls (#203): live results with animated bars, one vote per user. ── */
+  const PollCard = ({ p }: { p: Post }) => {
+    const poll = p.gate_meta?.poll;
+    if (!poll) return null;
+    const total = pollTotal(poll);
+    const pcts = pollPercentages(poll);
+    const mine = user ? myPollVote(poll, user.id) : null;
+    return (
+      <div className="osc-poll" onClick={(e) => e.stopPropagation()}>
+        {poll.options.map((opt, i) => {
+          const pct = pcts[i] ?? 0;
+          const isMine = mine === i;
+          return (
+            <button key={i} type="button" onClick={() => void castVote(p, i)} className={cn("osc-poll__opt", isMine && "osc-poll__opt--mine")} aria-pressed={isMine}>
+              <span className="osc-poll__fill" style={{ width: `${pct}%` }} />
+              <span className="osc-poll__label">{opt}</span>
+              <span className="osc-poll__meta">{pct}% · {poll.votes[i] ?? 0}</span>
+              {isMine && <Check className="osc-poll__check" />}
+            </button>
+          );
+        })}
+        <div className="osc-poll__foot">{total} vote{total === 1 ? "" : "s"}{mine !== null ? " · you voted" : ""}</div>
+      </div>
+    );
+  };
+
+  /* ── Reactions (#215): fire / rocket / skull, one per user per post. ── */
+  const REACTION_ICONS: Record<SocialReactionKind, { Icon: NavIcon; label: string; tone: string }> = {
+    fire: { Icon: Flame, label: "Fire", tone: "osc-react--fire" },
+    rocket: { Icon: Rocket, label: "Rocket", tone: "osc-react--rocket" },
+    skull: { Icon: Skull, label: "Skull", tone: "osc-react--skull" },
+  };
+  const ReactionStrip = ({ p }: { p: Post }) => {
+    const counts = reactionCounts(p.gate_meta?.reactions ?? null);
+    const mine = user ? myReaction(p.gate_meta?.reactions ?? null, user.id) : null;
+    const total = counts.fire + counts.rocket + counts.skull;
+    return (
+      <div className="osc-reacts" onClick={(e) => e.stopPropagation()}>
+        {REACTION_KINDS.map((kind) => {
+          const { Icon, label, tone } = REACTION_ICONS[kind];
+          const n = counts[kind];
+          return (
+            <button key={kind} type="button" onClick={() => void reactToPost(p, kind)} title={label} aria-pressed={mine === kind} className={cn("osc-react", tone, mine === kind && "osc-react--on")}>
+              <Icon className="h-[16px] w-[16px]" />
+              {n > 0 && <span>{n}</span>}
+            </button>
+          );
+        })}
+        {total > 0 && <span className="osc-reacts__total">{total} reaction{total === 1 ? "" : "s"}</span>}
+      </div>
+    );
+  };
+
   const PostCard = ({ p: raw, onOpen }: { p: Post; onOpen?: (id: string) => void }) => {
     const isRepost = Boolean(raw.repost_of);
     const original = isRepost ? repostOriginals[raw.repost_of as string] : raw;
@@ -1712,6 +1846,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               ))}
             </>
           ); })())}
+          {!gateLocked && <PollCard p={p} />}
           {callTokens.length > 0 && (
             <div className="osc-tradebar" onClick={(e) => e.stopPropagation()}>
               {callTokens.map((ct) => (
@@ -1757,6 +1892,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             </button>
           </div>
           )}
+          {!gateLocked && <ReactionStrip p={p} />}
           {!gateLocked && renderNftZone(p)}
         </div>
         {menuId === p.id && (
