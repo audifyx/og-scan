@@ -1,0 +1,166 @@
+/* Command hub (/command) — OrbitX Terminal theme.
+ * Black / white / gold / silver + Caveat handwriting, using ONLY the existing
+ * --term-* vars from web/src/index.css. No new palette, no hardcoded colors
+ * (neutral borders reuse the file's existing white-on-dark chrome). */
+
+.cmd-eyebrow {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--term-silver-dim);
+}
+
+.cmd-title {
+  font-family: var(--term-hand);
+  font-weight: 700;
+  color: var(--term-gold);
+}
+
+.cmd-panel {
+  background:
+    linear-gradient(135deg, hsl(var(--term-gold-hsl) / 0.07), transparent 55%),
+    var(--term-bg);
+  border: 1px solid hsl(var(--term-gold-hsl) / 0.22);
+}
+
+.cmd-mint-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--term-silver);
+}
+
+.cmd-mint-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--term-gold);
+  box-shadow: 0 0 8px hsl(var(--term-gold-hsl) / 0.8);
+}
+
+.cmd-mint-change {
+  border: 1px solid hsl(var(--term-gold-hsl) / 0.4);
+  background: hsl(var(--term-gold-hsl) / 0.08);
+  color: var(--term-gold);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  transition: background 0.15s;
+}
+.cmd-mint-change:hover {
+  background: hsl(var(--term-gold-hsl) / 0.16);
+}
+
+.cmd-section-title {
+  font-family: var(--term-hand);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--term-ink);
+}
+
+.cmd-section-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  border: 1px solid hsl(var(--term-gold-hsl) / 0.35);
+  background: hsl(var(--term-gold-hsl) / 0.1);
+  color: var(--term-gold);
+  transform: translateY(2px);
+}
+
+.cmd-count {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--term-silver-dim);
+}
+
+.cmd-quick {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  padding: 14px;
+  text-align: left;
+  color: var(--term-ink);
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+.cmd-quick svg {
+  color: var(--term-gold);
+}
+.cmd-quick:hover {
+  border-color: hsl(var(--term-gold-hsl) / 0.5);
+  background: hsl(var(--term-gold-hsl) / 0.06);
+}
+.cmd-quick:active {
+  transform: scale(0.98);
+}
+
+.cmd-quick-primary {
+  background: var(--term-gold);
+  border-color: transparent;
+  color: var(--term-bg);
+}
+.cmd-quick-primary svg {
+  color: var(--term-bg);
+}
+.cmd-quick-primary:hover {
+  background: var(--term-gold);
+  filter: brightness(1.08);
+}
+
+.cmd-card {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.02);
+}
+.cmd-card:hover {
+  border-color: hsl(var(--term-gold-hsl) / 0.45);
+  background: hsl(var(--term-gold-hsl) / 0.05);
+}
+
+.cmd-card-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  border: 1px solid hsl(var(--term-gold-hsl) / 0.35);
+  background: hsl(var(--term-gold-hsl) / 0.1);
+  color: var(--term-gold);
+}
+
+.cmd-card-arrow {
+  color: var(--term-gold);
+}
+
+.cmd-card-eyebrow {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--term-silver-dim);
+}
+
+.cmd-card-label {
+  color: var(--term-ink);
+}
+
+.cmd-card-desc {
+  color: var(--term-silver);
+  opacity: 0.85;
+}

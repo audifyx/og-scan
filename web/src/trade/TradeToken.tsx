@@ -1221,7 +1221,7 @@ export default function TradeToken() {
                   onClick={connectWallet}
                   className="inline-flex items-center gap-1 text-[10px] font-bold text-white/70 underline"
                 >
-                  <Wallet className="h-3 w-3" /> Connect wallet
+                  <Wallet className="h-3 w-3" /> Open wallet
                 </button>
               )}
             </div>

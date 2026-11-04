@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Search,
   ArrowLeft,
@@ -40,14 +40,21 @@ export default function TradeMore() {
   const [cat, setCat] = useState<string>("All");
   const activeId = params.get("tool");
 
-  const active = useMemo(
-    () => (activeId ? TRADE_TOOLS.find((t) => t.id === activeId) || null : null),
-    [activeId],
-  );
+  const active = useMemo(() => {
+    if (!activeId) return null;
+    const t = TRADE_TOOLS.find((t) => t.id === activeId) || null;
+    // Launchpad is hidden from the trade app — a deep-linked Launchpad tool
+    // falls back to the tool list instead of opening.
+    if (t && t.category === "Launchpad") return null;
+    return t;
+  }, [activeId]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return TRADE_TOOLS.filter((t) => {
+      // Launchpad category is hidden from the trade app (render-level filter;
+      // toolCatalog.ts is untouched).
+      if (t.category === "Launchpad") return false;
       if (cat !== "All" && t.category !== cat) return false;
       if (!q) return true;
       return (
@@ -108,7 +115,7 @@ export default function TradeMore() {
     );
   }
 
-  const featured = TRADE_TOOLS.filter((t) => t.featured);
+  const featured = TRADE_TOOLS.filter((t) => t.featured && t.category !== "Launchpad");
 
   return (
     <div className="h-full overflow-y-auto bg-[#060606] px-4 pb-8 pt-4">
@@ -151,7 +158,7 @@ export default function TradeMore() {
       </div>
 
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-        {["All", ...TOOL_CATEGORIES].map((c) => (
+        {["All", ...TOOL_CATEGORIES.filter((c) => c !== "Launchpad")].map((c) => (
           <button
             key={c}
             type="button"
@@ -192,13 +199,6 @@ export default function TradeMore() {
       </div>
 
       {!filtered.length && <p className="mt-10 text-center text-sm text-white/55">No tools match</p>}
-
-      <p className="mt-8 text-center text-[10px] text-white/70">
-        Full rescue suite →{" "}
-        <Link to="/orbitxlaunch/rescue" className="underline hover:text-white/70">
-          Rescue Console
-        </Link>
-      </p>
     </div>
   );
 }

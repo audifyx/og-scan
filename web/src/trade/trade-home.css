@@ -1,17 +1,20 @@
-/* OrbitX Trade Home — scoped redesign */
+/* OrbitX Trade Home — Terminal v2: black / white / gold / silver, glass cards, Caveat display. */
 
 .th {
-  --th-bg: #05080c;
-  --th-ink: #e8f0f8;
-  --th-muted: rgba(200, 220, 236, 0.52);
-  --th-faint: rgba(200, 220, 236, 0.2);
-  --th-line: rgba(61, 231, 255, 0.14);
-  --th-card: rgba(61, 231, 255, 0.04);
-  --th-card-hover: rgba(61, 231, 255, 0.09);
-  --th-accent: #3de7ff;
-  --th-up: #17ff4d;
-  --th-down: #ff4d5e;
-  --th-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --th-bg: var(--term-bg, #050505);
+  --th-ink: var(--term-ink, #f4f4f2);
+  --th-gold: var(--term-gold, #e8b84a);
+  --th-silver: var(--term-silver, #c9d1d9);
+  --th-muted: rgba(244, 244, 242, 0.55);
+  --th-faint: rgba(244, 244, 242, 0.32);
+  --th-line: var(--glass-border, rgba(255, 255, 255, 0.1));
+  --th-card: var(--glass-white, rgba(255, 255, 255, 0.06));
+  --th-card-hover: var(--glass-white-md, rgba(255, 255, 255, 0.1));
+  --th-accent: var(--term-gold, #e8b84a);
+  /* Direction uses the theme's semantic up/down tokens (same as the desk analytics). */
+  --th-up: var(--term-up, #2fd673);
+  --th-down: var(--term-down, #ff5c6c);
+  --th-display: var(--term-hand, "Caveat", cursive);
   --th-body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
   --th-mono: "JetBrains Mono", ui-monospace, monospace;
 
@@ -32,8 +35,8 @@
   inset: 0 0 auto 0;
   height: 340px;
   background:
-    radial-gradient(ellipse 90% 70% at 12% -10%, rgba(61, 231, 255, 0.14), transparent 55%),
-    radial-gradient(ellipse 55% 45% at 92% 8%, rgba(46, 230, 197, 0.1), transparent 50%),
+    radial-gradient(ellipse 90% 70% at 12% -10%, rgba(232, 184, 74, 0.13), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 92% 8%, rgba(201, 209, 217, 0.08), transparent 50%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 70%);
 }
 
@@ -50,7 +53,7 @@
   position: relative;
   z-index: 1;
   flex-shrink: 0;
-  padding: 10px 16px 0;
+  padding: 12px 16px 0;
 }
 
 .th__brand-row {
@@ -58,11 +61,11 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .th__kicker {
-  margin: 0 0 3px;
+  margin: 0 0 2px;
   font-family: var(--th-mono);
   font-size: 10px;
   font-weight: 500;
@@ -74,43 +77,43 @@
 .th__title {
   margin: 0;
   font-family: var(--th-display);
-  font-size: clamp(24px, 6vw, 30px);
-  font-weight: 750;
-  letter-spacing: -0.04em;
-  line-height: 1;
+  font-size: clamp(36px, 9vw, 46px);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: 0.01em;
 }
 
 .th__subtitle {
-  margin: 6px 0 0;
-  font-size: 12px;
+  margin: 8px 0 0;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--th-muted);
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .th__live {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 2px;
-  padding: 6px 10px;
+  margin-top: 4px;
+  padding: 7px 11px;
   border-radius: 999px;
-  border: 1px solid rgba(61, 231, 255, 0.28);
-  background: rgba(61, 231, 255, 0.08);
+  border: 1px solid rgba(232, 184, 74, 0.35);
+  background: rgba(232, 184, 74, 0.1);
   font-family: var(--th-mono);
   font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-weight: 700;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(61, 231, 255, 0.9);
+  color: var(--th-gold);
 }
 
 .th__live-dot {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: var(--th-up);
-  box-shadow: 0 0 0 3px rgba(23, 255, 77, 0.22);
+  background: var(--th-gold);
+  box-shadow: 0 0 0 3px rgba(232, 184, 74, 0.22);
   animation: th-live-pulse 1.6s ease-in-out infinite;
 }
 
@@ -121,7 +124,7 @@
 
 /* Spotlight — mobile = one compact row; desktop = 3 equal tiles */
 .th__spotlight {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .th__spot-mobile {
@@ -129,17 +132,19 @@
   width: 100%;
   align-items: center;
   gap: 12px;
-  padding: 12px 12px;
+  padding: 14px;
   border: 1px solid var(--th-line);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: 20px;
+  background: var(--th-card);
+  backdrop-filter: var(--glass-blur-sm, blur(12px));
+  -webkit-backdrop-filter: var(--glass-blur-sm, blur(12px));
   text-align: left;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .th__spot-mobile:active {
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--th-card-hover);
 }
 
 .th__spot-mobile-body {
@@ -167,10 +172,9 @@
 .th__spot-sym {
   margin: 0;
   font-family: var(--th-display);
-  font-size: 17px;
+  font-size: 22px;
   font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
+  line-height: 1.1;
 }
 
 .th__spot-meta {
@@ -187,9 +191,9 @@
 
 .th__feat-img,
 .th__feat-fallback {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
   flex-shrink: 0;
   object-fit: cover;
   background: rgba(255, 255, 255, 0.08);
@@ -200,14 +204,14 @@
   display: grid;
   place-items: center;
   font-family: var(--th-display);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
 }
 
 .th__chg {
   flex-shrink: 0;
-  padding: 4px 8px;
-  border-radius: 8px;
+  padding: 4px 9px;
+  border-radius: 999px;
   font-family: var(--th-mono);
   font-size: 11px;
   font-weight: 700;
@@ -215,12 +219,12 @@
 
 .th__chg--up {
   color: var(--th-up);
-  background: rgba(61, 214, 140, 0.1);
+  background: color-mix(in srgb, var(--th-up) 12%, transparent);
 }
 
 .th__chg--down {
   color: var(--th-down);
-  background: rgba(255, 107, 107, 0.1);
+  background: color-mix(in srgb, var(--th-down) 10%, transparent);
 }
 
 .th__chg--flat {
@@ -240,26 +244,28 @@
   .th__spot-desk {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
+    gap: 12px;
   }
 
   .th__spot-tile {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     width: 100%;
-    padding: 14px;
+    padding: 16px;
     border: 1px solid var(--th-line);
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.03);
+    border-radius: 20px;
+    background: var(--th-card);
+    backdrop-filter: var(--glass-blur-sm, blur(12px));
+    -webkit-backdrop-filter: var(--glass-blur-sm, blur(12px));
     text-align: left;
     cursor: pointer;
     transition: border-color 0.15s ease, background 0.15s ease;
   }
 
   .th__spot-tile:hover {
-    border-color: rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(232, 184, 74, 0.35);
+    background: var(--th-card-hover);
   }
 
   .th__spot-tile-head {
@@ -280,7 +286,7 @@
     display: flex;
     justify-content: space-between;
     gap: 8px;
-    padding-top: 8px;
+    padding-top: 10px;
     border-top: 1px solid var(--th-line);
     font-family: var(--th-mono);
     font-size: 11px;
@@ -289,13 +295,13 @@
 
   .th__feat-img,
   .th__feat-fallback {
-    width: 40px;
-    height: 40px;
-    border-radius: 11px;
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
   }
 
   .th__spot-sym {
-    font-size: 16px;
+    font-size: 20px;
   }
 }
 
@@ -308,28 +314,28 @@
 
 .th__cat {
   flex: 1;
-  min-height: 42px;
-  border-radius: 12px;
+  min-height: 44px;
+  border-radius: 16px;
   border: 1px solid var(--th-line);
   background: rgba(255, 255, 255, 0.02);
   color: var(--th-muted);
   font-family: var(--th-display);
-  font-size: 12.5px;
+  font-size: 19px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  line-height: 1;
   cursor: pointer;
   transition: all 0.16s ease;
 }
 
 .th__cat:hover {
   color: var(--th-ink);
-  border-color: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
 .th__cat--on {
   color: #0a0a0a;
-  background: #f4f4f2;
-  border-color: #f4f4f2;
+  background: var(--th-gold);
+  border-color: var(--th-gold);
 }
 
 /* Sub-tabs — spaced chips */
@@ -369,15 +375,15 @@
 }
 
 .th__sub--on {
-  color: var(--th-ink);
-  background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(255, 255, 255, 0.16);
+  color: #0a0a0a;
+  background: var(--th-ink);
+  border-color: var(--th-ink);
 }
 
 /* Search */
 .th__search-wrap {
   position: relative;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .th__search-icon {
@@ -393,9 +399,9 @@
 
 .th__search {
   width: 100%;
-  height: 46px;
+  height: 48px;
   padding: 0 44px 0 44px;
-  border-radius: 14px;
+  border-radius: 18px;
   border: 1px solid var(--th-line);
   background: rgba(255, 255, 255, 0.035);
   color: var(--th-ink);
@@ -411,7 +417,7 @@
 }
 
 .th__search:focus {
-  border-color: rgba(255, 255, 255, 0.22);
+  border-color: rgba(232, 184, 74, 0.45);
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -462,18 +468,20 @@
 .th__cards {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .th__card {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
   width: 100%;
-  padding: 12px 12px;
-  border-radius: 14px;
+  padding: 14px;
+  border-radius: 20px;
   border: 1px solid var(--th-line);
   background: var(--th-card);
+  backdrop-filter: var(--glass-blur-sm, blur(12px));
+  -webkit-backdrop-filter: var(--glass-blur-sm, blur(12px));
   text-align: left;
   cursor: pointer;
   transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
@@ -481,7 +489,7 @@
 
 .th__card:hover {
   background: var(--th-card-hover);
-  border-color: rgba(255, 255, 255, 0.14);
+  border-color: rgba(232, 184, 74, 0.3);
 }
 
 .th__card:active {
@@ -500,9 +508,9 @@
 
 .th__logo,
 .th__logo-fallback {
-  width: 40px;
-  height: 40px;
-  border-radius: 11px;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
   flex-shrink: 0;
   object-fit: cover;
   background: rgba(255, 255, 255, 0.08);
@@ -513,7 +521,7 @@
   display: grid;
   place-items: center;
   font-family: var(--th-display);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -531,9 +539,9 @@
 
 .th__sym {
   font-family: var(--th-display);
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 700;
-  letter-spacing: -0.03em;
+  line-height: 1.1;
   white-space: nowrap;
 }
 
@@ -550,31 +558,24 @@
 .th__row2 {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 5px;
+  gap: 6px;
+  margin-top: 6px;
   font-family: var(--th-mono);
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--th-muted);
 }
 
 .th__chip {
   display: inline-flex;
   align-items: center;
-  padding: 10px 16px;
-  min-height: 44px;
+  padding: 3px 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 13px;
+  font-size: 10.5px;
   font-weight: 600;
   color: rgba(244, 244, 242, 0.7);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.th__chip:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(90, 162, 255, 0.4);
-  color: #fff;
+  white-space: nowrap;
 }
 
 .th__stats {
@@ -594,8 +595,8 @@
 .th__pct {
   display: inline-block;
   margin-top: 6px;
-  padding: 4px 8px;
-  border-radius: 10px;
+  padding: 4px 9px;
+  border-radius: 999px;
   font-family: var(--th-mono);
   font-size: 11px;
   font-weight: 700;
@@ -609,6 +610,9 @@
   justify-content: center;
   gap: 10px;
   padding: 64px 20px;
+  border: 1px solid var(--th-line);
+  border-radius: 22px;
+  background: var(--th-card);
   color: var(--th-muted);
   font-size: 14px;
   text-align: center;
@@ -617,9 +621,8 @@
 .th__empty-title {
   margin: 0;
   font-family: var(--th-display);
-  font-size: 18px;
+  font-size: 26px;
   font-weight: 700;
-  letter-spacing: -0.03em;
   color: var(--th-ink);
 }
 
@@ -638,7 +641,7 @@
   margin-top: 8px;
   padding: 10px 16px;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 12px;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.05);
   color: var(--th-ink);
   font-size: 12px;
@@ -654,7 +657,7 @@
   width: 28px;
   height: 28px;
   animation: th-spin 0.8s linear infinite;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--th-gold);
 }
 
 @keyframes th-spin {
@@ -672,9 +675,8 @@
 .th__footer-brand {
   margin: 0;
   font-family: var(--th-display);
-  font-size: 14px;
+  font-size: 20px;
   font-weight: 700;
-  letter-spacing: -0.03em;
 }
 
 .th__footer-copy {

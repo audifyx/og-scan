@@ -47,7 +47,7 @@ export default function ActiveTradingWalletChip({ className = "", showManage = t
           </span>
         ) : (
           <button type="button" onClick={openPicker} className="tx-wallet-chip__cta">
-            <Wallet className="h-3 w-3" /> Connect wallet
+            <Wallet className="h-3 w-3" /> Open wallet
           </button>
         )}
         {showManage ? (

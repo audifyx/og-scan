@@ -2,7 +2,19 @@ import { FormEvent, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTokenIntel } from "../hooks/useTokenIntel";
 import { RiskFactors, RiskGauge } from "../components/RiskGauge";
-import { DevHistoryPanel, HolderTable, TokenOverview } from "../components/TokenPanels";
+import {
+  ClonesPanel,
+  ContractPanel,
+  DevHistoryPanel,
+  HolderTable,
+  LinksPanel,
+  LiquidityPanel,
+  MarketPanel,
+  OgScorePanel,
+  TokenOverview,
+  termH3,
+  termPanel,
+} from "../components/TokenPanels";
 import { isValidMint } from "../api/client";
 
 export default function TokenScanner() {
@@ -18,14 +30,18 @@ export default function TokenScanner() {
     navigate(`/intel/scan/${m}`);
   }
 
+  const mcap = Number(intel.token?.marketCap ?? intel.token?.mcap ?? NaN);
+
   return (
     <div>
       <header className="oxc-hero">
-        <h1>Token scanner</h1>
-        <p>Overview, contract flags, liquidity, holders, rug detection, and explainable safety ratings.</p>
+        <h1 style={{ fontFamily: "var(--term-hand)", color: "var(--term-gold)", fontSize: "2.6rem" }}>
+          Token scanner
+        </h1>
+        <p>OG score, contract, liquidity, holders, deployer, market, rug & clone signals — every check sourced, unknowns shown as unknown.</p>
       </header>
 
-      <form className="oxc-panel" onSubmit={onSubmit} style={{ marginBottom: "1rem" }}>
+      <form className="oxc-panel" onSubmit={onSubmit} style={{ ...termPanel, marginBottom: "1rem" }}>
         <div className="oxc-input-row">
           <input
             className="oxc-input"
@@ -54,23 +70,61 @@ export default function TokenScanner() {
           <TokenOverview mint={intel.mint} token={intel.token} safety={intel.safety} forensics={intel.forensics} />
 
           <div className="oxc-grid oxc-grid-2">
-            <div className="oxc-panel">
-              <h3>Risk score & safety rating</h3>
-              {intel.risk ? <RiskGauge risk={intel.risk} /> : <p className="oxc-empty">No score</p>}
+            <div className="oxc-panel" style={termPanel}>
+              <h3 style={termH3}>OG score</h3>
+              <OgScorePanel ogScore={intel.ogScore} />
             </div>
-            <div className="oxc-panel">
-              <h3>Risk factors</h3>
-              {intel.risk ? <RiskFactors risk={intel.risk} /> : null}
+            <div className="oxc-panel" style={termPanel}>
+              <h3 style={termH3}>Risk score & safety rating</h3>
+              {intel.risk ? <RiskGauge risk={intel.risk} /> : <p className="oxc-empty">No score</p>}
             </div>
           </div>
 
           <div className="oxc-grid oxc-grid-2">
-            <HolderTable token={intel.token} forensics={intel.forensics} />
-            <DevHistoryPanel forensics={intel.forensics} />
+            <div className="oxc-panel" style={termPanel}>
+              <h3 style={termH3}>Contract</h3>
+              <ContractPanel forensics={intel.forensics} safety={intel.safety} token={intel.token} />
+            </div>
+            <div className="oxc-panel" style={termPanel}>
+              <h3 style={termH3}>Liquidity</h3>
+              <LiquidityPanel token={intel.token} forensics={intel.forensics} dexPairs={intel.dexPairs} />
+            </div>
           </div>
 
-          <div className="oxc-panel">
-            <h3>Tradeability note</h3>
+          <div className="oxc-panel" style={termPanel}>
+            <h3 style={termH3}>Market</h3>
+            <MarketPanel token={intel.token} dexPairs={intel.dexPairs} />
+          </div>
+
+          <div className="oxc-grid oxc-grid-2">
+            <div className="oxc-panel" style={termPanel}>
+              <h3 style={termH3}>Holders</h3>
+              <HolderTable token={intel.token} forensics={intel.forensics} />
+            </div>
+            <div className="oxc-panel" style={termPanel}>
+              <h3 style={termH3}>Deployer</h3>
+              <DevHistoryPanel forensics={intel.forensics} />
+            </div>
+          </div>
+
+          <div className="oxc-grid oxc-grid-2">
+            <div className="oxc-panel" style={termPanel}>
+              <h3 style={termH3}>Clone signals</h3>
+              <ClonesPanel research={intel.research} ownMcap={Number.isFinite(mcap) ? mcap : null} mint={intel.mint} />
+            </div>
+            <div className="oxc-panel" style={termPanel}>
+              <h3 style={termH3}>Links</h3>
+              <LinksPanel token={intel.token} research={intel.research} mint={intel.mint} />
+            </div>
+          </div>
+
+          <div className="oxc-panel" style={termPanel}>
+            <h3 style={termH3}>Risk factors</h3>
+            {intel.risk ? <RiskFactors risk={intel.risk} /> : null}
+          </div>
+
+          <div className="oxc-panel" style={termPanel}>
+            <h3 style={termH3}>Tradeability note</h3>
             <p className="oxc-muted" style={{ margin: 0, fontSize: "0.85rem" }}>
               {intel.safety?.note || "Run completed — see Jupiter verdict above."}
             </p>

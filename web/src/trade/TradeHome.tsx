@@ -4,6 +4,7 @@ import { Loader2, RefreshCw, Search, X } from "lucide-react";
 import { fetchScreener, searchCoins, type MarketCoin } from "./tradeApi";
 import { fmtNum, fmtPct, fmtUsd } from "./tradeFmt";
 import TokenAvatar from "./TokenAvatar";
+import PulseFeed from "./PulseFeed";
 import "./trade-home.css";
 
 type Cat = "discover" | "pump" | "curated";
@@ -16,7 +17,7 @@ const CATS: { id: Cat; label: string }[] = [
 
 const TABS: Record<Cat, { id: string; label: string }[]> = {
   discover: [
-    { id: "trending", label: "Trending" },
+    { id: "pulse", label: "Pulse" },
     { id: "runners", label: "Runners" },
     { id: "new", label: "New" },
     { id: "fomo", label: "FOMO" },
@@ -68,7 +69,7 @@ function CoinLogo({ coin, size = "card" }: { coin: MarketCoin; size?: "card" | "
 export default function TradeHome() {
   const navigate = useNavigate();
   const [cat, setCat] = useState<Cat>("discover");
-  const [tab, setTab] = useState("trending");
+  const [tab, setTab] = useState("pulse");
   const [coins, setCoins] = useState<MarketCoin[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState("");
@@ -82,6 +83,13 @@ export default function TradeHome() {
   }, [cat]);
 
   useEffect(() => {
+    // Pulse is a self-contained feed (own fetcher, own refresh) — no screener call.
+    if (tab === "pulse") {
+      setCoins([]);
+      setLoading(false);
+      setLoadErr("");
+      return;
+    }
     let on = true;
     setLoading(true);
     setLoadErr("");
@@ -114,9 +122,10 @@ export default function TradeHome() {
   }, [q]);
 
   const searchingMode = q.trim().length >= 2;
+  const pulseMode = tab === "pulse" && !searchingMode;
   const list = searchingMode ? results : coins;
   const subTabs = TABS[cat];
-  const featured = !searchingMode && !loading ? coins.slice(0, 3) : [];
+  const featured = !searchingMode && !pulseMode && !loading ? coins.slice(0, 3) : [];
 
   const openCoin = (mint: string) => {
     try {
@@ -145,7 +154,9 @@ export default function TradeHome() {
                 ? "Syncing…"
                 : searchingMode
                   ? `${list.length} results`
-                  : `${list.length} coins in ${subTabs.find((t) => t.id === tab)?.label || "feed"}`}
+                  : pulseMode
+                    ? "Live signals · whale & KOL flow"
+                    : `${list.length} coins in ${subTabs.find((t) => t.id === tab)?.label || "feed"}`}
             </p>
           </div>
           <div className="th__live" aria-live="polite">
@@ -154,7 +165,7 @@ export default function TradeHome() {
           </div>
         </div>
 
-        {featured.length > 0 && (
+        {!pulseMode && featured.length > 0 && (
           <section className="th__spotlight" aria-label="Top in feed">
             <button
               type="button"
@@ -255,16 +266,20 @@ export default function TradeHome() {
           ) : null}
         </div>
 
-        <div className="th__cols">
-          <span>#</span>
-          <span>Token</span>
-          <span>Mcap</span>
-          <span>24h</span>
-        </div>
+        {!pulseMode && (
+          <div className="th__cols">
+            <span>#</span>
+            <span>Token</span>
+            <span>Mcap</span>
+            <span>24h</span>
+          </div>
+        )}
       </div>
 
       <div className="th__list">
-        {loading && !list.length ? (
+        {pulseMode ? (
+          <PulseFeed />
+        ) : loading && !list.length ? (
           <div className="th__loading">
             <Loader2 className="th__spin" />
             <p>Loading markets…</p>
@@ -319,13 +334,15 @@ export default function TradeHome() {
           </div>
         )}
 
-        <footer className="th__footer">
-          <p className="th__footer-brand">OrbitX Trade</p>
-          <p className="th__footer-copy">Live Solana markets · non-custodial desk</p>
-          <p className="th__footer-meta">
-            {searchingMode ? "Search" : subTabs.find((t) => t.id === tab)?.label || "Feed"} · updated live
-          </p>
-        </footer>
+        {!pulseMode && (
+          <footer className="th__footer">
+            <p className="th__footer-brand">OrbitX Trade</p>
+            <p className="th__footer-copy">Live Solana markets · non-custodial desk</p>
+            <p className="th__footer-meta">
+              {searchingMode ? "Search" : subTabs.find((t) => t.id === tab)?.label || "Feed"} · updated live
+            </p>
+          </footer>
+        )}
       </div>
     </div>
   );

@@ -320,7 +320,7 @@ export default function TradePortfolio() {
                 <p>
                   {localActive
                     ? "Set a default local trading wallet to see holdings"
-                    : "Connect a wallet to see your bag and PnL"}
+                    : "Open your wallet to see your bag and PnL"}
                 </p>
                 {picker}
                 {localActive ? (
@@ -329,7 +329,7 @@ export default function TradePortfolio() {
                   </Link>
                 ) : (
                   <button type="button" onClick={openPicker} className="tp__btn mt-5">
-                    Connect wallet
+                    Open wallet
                   </button>
                 )}
               </div>

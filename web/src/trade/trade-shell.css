@@ -6,31 +6,34 @@
   --tx-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --tx-body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
   --tx-mono: "JetBrains Mono", ui-monospace, monospace;
-  --tx-hand: "Caveat", "Segoe Script", "Bradley Hand", cursive;
+  --tx-hand: var(--term-hand, "Caveat", "Segoe Script", "Bradley Hand", cursive);
 
-  /* Black / white / gold / silver theme tokens */
-  --tx-bg: #050505;
-  --tx-ink: #f4f4f2;
-  --tx-muted: rgba(244, 244, 242, 0.55);
-  --tx-faint: rgba(244, 244, 242, 0.22);
-  --tx-line: rgba(232, 184, 74, 0.16);
-  --tx-glass: rgba(10, 10, 9, 0.58);
-  --tx-glass-strong: rgba(8, 8, 7, 0.78);
+  /* Black / white / gold / silver theme tokens.
+   * Aliased to the --term-* tokens in index.css (:root) — that block is
+   * the single source of truth. Fallbacks below equal the current values
+   * so the shell still renders if loaded without index.css. */
+  --tx-bg: var(--term-bg, #050505);
+  --tx-ink: var(--term-ink, #f4f4f2);
+  --tx-muted: var(--term-muted, rgba(244, 244, 242, 0.55));
+  --tx-faint: var(--term-faint, rgba(244, 244, 242, 0.22));
+  --tx-line: var(--term-line, rgba(232, 184, 74, 0.16));
+  --tx-glass: var(--term-glass, rgba(10, 10, 9, 0.58));
+  --tx-glass-strong: var(--term-glass-strong, rgba(8, 8, 7, 0.78));
   --tx-highlight: rgba(255, 255, 255, 0.14);
-  --tx-accent: #e8b84a;
-  --tx-accent-2: #c9d1d9;
-  --tx-accent-soft: rgba(232, 184, 74, 0.14);
-  --tx-up: #2fd673;
-  --tx-down: #ff5c6c;
+  --tx-accent: var(--term-gold, #e8b84a);
+  --tx-accent-2: var(--term-silver, #c9d1d9);
+  --tx-accent-soft: var(--term-gold-soft, rgba(232, 184, 74, 0.14));
+  --tx-up: var(--term-up, #2fd673);
+  --tx-down: var(--term-down, #ff5c6c);
 
   display: flex;
   flex-direction: column;
   height: 100dvh;
   overflow: hidden;
   background:
-    radial-gradient(ellipse 85% 55% at 50% -10%, rgba(232, 184, 74, 0.12), transparent 55%),
-    radial-gradient(ellipse 55% 40% at 100% 18%, rgba(201, 209, 217, 0.08), transparent 50%),
-    radial-gradient(ellipse 50% 35% at 0% 70%, rgba(232, 184, 74, 0.05), transparent 55%),
+    radial-gradient(ellipse 85% 55% at 50% -10%, color-mix(in srgb, var(--tx-accent) 12%, transparent), transparent 55%),
+    radial-gradient(ellipse 55% 40% at 100% 18%, color-mix(in srgb, var(--tx-accent-2) 8%, transparent), transparent 50%),
+    radial-gradient(ellipse 50% 35% at 0% 70%, color-mix(in srgb, var(--tx-accent) 5%, transparent), transparent 55%),
     var(--tx-bg);
   color: var(--tx-ink);
   font-family: var(--tx-body);
@@ -77,10 +80,10 @@
   border-radius: 10px;
   background: rgba(8, 10, 9, 0.9);
   box-shadow:
-    0 0 0 1px rgba(232, 184, 74, 0.28),
+    0 0 0 1px color-mix(in srgb, var(--tx-accent) 28%, transparent),
     0 1px 0 rgba(255, 255, 255, 0.2) inset,
     0 6px 18px rgba(0, 0, 0, 0.4),
-    0 0 20px rgba(232, 184, 74, 0.12);
+    0 0 20px color-mix(in srgb, var(--tx-accent) 12%, transparent);
 }
 
 .tx-header__name {
@@ -134,10 +137,10 @@
 }
 
 .tx-header__bell--on {
-  background: linear-gradient(145deg, rgba(232, 184, 74, 0.95), rgba(201, 209, 217, 0.88));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--tx-accent) 95%, transparent), color-mix(in srgb, var(--tx-accent-2) 88%, transparent));
   color: #0a0a0a;
   border-color: transparent;
-  box-shadow: 0 0 18px rgba(232, 184, 74, 0.28);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--tx-accent) 28%, transparent);
 }
 
 .tx-main {
@@ -173,13 +176,13 @@
   isolation: isolate;
   overflow: hidden;
 
-  border: 1px solid rgba(232, 184, 74, 0.2);
+  border: 1px solid color-mix(in srgb, var(--tx-accent) 20%, transparent);
   background:
-    linear-gradient(180deg, rgba(232, 184, 74, 0.1) 0%, rgba(255, 255, 255, 0.03) 38%, rgba(8, 8, 7, 0.4) 100%),
+    linear-gradient(180deg, color-mix(in srgb, var(--tx-accent) 10%, transparent) 0%, rgba(255, 255, 255, 0.03) 38%, rgba(8, 8, 7, 0.4) 100%),
     var(--tx-glass);
   box-shadow:
     0 20px 50px rgba(0, 0, 0, 0.55),
-    0 0 40px rgba(232, 184, 74, 0.06),
+    0 0 40px color-mix(in srgb, var(--tx-accent) 6%, transparent),
     0 1px 0 rgba(255, 255, 255, 0.18) inset,
     0 -1px 0 rgba(0, 0, 0, 0.35) inset;
   backdrop-filter: blur(28px) saturate(1.55);
@@ -197,7 +200,7 @@
     rgba(255, 255, 255, 0.18) 0%,
     transparent 28%,
     transparent 72%,
-    rgba(232, 184, 74, 0.12) 100%
+    color-mix(in srgb, var(--tx-accent) 12%, transparent) 100%
   );
   opacity: 0.9;
   z-index: 0;
@@ -239,10 +242,10 @@
 
 .tx-dock__icon--on {
   color: #0a0a0a;
-  background: linear-gradient(160deg, rgba(232, 184, 74, 0.98) 0%, rgba(201, 209, 217, 0.9) 100%);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tx-accent) 98%, transparent) 0%, color-mix(in srgb, var(--tx-accent-2) 90%, transparent) 100%);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.55) inset,
-    0 6px 18px rgba(232, 184, 74, 0.32);
+    0 6px 18px color-mix(in srgb, var(--tx-accent) 32%, transparent);
   transform: translateY(-1px);
 }
 
@@ -295,7 +298,7 @@
 }
 
 .tx-wallet-chip__mode--on {
-  background: linear-gradient(160deg, rgba(232, 184, 74, 0.95), rgba(201, 209, 217, 0.88));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tx-accent) 95%, transparent), color-mix(in srgb, var(--tx-accent-2) 88%, transparent));
   color: #0a0a0a;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) inset;
 }
@@ -324,7 +327,7 @@
   height: 6px;
   border-radius: 999px;
   background: var(--tx-accent-2);
-  box-shadow: 0 0 0 3px rgba(158, 182, 212, 0.18);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tx-accent-2) 18%, transparent);
 }
 
 .tx-wallet-chip__dot--local {

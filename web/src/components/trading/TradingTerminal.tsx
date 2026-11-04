@@ -28,6 +28,8 @@ import {
   type AlertKind,
 } from "@/trade/tradeAlerts";
 import { getBuyPresets, getSellPresets, saveBuyPresets } from "@/trade/tradePresets";
+import { TradeAnalytics } from "@/trade/TradeAnalytics";
+import PulseFeed from "@/trade/PulseFeed";
 import { fetchWallet, findWalletPnlToken } from "@/trade/tradeApi";
 import { fmtPnl, fmtTok, fmtUsd } from "@/trade/tradeFmt";
 import { Button } from "@/components/ui/button";
@@ -132,7 +134,7 @@ const DEFAULT_MINTS: { mint: string; symbol: string; name: string }[] = [
 /** Same market universe as ORBITX_DEX Screener (minus social feed). */
 type MarketCategory = "discover" | "pumpfun" | "curated" | "wallet";
 type MarketTab =
-  | "trending" | "runners" | "new" | "fomo" | "jupiter"
+  | "pulse" | "runners" | "new" | "fomo" | "jupiter"
   | "unbonded" | "migrated" | "moonshot" | "newpairs"
   | "og" | "kols" | "celebrity" | "organic" | "listed"
   | "positions";
@@ -146,7 +148,7 @@ const MARKET_CATEGORIES: { id: MarketCategory; label: string }[] = [
 
 const TABS_BY_CATEGORY: Record<MarketCategory, { id: MarketTab; label: string }[]> = {
   discover: [
-    { id: "trending", label: "Trending" },
+    { id: "pulse", label: "Pulse" },
     { id: "runners", label: "Runners" },
     { id: "new", label: "New" },
     { id: "fomo", label: "FOMO" },
@@ -171,7 +173,7 @@ const TABS_BY_CATEGORY: Record<MarketCategory, { id: MarketTab; label: string }[
 };
 
 const DEFAULT_TAB: Record<MarketCategory, MarketTab> = {
-  discover: "trending",
+  discover: "pulse",
   pumpfun: "unbonded",
   curated: "og",
   wallet: "positions",
@@ -244,7 +246,7 @@ function dexScreenerEmbedUrl(ref: string, interval: string): string {
   return `https://dexscreener.com/solana/${ref}?${q.toString()}`;
 }
 
-const BOTTOM_TABS = ["Trades", "My Trades", "Positions", "Top Traders", "Clusters"] as const;
+const BOTTOM_TABS = ["Trades", "My Trades", "Positions", "Top Traders", "Clusters", "Analytics"] as const;
 type BottomTab = (typeof BOTTOM_TABS)[number];
 
 const GECKO_BASE = "https://api.geckoterminal.com/api/v2";
@@ -426,7 +428,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   const [clusterHolderCount, setClusterHolderCount] = useState<number | null>(null);
   const [loadingXray, setLoadingXray] = useState(false);
   const [marketCategory, setMarketCategory] = useState<MarketCategory>("discover");
-  const [marketTab, setMarketTab] = useState<MarketTab>("trending");
+  const [marketTab, setMarketTab] = useState<MarketTab>("pulse");
   const [bottomTab, setBottomTab] = useState<BottomTab>("Trades");
   const [myTrades, setMyTrades] = useState<any[]>([]);
   const [myTradesLoading, setMyTradesLoading] = useState(false);
@@ -498,7 +500,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       setLoadingTokens(false);
       return;
     }
-    if (marketTab === "positions") return;
+    if (marketTab === "positions" || marketTab === "pulse") return;
     let cancelled = false;
     (async () => {
       setLoadingTokens(true);
@@ -1777,10 +1779,10 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   return (
     <>
     {renderWalletPickerOverlay()}
-    <div className={`flex h-full min-h-0 bg-black ${deskMode ? "flex-col overflow-y-auto overscroll-contain lg:flex-row lg:overflow-hidden" : "min-h-[calc(100vh-68px)] flex-col overflow-y-auto lg:min-h-0 lg:flex-row lg:overflow-hidden"}`}>
+    <div className={`flex h-full min-h-0 bg-[var(--term-bg-deep)] ${deskMode ? "flex-col overflow-y-auto overscroll-contain lg:flex-row lg:overflow-hidden" : "min-h-[calc(100vh-68px)] flex-col overflow-y-auto lg:min-h-0 lg:flex-row lg:overflow-hidden"}`}>
 
       {/* ??????????????? LEFT SIDEBAR (hidden in desk mode) ??????????????? */}
-      <aside className={`${deskMode ? "hidden" : "hidden lg:flex"} flex-col w-[300px] min-w-[300px] border-r border-white/10 bg-[#050505]`}>
+      <aside className={`${deskMode ? "hidden" : "hidden lg:flex"} flex-col w-[300px] min-w-[300px] border-r border-white/10 bg-[var(--term-bg)]`}>
         {/* Category + market tabs (full DEX universe) */}
         <div className="border-b border-white/10">
           <div className="flex overflow-x-auto scrollbar-none">
@@ -1818,7 +1820,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               </button>
             ))}
           </div>
-          {marketTab !== "positions" && (
+          {marketTab !== "positions" && marketTab !== "pulse" && (
             <p className="px-3 py-1 text-[9px] text-white/25 font-mono">
               {loadingTokens ? "Loading?" : `${tokens.length} tokens`}
             </p>
@@ -1871,6 +1873,10 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           {loadingTokens ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-5 w-5 animate-spin text-white/60" />
+            </div>
+          ) : marketTab === "pulse" ? (
+            <div className="p-2">
+              <PulseFeed />
             </div>
           ) : marketTab !== "positions" ? (
             tokens.map((token) => (
@@ -1957,14 +1963,14 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
 
       {/* ??????????????? CENTER PANEL ??????????????? */}
       {/* Mobile swap first: on phones the trade panel sits above the chart. */}
-      <div className="lg:hidden border-b border-white/[0.07] bg-[#050505]">
+      <div className="lg:hidden border-b border-white/[0.07] bg-[var(--term-bg)]">
         {renderSwapPanel()}
       </div>
       <div className={`flex min-w-0 flex-col ${deskMode ? "min-h-[85vh] lg:min-h-0 lg:flex-1 lg:overflow-hidden" : "min-h-0 flex-1 overflow-hidden"}`}>
 
         {/* Mobile market browser ? only in full mode */}
         {!deskMode && (
-        <div className="lg:hidden border-b border-white/10 bg-[#050505]">
+        <div className="lg:hidden border-b border-white/10 bg-[var(--term-bg)]">
           <div className="p-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/25" />
@@ -1998,7 +2004,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
 
         {/* Token header */}
         {t && (
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.07] bg-[#050505]/80 flex-wrap">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.07] bg-[var(--term-bg)]/80 flex-wrap">
             {deskMode && (
               <a
                 href={`/trade/token/${selectedMint}`}
@@ -2077,7 +2083,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         )}
 
         {/* Chart controls ? DexScreener embed */}
-        <div className="flex items-center gap-1 px-3 py-1.5 border-b border-white/10 bg-black">
+        <div className="flex items-center gap-1 px-3 py-1.5 border-b border-white/10 bg-[var(--term-bg-deep)]">
           {(Object.keys(TIMEFRAME_CONFIG) as Timeframe[]).map((tf) => (
             <button
               key={tf}
@@ -2118,9 +2124,9 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         </div>
 
         {/* DexScreener chart ? delayed mount so swap UI paints first */}
-        <div className="relative min-h-[180px] flex-1 bg-black lg:min-h-[240px]">
+        <div className="relative min-h-[180px] flex-1 bg-[var(--term-bg-deep)] lg:min-h-[240px]">
           {(!mountChart || !chartReady) && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black">
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-[var(--term-bg-deep)]">
               <Loader2 className="h-6 w-6 animate-spin text-white/60" />
               <p className="text-[11px] text-white/60">Loading chart?</p>
             </div>
@@ -2144,8 +2150,8 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
 
         {/* Bottom tabs: Trades / My Trades / Positions / Top Traders */}
         <div
-          className={`flex shrink-0 flex-col border-t border-white/10 bg-[#050505] ${
-            bottomTab === "Clusters"
+          className={`flex shrink-0 flex-col border-t border-white/10 bg-[var(--term-bg)] ${
+            bottomTab === "Clusters" || bottomTab === "Analytics"
               ? "min-h-[520px] sm:min-h-[640px]"
               : "h-[240px] sm:h-[260px]"
           }`}
@@ -2176,7 +2182,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {bottomTab === "Trades" && (
               <>
-                <div className="sticky top-0 grid grid-cols-6 gap-2 border-b border-white/[0.05] bg-[#050505] px-3 py-1.5 text-[10px] font-medium text-white/25">
+                <div className="sticky top-0 grid grid-cols-6 gap-2 border-b border-white/[0.05] bg-[var(--term-bg)] px-3 py-1.5 text-[10px] font-medium text-white/25">
                   <span>Time</span><span>Type</span><span>Price</span><span>Amount</span><span>Value</span><span>Wallet</span>
                 </div>
                 {trades.length === 0 ? (
@@ -2253,7 +2259,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             {bottomTab === "Positions" && (
               tradeReady && positions.length > 0 ? (
                 <>
-                  <div className="sticky top-0 grid grid-cols-4 gap-2 border-b border-white/[0.05] bg-[#050505] px-3 py-1.5 text-[10px] font-medium text-white/25">
+                  <div className="sticky top-0 grid grid-cols-4 gap-2 border-b border-white/[0.05] bg-[var(--term-bg)] px-3 py-1.5 text-[10px] font-medium text-white/25">
                     <span>Token</span><span>Balance</span><span>Price</span><span>Value</span>
                   </div>
                   {positions.slice(0, 40).map((pos) => {
@@ -2382,13 +2388,37 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 )}
               </div>
             )}
+            {bottomTab === "Analytics" && (
+              <TradeAnalytics
+                source={
+                  t
+                    ? {
+                        mint: selectedMint,
+                        symbol: t.symbol,
+                        volume5m: t.volume5m,
+                        volume24h: t.volume24h,
+                        buys5m: t.buys5m,
+                        sells5m: t.sells5m,
+                        buyVol5m: t.buyVol5m,
+                        sellVol5m: t.sellVol5m,
+                        trades,
+                        holders: clusterHolders,
+                        holderCount: clusterHolderCount,
+                        top10Pct: security?.top10HoldersPercent ?? null,
+                        devPct: security?.devHoldersPercent ?? null,
+                      }
+                    : null
+                }
+                onSelectMint={selectToken}
+              />
+            )}
 
           </div>
         </div>
       </div>
 
       {/* ??????????????? RIGHT SIDEBAR (Desktop) ??????????????? */}
-      <aside className="hidden lg:flex flex-col w-[320px] min-w-[320px] border-l border-white/[0.07] bg-[#050505]">
+      <aside className="hidden lg:flex flex-col w-[320px] min-w-[320px] border-l border-white/[0.07] bg-[var(--term-bg)]">
         {/* 5m stats bar */}
         {t && (
           <div className="grid grid-cols-3 border-b border-white/[0.07]">
@@ -2464,7 +2494,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       </aside>
 
       {/* ??????????????? MOBILE SWAP & INFO SECTION ??????????????? */}
-      <div className="lg:hidden bg-[#050505] border-t border-white/[0.07]">
+      <div className="lg:hidden bg-[var(--term-bg)] border-t border-white/[0.07]">
         {/* 5m stats */}
         {t && (
           <div className="grid grid-cols-3 border-b border-white/[0.07]">

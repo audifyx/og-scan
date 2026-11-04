@@ -255,14 +255,14 @@ export default function TradeProfile() {
 
         {!addr ? (
           <div className="mt-4 text-center py-4">
-            <p className="text-sm text-white/70">Connect your in-app wallet to see balances</p>
+            <p className="text-sm text-white/70">Open your in-app wallet to see balances</p>
             {picker}
             <button
               type="button"
               onClick={openPicker}
               className="mt-3 h-12 w-full rounded-2xl bg-white text-sm font-bold text-black"
             >
-              Connect wallet
+              Open wallet
             </button>
           </div>
         ) : (

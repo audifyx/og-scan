@@ -57,13 +57,28 @@
     --og-ink: var(--background);
     --og-grid: var(--border);
 
-    /* OrbitX Terminal — black / white / gold / silver (display only) */
+    /* OrbitX Terminal — black / white / gold / silver (display only)
+     * Single source of truth for the Terminal palette. Every Terminal
+     * surface (trade shell, desk, analytics) reads these vars — change
+     * the palette here and it follows everywhere. Do not hardcode the
+     * hex values in Terminal components; use var(--term-*) instead. */
     --term-gold: #e8b84a;
     --term-gold-hsl: 42 79% 60%;
+    --term-gold-soft: rgba(232, 184, 74, 0.14);
     --term-silver: #c9d1d9;
     --term-silver-dim: #8b98a5;
     --term-ink: #f4f4f2;
+    --term-muted: rgba(244, 244, 242, 0.55);
+    --term-faint: rgba(244, 244, 242, 0.22);
     --term-bg: #050505;
+    --term-bg-2: #0a0a0a;
+    --term-bg-deep: #000000;
+    --term-line: rgba(232, 184, 74, 0.16);
+    --term-line-soft: rgba(255, 255, 255, 0.08);
+    --term-glass: rgba(10, 10, 9, 0.58);
+    --term-glass-strong: rgba(8, 8, 7, 0.78);
+    --term-up: #2fd673;
+    --term-down: #ff5c6c;
     --term-hand: "Caveat", "Segoe Script", "Bradley Hand", cursive;
 
     /* ── Glass system tokens ── */

@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Activity,
   ArrowUpRight,
+  AlertTriangle,
   Bell,
   Bot,
   ChevronLeft,
@@ -48,6 +49,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import "./command-hub.css";
 import { useAuth } from "@/hooks/useAuth";
 import { DEFAULT_OG_MINT, OGSCAN_TOKEN_MINT, SOL_MINT, STORAGE_OG_MINT, shortAddr, type JupTokenInfo } from "@/lib/og";
 import { CoinDetailDialog } from "@/components/CoinDetailDialog";
@@ -60,7 +62,6 @@ import { ToolHeader, EmeraldHeader, SegmentedTabs } from "@/components/ToolPageS
 
 /* ─── Standard Feature imports ─── */
 const OgStats = lazy(() => import("@/components/OgStats").then(m => ({ default: m.OgStats })));
-import SocialHome from "@/components/SocialHome";
 const Scanner = lazy(() => import("@/components/Scanner").then(m => ({ default: m.Scanner })));
 const Trending = lazy(() => import("@/components/Trending").then(m => ({ default: m.Trending })));
 const OgFinder = lazy(() => import("@/components/OgFinder").then(m => ({ default: m.OgFinder })));
@@ -196,7 +197,7 @@ class TabErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         <div className="flex flex-col items-center justify-center gap-4 py-20 px-6 text-center">
-          <p className="text-2xl">⚠️</p>
+          <AlertTriangle className="h-6 w-6 text-[var(--term-gold)]" />
           <p className="text-sm font-bold text-white/60">This tab ran into an error.</p>
           <p className="text-xs text-white/30 max-w-xs">{this.state.error}</p>
           <button
@@ -253,7 +254,7 @@ type TabId =
   | "research";
 
 type TabAccent = "blue" | "white" | "cyan" | "gold" | "lime";
-type TabGroup = "Main" | "Forensics" | "Market" | "Project";
+type TabGroup = "Main" | "Forensics" | "Live" | "Tools" | "Social" | "Project" | "Account";
 type CommunitySubTab = "social" | "rooms" | "spaces" | "communities" | "discover";
 
 type TabConfig = {
@@ -268,6 +269,8 @@ type TabConfig = {
   group: TabGroup;
   showInNav?: boolean;
   mergedInto?: TabId;
+  /** Excluded from the /command hub cards (e.g. its route no longer lands on the tool). */
+  hideFromHub?: boolean;
 };
 
 const TABS: TabConfig[] = [
@@ -317,7 +320,7 @@ const TABS: TabConfig[] = [
     description: "New coins, repeat creators, watch alerts, migration timing, and launch quality scores.",
     Icon: Target,
     accent: "cyan",
-    group: "Forensics",
+    group: "Live",
     showInNav: false,
     mergedInto: "tools",
   },
@@ -330,7 +333,7 @@ const TABS: TabConfig[] = [
     description: "Migration timing module for Pump.fun breakout and DEX arrival tracking.",
     Icon: Rocket,
     accent: "gold",
-    group: "Forensics",
+    group: "Live",
     showInNav: false,
     mergedInto: "snipe-feed",
   },
@@ -343,7 +346,7 @@ const TABS: TabConfig[] = [
     description: "Trending coins, pair discovery, whale context, bundle status, boosts, and CTO analytics.",
     Icon: Rss,
     accent: "lime",
-    group: "Market",
+    group: "Live",
     showInNav: false,
     mergedInto: "tools",
   },
@@ -356,7 +359,7 @@ const TABS: TabConfig[] = [
     description: "Fast price, liquidity, holders, and market cap for any active mint.",
     Icon: Activity,
     accent: "blue",
-    group: "Market",
+    group: "Live",
     showInNav: false,
     mergedInto: "feed",
   },
@@ -369,7 +372,7 @@ const TABS: TabConfig[] = [
     description: "New pool, liquidity, and routing intelligence across Solana DEXes.",
     Icon: Radar,
     accent: "cyan",
-    group: "Market",
+    group: "Live",
     showInNav: false,
     mergedInto: "feed",
   },
@@ -382,7 +385,7 @@ const TABS: TabConfig[] = [
     description: "Live token momentum and catalyst discovery.",
     Icon: Flame,
     accent: "cyan",
-    group: "Market",
+    group: "Live",
     showInNav: false,
     mergedInto: "feed",
   },
@@ -395,7 +398,7 @@ const TABS: TabConfig[] = [
     description: "Holder concentration and whale structure for the selected mint.",
     Icon: Wallet,
     accent: "white",
-    group: "Market",
+    group: "Live",
     showInNav: false,
     mergedInto: "feed",
   },
@@ -408,7 +411,7 @@ const TABS: TabConfig[] = [
     description: "Live buy/sell tape for the currently selected token.",
     Icon: Activity,
     accent: "cyan",
-    group: "Market",
+    group: "Live",
     showInNav: false,
     mergedInto: "feed",
   },
@@ -421,7 +424,7 @@ const TABS: TabConfig[] = [
     description: "Search coins and quote routes while keeping scanner context on-screen.",
     Icon: Zap,
     accent: "blue",
-    group: "Market",
+    group: "Tools",
     showInNav: false,
     mergedInto: "tools",
   },
@@ -448,6 +451,7 @@ const TABS: TabConfig[] = [
     Icon: Map,
     accent: "cyan",
     group: "Project",
+    hideFromHub: true,
     showInNav: false,
     mergedInto: "tools",
   },
@@ -473,7 +477,7 @@ const TABS: TabConfig[] = [
     description: "Elon, Trump, White House & more — find the coins before the market reacts.",
     Icon: Radio,
     accent: "lime",
-    group: "Market",
+    group: "Live",
     showInNav: false,
     mergedInto: "tools",
   },
@@ -486,7 +490,7 @@ const TABS: TabConfig[] = [
     description: "Join crypto communities, share alpha, post calls, and chat with fellow traders.",
     Icon: Users,
     accent: "cyan",
-    group: "Main",
+    group: "Social",
     showInNav: false,
     mergedInto: "community",
   },
@@ -499,7 +503,7 @@ const TABS: TabConfig[] = [
     description: "Trending tokens, top trader leaderboard, whale watch, and live social activity.",
     Icon: Compass,
     accent: "gold",
-    group: "Main",
+    group: "Social",
     showInNav: false,
     mergedInto: "community",
   },
@@ -512,7 +516,7 @@ const TABS: TabConfig[] = [
     description: "Live meme feed from the OG Memes Room — fresh degens art, memes, and vibes.",
     Icon: Palette,
     accent: "lime",
-    group: "Main",
+    group: "Social",
     showInNav: false,
     mergedInto: "tools",
   },
@@ -525,7 +529,7 @@ const TABS: TabConfig[] = [
     description: "Join or start live voice rooms — alpha calls, discussions, and community hangouts.",
     Icon: Radio,
     accent: "cyan",
-    group: "Main",
+    group: "Social",
     showInNav: false,
     mergedInto: "community",
   },
@@ -538,7 +542,7 @@ const TABS: TabConfig[] = [
     description: "Discord-style community hub — chat, voice lobby, rooms, and live streams.",
     Icon: MessageSquare,
     accent: "lime",
-    group: "Main",
+    group: "Social",
     showInNav: false,
     mergedInto: "community",
   },
@@ -551,7 +555,7 @@ const TABS: TabConfig[] = [
     description: "List & promote tokens — paste a CA, Helius pulls all data, analytics, and verdict.",
     Icon: Star,
     accent: "gold",
-    group: "Main",
+    group: "Tools",
   },
   {
     id: "token-manager",
@@ -562,7 +566,7 @@ const TABS: TabConfig[] = [
     description: "Update your token's image, description & links on-chain — changes show on every platform. Free.",
     Icon: Pencil,
     accent: "lime",
-    group: "Main",
+    group: "Tools",
   },
   {
     id: "trading-hub",
@@ -573,7 +577,7 @@ const TABS: TabConfig[] = [
     description: "Token Launcher, Trading Lobbies, and Alpha Callouts — all in one place.",
     Icon: TrendingUp,
     accent: "lime",
-    group: "Main",
+    group: "Tools",
   },
   {
     id: "community",
@@ -584,7 +588,7 @@ const TABS: TabConfig[] = [
     description: "Chat, voice spaces, communities, and discovery — all in one hub.",
     Icon: Users,
     accent: "cyan",
-    group: "Main",
+    group: "Social",
   },
   {
     id: "coin-communities",
@@ -595,7 +599,7 @@ const TABS: TabConfig[] = [
     description: "Live feed and top communities powered by CoinCommunities — real posts from real traders.",
     Icon: Globe,
     accent: "lime",
-    group: "Main",
+    group: "Social",
   },
   {
     id: "tools",
@@ -606,7 +610,7 @@ const TABS: TabConfig[] = [
     description: "Every forensic, market, and trading tool — organized by category.",
     Icon: Wrench,
     accent: "gold",
-    group: "Main",
+    group: "Tools",
   },
   {
     id: "profile",
@@ -617,7 +621,7 @@ const TABS: TabConfig[] = [
     description: "View your profile, settings, and account preferences.",
     Icon: User,
     accent: "cyan",
-    group: "Main",
+    group: "Account",
   },
   {
     id: "charts",
@@ -628,7 +632,7 @@ const TABS: TabConfig[] = [
     description: "Real-time DEX charts powered by DexScreener with favorites and history.",
     Icon: LineChart,
     accent: "cyan",
-    group: "Market",
+    group: "Tools",
   },
   {
     id: "live-trading",
@@ -639,7 +643,7 @@ const TABS: TabConfig[] = [
     description: "Track your trades, watch signals, and manage your portfolio in real-time.",
     Icon: TrendingUp,
     accent: "lime",
-    group: "Market",
+    group: "Tools",
   },
   {
     id: "live-feed-page",
@@ -652,7 +656,7 @@ const TABS: TabConfig[] = [
     accent: "cyan",
     showInNav: false,
     mergedInto: "community",
-    group: "Market",
+    group: "Live",
   },
   {
     id: "research",
@@ -1152,9 +1156,28 @@ const ToolsTabbed = ({ mint, onSelectMint }: { mint: string; onSelectMint: (m: s
   );
 };
 
+/* ─── Overview / Command Dashboard ───
+ * /command home: grouped tool cards + quick actions. Every card launches a
+ * real destination — in-hub tabs go through switchTab (which navigates to the
+ * tab's /<slug>; App.tsx then either renders the tab inside Index or
+ * redirects to its live /ORBITX_DEX equivalent), and out-of-hub actions use
+ * routes verified in App.tsx (/terminal, /ORBITX_DEX, /launchpad,
+ * /orbitx-social). The only tab kept out of the hub is "roadmap": /roadmap
+ * redirects to the "/" splash, so it cannot launch its tool from here. */
+const HUB_SECTIONS: { group: TabGroup; title: string; blurb: string; Icon: ComponentType<{ className?: string }> }[] = [
+  { group: "Forensics", title: "Forensics", blurb: "Prove it before you buy it — mint checks, origin proof, and full token intel.", Icon: Search },
+  { group: "Live", title: "Live Feeds", blurb: "Fresh launches, migrations, market tape, and whale flow — as it happens.", Icon: Radio },
+  { group: "Tools", title: "Tools", blurb: "Swap, charts, listings, and the pro trading suite.", Icon: Wrench },
+  { group: "Social", title: "Social", blurb: "Communities, voice rooms, memes, and discovery.", Icon: Users },
+  { group: "Project", title: "OrbitX", blurb: "The token, the tech, and where this is going.", Icon: Coins },
+  { group: "Account", title: "Account", blurb: "Your profile and preferences.", Icon: User },
+];
+
 const OverviewPage = ({
+  mint,
   onSwitchTab,
-  onSelectMint,
+  onScanClick,
+  onChangeMint,
 }: {
   mint: string;
   onSwitchTab: (t: TabId) => void;
@@ -1162,27 +1185,95 @@ const OverviewPage = ({
   onChangeMint: () => void;
   onSelectMint: (m: string) => void;
 }) => {
-  // Home is now an X-style social timeline (composer + live community feed),
-  // wired to the shared social_messages feed. Quick-action launcher removed.
-  return <SocialHome onSwitchTab={(t) => onSwitchTab(t as TabId)} onSelectMint={onSelectMint} />;
+  const navigate = useNavigate();
+  const hubTabs = TABS.filter((t) => t.id !== "overview" && !t.hideFromHub);
+  const quickActions: { label: string; desc: string; Icon: ComponentType<{ className?: string }>; onClick: () => void; primary?: boolean }[] = [
+    { label: "Scan a token", desc: "Paste any mint", Icon: Search, onClick: onChangeMint, primary: true },
+    { label: "Open Scanner", desc: "Truth Scan", Icon: Crosshair, onClick: onScanClick },
+    { label: "Open Terminal", desc: "Trade · Portfolio · Launch", Icon: LineChart, onClick: () => navigate("/terminal") },
+    { label: "Open DEX", desc: "OrbitX DEX", Icon: ArrowUpRight, onClick: () => navigate("/ORBITX_DEX") },
+    { label: "Launchpad", desc: "Launch a token", Icon: Rocket, onClick: () => navigate("/launchpad") },
+    { label: "Social", desc: "Community feed", Icon: MessageSquare, onClick: () => navigate("/orbitx-social") },
+  ];
+  return (
+    <div className="cmd-hub mx-auto w-full max-w-6xl space-y-8 pb-4">
+      {/* Header */}
+      <header className="cmd-panel relative overflow-hidden rounded-3xl p-5 sm:p-7">
+        <p className="cmd-eyebrow">OrbitX Terminal · Command Hub</p>
+        <h1 className="cmd-title mt-1 text-5xl leading-none sm:text-6xl">Command</h1>
+        <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-[var(--term-silver)]">
+          Launch scanner, OG finder, snipe feed, and every standalone tool from one command hub.
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="cmd-mint-chip">
+            <span className="cmd-mint-dot" />
+            Watching <span className="font-mono font-bold text-[var(--term-ink)]">{shortAddr(mint)}</span>
+          </span>
+          <button type="button" onClick={onChangeMint} className="cmd-mint-change">Change mint</button>
+        </div>
+      </header>
+
+      {/* Quick actions */}
+      <section aria-label="Quick actions">
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <h2 className="cmd-section-title">Quick actions</h2>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-white/30">{quickActions.length} shortcuts</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+          {quickActions.map((a) => (
+            <button key={a.label} type="button" onClick={a.onClick} className={cn("cmd-quick", a.primary && "cmd-quick-primary")}>
+              <a.Icon className="h-5 w-5" />
+              <span className="text-[13px] font-black leading-tight">{a.label}</span>
+              <span className="text-[10px] leading-tight opacity-60">{a.desc}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Grouped tool sections */}
+      {HUB_SECTIONS.map((section) => {
+        const tools = hubTabs.filter((t) => t.group === section.group);
+        if (tools.length === 0) return null;
+        return (
+          <section key={section.group} aria-label={section.title}>
+            <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="cmd-section-icon"><section.Icon className="h-4 w-4" /></span>
+              <h2 className="cmd-section-title">{section.title}</h2>
+              <span className="cmd-count">{tools.length} {tools.length === 1 ? "tool" : "tools"}</span>
+              <span className="hidden text-[11px] text-white/30 md:block">{section.blurb}</span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {tools.map((tool) => (
+                <QuickToolCard key={tool.id} tool={tool} onClick={() => onSwitchTab(tool.id)} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+
+      <p className="pb-2 text-center text-[11px] text-white/25">
+        Every card opens a live tool — no placeholders. The social timeline lives under Social.
+      </p>
+    </div>
+  );
 };
 
 const QuickToolCard = ({ tool, onClick }: { tool: TabConfig; onClick: () => void }) => (
   <button
     type="button"
     onClick={onClick}
-    className="group relative flex flex-col gap-3 overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.03] p-4 text-left transition hover:border-white/[0.12] hover:bg-white/[0.05] active:scale-[0.99]"
+    className="cmd-card group relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4 text-left transition active:scale-[0.99]"
   >
     <div className="flex items-start justify-between gap-3">
-      <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border", accentIcon(tool.accent))}>
+      <div className="cmd-card-icon">
         <tool.Icon className="h-5 w-5" />
       </div>
-      <ArrowUpRight className={cn("h-4 w-4 opacity-0 transition group-hover:opacity-100", accentText(tool.accent))} />
+      <ArrowUpRight className="cmd-card-arrow h-4 w-4 opacity-0 transition group-hover:opacity-100" />
     </div>
     <div>
-      <div className={cn("mb-0.5 text-[9px] font-bold uppercase tracking-widest", accentText(tool.accent))}>{tool.eyebrow}</div>
-      <div className="text-[15px] font-black text-white">{tool.label}</div>
-      <p className="mt-1.5 line-clamp-2 text-[12px] leading-relaxed text-white/45">{tool.description}</p>
+      <div className="cmd-card-eyebrow mb-0.5">{tool.eyebrow}</div>
+      <div className="cmd-card-label text-[15px] font-black">{tool.label}</div>
+      <p className="cmd-card-desc mt-1.5 line-clamp-2 text-[12px] leading-relaxed">{tool.description}</p>
     </div>
   </button>
 );
