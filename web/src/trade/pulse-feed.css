@@ -498,11 +498,11 @@
 }
 
 .pf__up {
-  color: var(--term-up, #2fd673);
+  color: var(--term-up, #e8b84a);
 }
 
 .pf__down {
-  color: var(--term-down, #ff5c6c);
+  color: var(--term-down, #c9d1d9);
 }
 
 .pf__muted {

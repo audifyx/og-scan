@@ -12,8 +12,8 @@
   --th-card-hover: var(--glass-white-md, rgba(255, 255, 255, 0.1));
   --th-accent: var(--term-gold, #e8b84a);
   /* Direction uses the theme's semantic up/down tokens (same as the desk analytics). */
-  --th-up: var(--term-up, #2fd673);
-  --th-down: var(--term-down, #ff5c6c);
+  --th-up: var(--term-up, #e8b84a);
+  --th-down: var(--term-down, #c9d1d9);
   --th-display: var(--term-hand, "Caveat", cursive);
   --th-body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
   --th-mono: "JetBrains Mono", ui-monospace, monospace;

@@ -23,8 +23,8 @@
   --tx-accent: var(--term-gold, #e8b84a);
   --tx-accent-2: var(--term-silver, #c9d1d9);
   --tx-accent-soft: var(--term-gold-soft, rgba(232, 184, 74, 0.14));
-  --tx-up: var(--term-up, #2fd673);
-  --tx-down: var(--term-down, #ff5c6c);
+  --tx-up: var(--term-up, #e8b84a);
+  --tx-down: var(--term-down, #c9d1d9);
 
   display: flex;
   flex-direction: column;

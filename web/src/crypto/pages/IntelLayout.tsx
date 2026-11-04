@@ -32,7 +32,8 @@ export default function IntelLayout() {
             OrbitX
             <span>Crypto Intelligence</span>
           </div>
-          {NAV.map(({ to, end, label, icon: Icon }) => (
+          {/* Launchpad is hidden from the Intel sidebar (entry stays in NAV data, filtered at render). */}
+          {NAV.filter((n) => n.label !== "Launchpad").map(({ to, end, label, icon: Icon }) => (
             <NavLink key={to} to={to} end={end} className={({ isActive }) => (isActive ? "active" : undefined)}>
               <Icon size={16} />
               {label}
@@ -46,9 +47,7 @@ export default function IntelLayout() {
             <a href="/ORBITX_DEX" className="oxc-link" style={{ fontSize: "0.75rem" }}>
               Full DEX →
             </a>
-            <Link to="/orbitxlaunch/rescue" className="oxc-link" style={{ fontSize: "0.75rem" }}>
-              Launchpad →
-            </Link>
+            {/* Launchpad quick link hidden from the sidebar. */}
             <Link to="/supercomputer?tab=agent" className="oxc-link" style={{ fontSize: "0.75rem" }}>
               Super Computer →
             </Link>

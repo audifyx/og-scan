@@ -77,8 +77,8 @@
     --term-line-soft: rgba(255, 255, 255, 0.08);
     --term-glass: rgba(10, 10, 9, 0.58);
     --term-glass-strong: rgba(8, 8, 7, 0.78);
-    --term-up: #2fd673;
-    --term-down: #ff5c6c;
+    --term-up: #e8b84a;
+    --term-down: #c9d1d9;
     --term-hand: "Caveat", "Segoe Script", "Bradley Hand", cursive;
 
     /* ── Glass system tokens ── */
