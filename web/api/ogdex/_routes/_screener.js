@@ -93,6 +93,56 @@ export function filterNewPairCoins(coins, cutoffMs) {
     .filter((c) => (c.created_timestamp ?? 0) >= cutoffMs && (c.usd_market_cap || 0) >= 2500);
 }
 
+// ── DexScreener fallback for the Pump tabs ────────────────────────────────────
+// pump.fun's frontend API 403s from Vercel IPs, so on the deployed site
+// fetchPump returns [] and both Pump tabs would be empty. DexScreener indexes
+// the same coins: still-on-the-curve pairs trade on the pump.fun AMM and show
+// up with dexId "pumpfun"; once a coin graduates it moves to pumpswap/raydium
+// and leaves this dex. Same mcap windows as the pump.fun path, so the tabs
+// show the same kind of coins from a working source — never placeholders.
+export function normDexPumpfunPair(p) {
+  if (!p || String(p.dexId || "").toLowerCase() !== "pumpfun") return null;
+  const mint = p.baseToken?.address;
+  if (!mint) return null;
+  const createdMs = p.pairCreatedAt ? Number(p.pairCreatedAt) : 0;
+  return {
+    mint,
+    name: p.baseToken?.name || null,
+    symbol: p.baseToken?.symbol || null,
+    icon: p.info?.imageUrl || null,
+    priceUsd: num(p.priceUsd),
+    mcap: num(p.marketCap) ?? num(p.fdv),
+    liquidity: num(p.liquidity?.usd),
+    volume: num(p.volume?.h24),
+    change5m: num(p.priceChange?.m5),
+    change1h: num(p.priceChange?.h1),
+    change24h: num(p.priceChange?.h24),
+    holderCount: null,
+    chain: "solana",
+    poolAddress: p.pairAddress || null,
+    createdAt: createdMs ? new Date(createdMs).toISOString() : null,
+    lastTrade: createdMs || 0,
+    bondingPct: null, // DexScreener cannot see the bonding curve — unknown, not 0
+    _source: "dexscreener",
+  };
+}
+
+export function filterDexUnbondedPairs(pairs) {
+  return (Array.isArray(pairs) ? pairs : [])
+    .map(normDexPumpfunPair)
+    .filter(Boolean)
+    .filter((r) => (r.mcap || 0) >= 1500 && (r.mcap || 0) <= 40000)
+    .sort((a, b) => (b.lastTrade || 0) - (a.lastTrade || 0));
+}
+
+export function filterDexNewPairs(pairs, cutoffMs) {
+  return (Array.isArray(pairs) ? pairs : [])
+    .map(normDexPumpfunPair)
+    .filter(Boolean)
+    .filter((r) => (r.lastTrade || 0) >= cutoffMs && (r.mcap || 0) >= 2500)
+    .sort((a, b) => (b.lastTrade || 0) - (a.lastTrade || 0));
+}
+
 // ── GeckoTerminal pool normalizer ─────────────────────────────────────────────
 function normGecko(item, tokenMap = {}, fallbackChain) {
   if (!item) return null;
@@ -190,6 +240,20 @@ async function fetchPump(sortBy, limit = 200, filterFn = null) {
     return filterFn ? coins.filter(filterFn) : coins;
   } catch (e) {
     console.error("pump.fun fetch failed:", e.message);
+    return [];
+  }
+}
+
+// ── DexScreener pump.fun-dex pairs (fallback when pump.fun 403s, e.g. Vercel) ─
+async function fetchDexPumpfun() {
+  try {
+    const resp = await fetch(`https://api.dexscreener.com/latest/dex/search?q=pumpfun&chainId=solana`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return Array.isArray(data?.pairs) ? data.pairs : [];
+  } catch {
     return [];
   }
 }
@@ -318,6 +382,11 @@ export default async function handler(req, res) {
       // Still on the curve (complete=false) with real size but below the
       // ~graduation cap. Sorted by most recent trade first.
       rows = dedup(filterUnbondedCoins(coins)).slice(0, limit);
+      // pump.fun 403s from Vercel IPs → fetchPump returns []. Fall back to the
+      // same coins via DexScreener's pumpfun dex (same mcap window).
+      if (!rows.length) {
+        rows = dedup(filterDexUnbondedPairs(await fetchDexPumpfun())).slice(0, limit);
+      }
 
     // ── Pump.fun: Migrated (graduated — DexScreener has real volume) ──────────
     } else if (type === "migrated") {
@@ -388,6 +457,11 @@ export default async function handler(req, res) {
       rows = dedupBySymbol(dedup(enriched))
         .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
         .slice(0, limit);
+      // pump.fun 403s from Vercel IPs → no coins to enrich. Fall back to the
+      // same newest coins via DexScreener's pumpfun dex (created <24h).
+      if (!rows.length) {
+        rows = dedupBySymbol(dedup(filterDexNewPairs(await fetchDexPumpfun(), cutoff24h))).slice(0, limit);
+      }
 
     // ── Moonshot (Jupiter moonshot-verified tag) ──────────────────────────────
     } else if (type === "moonshot") {

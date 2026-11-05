@@ -8,7 +8,7 @@
  * (unknown) when reserves are absent.
  */
 import { describe, it, expect } from "vitest";
-import { filterUnbondedCoins, filterNewPairCoins } from "./_screener.js";
+import { filterUnbondedCoins, filterNewPairCoins, normDexPumpfunPair, filterDexUnbondedPairs, filterDexNewPairs } from "./_screener.js";
 
 const now = Date.now();
 const base = (over = {}) => ({
@@ -75,5 +75,74 @@ describe("filterNewPairCoins", () => {
 
   it("passes complete coins too (both bonded + unbonded)", () => {
     expect(filterNewPairCoins([base({ complete: true })], cutoff)).toHaveLength(1);
+  });
+});
+
+/**
+ * DexScreener fallback for the Pump tabs.
+ *
+ * pump.fun's frontend API 403s from Vercel IPs, so on the deployed site the
+ * pump.fun fetch returns [] and both Pump tabs would be empty. The fallback
+ * reads the same coins from DexScreener's pumpfun dex (still-on-the-curve
+ * pairs trade there; graduated coins move to pumpswap/raydium).
+ */
+const dexPair = (over = {}) => ({
+  chainId: "solana",
+  dexId: "pumpfun",
+  pairAddress: "Pair11111111111111111111111111111111111111",
+  baseToken: { address: "Mint111111111111111111111111111111111111111", name: "Test", symbol: "TEST" },
+  priceUsd: "0.00001",
+  marketCap: 5000,
+  fdv: 5000,
+  liquidity: { usd: 1200 },
+  volume: { h24: 3000 },
+  priceChange: { m5: 1, h1: 2, h24: 3 },
+  pairCreatedAt: now - 3600_000,
+  info: { imageUrl: "https://example.com/img.png" },
+  ...over,
+});
+
+describe("normDexPumpfunPair", () => {
+  it("maps a pumpfun pair to a desk row with _source dexscreener", () => {
+    const r = normDexPumpfunPair(dexPair());
+    expect(r.mint).toBe("Mint111111111111111111111111111111111111111");
+    expect(r.symbol).toBe("TEST");
+    expect(r.mcap).toBe(5000);
+    expect(r._source).toBe("dexscreener");
+    expect(r.bondingPct).toBeNull();
+  });
+
+  it("returns null for non-pumpfun pairs and pairs without a base address", () => {
+    expect(normDexPumpfunPair(dexPair({ dexId: "raydium" }))).toBeNull();
+    expect(normDexPumpfunPair(dexPair({ baseToken: {} }))).toBeNull();
+    expect(normDexPumpfunPair(null)).toBeNull();
+  });
+});
+
+describe("filterDexUnbondedPairs", () => {
+  it("passes pumpfun pairs with mcap in 1500–40000, sorted newest first", () => {
+    const rows = filterDexUnbondedPairs([
+      dexPair({ baseToken: { address: "Old111111111111111111111111111111111111111", name: "Old", symbol: "OLD" }, pairCreatedAt: now - 7200_000 }),
+      dexPair({ baseToken: { address: "New111111111111111111111111111111111111111", name: "New", symbol: "NEW" }, pairCreatedAt: now - 1000 }),
+    ]);
+    expect(rows.map((r) => r.symbol)).toEqual(["NEW", "OLD"]);
+  });
+
+  it("excludes out-of-range mcap and migrated (non-pumpfun) pairs", () => {
+    expect(filterDexUnbondedPairs([dexPair({ marketCap: 1000 })])).toHaveLength(0);
+    expect(filterDexUnbondedPairs([dexPair({ marketCap: 50000 })])).toHaveLength(0);
+    expect(filterDexUnbondedPairs([dexPair({ dexId: "pumpswap" })])).toHaveLength(0);
+  });
+});
+
+describe("filterDexNewPairs", () => {
+  const cutoff = now - 86_400_000;
+  it("passes pumpfun pairs created in the last 24h with mcap >= 2500", () => {
+    expect(filterDexNewPairs([dexPair()], cutoff)).toHaveLength(1);
+  });
+
+  it("excludes pairs older than 24h and tiny mcap", () => {
+    expect(filterDexNewPairs([dexPair({ pairCreatedAt: now - 2 * 86_400_000 })], cutoff)).toHaveLength(0);
+    expect(filterDexNewPairs([dexPair({ marketCap: 100 })], cutoff)).toHaveLength(0);
   });
 });
