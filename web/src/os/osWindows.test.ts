@@ -95,4 +95,48 @@ describe("osWindowsReducer", () => {
     expect(s.windows[0].hrefOverride).toBe("/ORBITX_DEX?mint=abc");
     expect(s.windows[0].pinned).toBe(true);
   });
+
+  it("split saves floating geometry and unsplit restores it", () => {
+    let s = osWindowsReducer(EMPTY_OS_WINDOWS, { type: "open", window: win("a", "A") });
+    s = osWindowsReducer(s, { type: "split", id: "a", zone: 0, x: 0, y: 0, w: 960, h: 1080 });
+    expect(s.windows[0].splitZone).toBe(0);
+    expect(s.windows[0].splitPrev).toEqual({ x: 100, y: 80, w: 800, h: 520 });
+    expect(s.windows[0].w).toBe(960);
+    // Re-slotting keeps the original floating geometry.
+    s = osWindowsReducer(s, { type: "split", id: "a", zone: 1, x: 960, y: 0, w: 960, h: 1080 });
+    expect(s.windows[0].splitZone).toBe(1);
+    expect(s.windows[0].splitPrev).toEqual({ x: 100, y: 80, w: 800, h: 520 });
+    s = osWindowsReducer(s, { type: "unsplit", id: "a" });
+    expect(s.windows[0].splitZone).toBeNull();
+    expect(s.windows[0].splitPrev).toBeNull();
+    expect(s.windows[0].x).toBe(100);
+    expect(s.windows[0].y).toBe(80);
+    expect(s.windows[0].w).toBe(800);
+    expect(s.windows[0].h).toBe(520);
+  });
+
+  it("minimize and maximize free the split zone and restore geometry", () => {
+    let s = osWindowsReducer(EMPTY_OS_WINDOWS, { type: "open", window: win("a", "A") });
+    s = osWindowsReducer(s, { type: "split", id: "a", zone: 0, x: 0, y: 0, w: 960, h: 1080 });
+    s = osWindowsReducer(s, { type: "minimize", id: "a" });
+    expect(s.windows[0].minimized).toBe(true);
+    expect(s.windows[0].splitZone).toBeNull();
+    expect(s.windows[0].w).toBe(800);
+    s = osWindowsReducer(s, { type: "restore", id: "a" });
+    expect(s.windows[0].minimized).toBe(false);
+    expect(s.windows[0].splitZone).toBeNull();
+    s = osWindowsReducer(s, { type: "split", id: "a", zone: 1, x: 960, y: 0, w: 960, h: 1080 });
+    s = osWindowsReducer(s, { type: "toggle-maximize", id: "a" });
+    expect(s.windows[0].maximized).toBe(true);
+    expect(s.windows[0].splitZone).toBeNull();
+    expect(s.windows[0].x).toBe(100);
+  });
+
+  it("snap does not touch split state (reflow uses it)", () => {
+    let s = osWindowsReducer(EMPTY_OS_WINDOWS, { type: "open", window: win("a", "A") });
+    s = osWindowsReducer(s, { type: "split", id: "a", zone: 0, x: 0, y: 0, w: 960, h: 1080 });
+    s = osWindowsReducer(s, { type: "snap", id: "a", x: 0, y: 0, w: 960, h: 540 });
+    expect(s.windows[0].splitZone).toBe(0);
+    expect(s.windows[0].h).toBe(540);
+  });
 });

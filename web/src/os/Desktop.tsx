@@ -17,8 +17,10 @@ import { WalletConnectButton } from "@/components/WalletConnectButton";
 import {
   EMPTY_OS_WINDOWS,
   osWindowsReducer,
+  type OsWindow,
   type OsWindowKind,
 } from "./osWindows";
+import { SPLIT_MAX, splitRect, splitSlotForPoint } from "./splitView";
 import { CalendarApp, MiniCal, ShortcutsBody, TasksApp, daysUntil, isoDay, quoteOfDay } from "./osWave4";
 import {
   OS_ACCENTS,
@@ -626,6 +628,7 @@ export default function Desktop(props: DesktopProps) {
   const [cmdQ, setCmdQ] = useState("");
   const [cmdTokens, setCmdTokens] = useState<TokenSearchRow[]>([]);
   const [snapPreview, setSnapPreview] = useState<"left" | "right" | "max" | "tl" | "tr" | "bl" | "br" | null>(null);
+  const [splitPreview, setSplitPreview] = useState<{ slot: number; rect: { x: number; y: number; w: number; h: number } } | null>(null);
   const [winMenuId, setWinMenuId] = useState<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [jumpNoteId, setJumpNoteId] = useState<string | null>(null);
@@ -692,6 +695,7 @@ export default function Desktop(props: DesktopProps) {
   const [discordServerId, setDiscordServerId] = useState("");
   const [discordServerInput, setDiscordServerInput] = useState("");
   const [viewportW, setViewportW] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 1280));
+  const [viewportH, setViewportH] = useState(() => (typeof window !== "undefined" ? window.innerHeight : 800));
   const [phoneSwitcherOpen, setPhoneSwitcherOpen] = useState(false);
   const [phoneFolderId, setPhoneFolderId] = useState<string | null>(null);
 
@@ -717,7 +721,10 @@ export default function Desktop(props: DesktopProps) {
   useEffect(() => { saveOsDesktops(desktops); }, [desktops]);
   useEffect(() => { saveOsLayouts(layouts); }, [layouts]);
   useEffect(() => {
-    const onResize = () => setViewportW(window.innerWidth);
+    const onResize = () => {
+      setViewportW(window.innerWidth);
+      setViewportH(window.innerHeight);
+    };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
@@ -732,6 +739,51 @@ export default function Desktop(props: DesktopProps) {
     if (w.tabGroupId) groupMaxZ.set(w.tabGroupId, Math.max(groupMaxZ.get(w.tabGroupId) ?? 0, w.z));
   }
   const renderWindows = visibleWindows.filter((w) => !w.tabGroupId || groupMaxZ.get(w.tabGroupId) === w.z);
+
+  // Split view: windows holding a split slot, in slot order. Reflow keeps
+  // them filling their zones when the viewport resizes or the split set
+  // changes (close/minimize/unsnap). Skipped mid-drag — the drag handler
+  // owns geometry until drop.
+  const splitWindows = visibleWindows
+    .filter((w) => w.splitZone != null && !w.minimized)
+    .sort((a, b) => (a.splitZone ?? 0) - (b.splitZone ?? 0));
+  const splitCount = splitWindows.length;
+  const splitSignature = splitWindows.map((w) => `${w.id}:${w.splitZone}`).join(",");
+  // Once a multi-window split existed, the last window standing expands to
+  // fill the freed zone instead of sitting in a half on its own. Reset when
+  // split view empties, so a fresh single snap takes a half again.
+  const splitWasMultiRef = useRef(false);
+  // Bumped when a window drag ends: the reflow effect skips mid-drag (the
+  // window is under the cursor), so without this it would never re-run
+  // after a drag-out changed the split set.
+  const [dragSeq, setDragSeq] = useState(0);
+  // True while a window is being dragged. The root gets .oxos--dragging,
+  // which disables pointer events on iframes — otherwise a drag dies the
+  // moment the cursor crosses another app's iframe (its pointer events
+  // never reach the root, so the drop zone never registers).
+  const [winDragging, setWinDragging] = useState(false);
+
+  useEffect(() => {
+    if (splitCount === 0) {
+      splitWasMultiRef.current = false;
+      return;
+    }
+    if (splitCount >= 2) splitWasMultiRef.current = true;
+    if (dragRef.current?.type === "win") return;
+    const el = rootRef.current;
+    const vw = el?.clientWidth ?? window.innerWidth;
+    const vh = el?.clientHeight ?? window.innerHeight;
+    for (const w of splitWindows) {
+      const r =
+        splitCount === 1 && splitWasMultiRef.current
+          ? { x: 0, y: 0, w: vw, h: vh }
+          : splitRect(splitCount, w.splitZone ?? 0, vw, vh, isPhone);
+      if (w.x !== r.x || w.y !== r.y || w.w !== r.w || w.h !== r.h) {
+        dispatch({ type: "snap", id: w.id, x: r.x, y: r.y, w: r.w, h: r.h });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [splitSignature, viewportW, viewportH, dragSeq]);
 
   const pushNotification = (title: string, body: string, kind: OsNotification["kind"]) => {
     const n: OsNotification = {
@@ -1087,39 +1139,88 @@ export default function Desktop(props: DesktopProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.seasonalTheme]);
 
-  /** Arrange all open windows (idea bank #5: snap layouts menu). */
+  /** Arrange all open windows (idea bank #5: snap layouts menu). Halves/grid
+   *  build a real split group (up to 4 apps, reflows on close/resize);
+   *  stack cascades them as floating windows. */
   const arrangeWindows = (mode: "halves" | "grid" | "stack") => {
-    const el = rootRef.current;
-    const rect = el?.getBoundingClientRect();
-    const vw = rect?.width ?? window.innerWidth;
-    const vh = rect?.height ?? window.innerHeight;
     const wins = visibleWindows.filter((w) => !w.minimized);
     if (!wins.length) return;
+    const el = rootRef.current;
+    const vw = el?.clientWidth ?? window.innerWidth;
+    const vh = el?.clientHeight ?? window.innerHeight;
     if (mode === "stack") {
       wins.forEach((w, i) => {
+        if (w.splitZone != null) dispatch({ type: "unsplit", id: w.id });
         dispatch({ type: "snap", id: w.id, x: 24 + i * 32, y: 24 + i * 32, w: Math.min(640, vw - 64), h: Math.min(480, vh - 140) });
       });
       return;
     }
-    if (mode === "halves") {
-      const half = Math.floor(vw / 2);
-      wins.forEach((w, i) => {
-        dispatch({ type: "snap", id: w.id, x: i % 2 === 0 ? 0 : half, y: 0, w: half, h: vh });
-      });
+    const take = wins.slice(0, SPLIT_MAX);
+    take.forEach((w, i) => {
+      const r = splitRect(take.length, i, vw, vh, isPhone);
+      dispatch({ type: "split", id: w.id, zone: i, x: r.x, y: r.y, w: r.w, h: r.h });
+    });
+  };
+
+  /**
+   * Snap a window into a split slot, inserting at `slot` and shifting the
+   * windows after it up one slot. A 5th window never joins split view.
+   * On phones the first split pairs with the topmost other window (apps
+   * open maximized there, and going home minimizes them — without pairing
+   * the split window would sit alone over a maximized app).
+   */
+  const snapToSplit = (id: string, slot: number) => {
+    const el = rootRef.current;
+    const vw = el?.clientWidth ?? window.innerWidth;
+    const vh = el?.clientHeight ?? window.innerHeight;
+    const current = ws.windows
+      .filter((w) => w.splitZone != null && !w.minimized && w.id !== id)
+      .sort((a, b) => (a.splitZone ?? 0) - (b.splitZone ?? 0));
+    if (current.length >= SPLIT_MAX) {
+      pushNotification("Split view is full", "4 apps max — close or unsnap one first.", "system");
       return;
     }
-    const cols = Math.ceil(Math.sqrt(wins.length));
-    const rows = Math.ceil(wins.length / cols);
-    wins.forEach((w, i) => {
-      dispatch({
-        type: "snap",
-        id: w.id,
-        x: Math.floor((i % cols) * vw / cols),
-        y: Math.floor(Math.floor(i / cols) * vh / rows),
-        w: Math.floor(vw / cols),
-        h: Math.floor(vh / rows),
-      });
+    let pair: OsWindow | null = null;
+    if (isPhone && current.length === 0) {
+      pair =
+        [...visibleWindows]
+          .filter((x) => x.id !== id && !x.pinned)
+          .sort((a, b) => (a.minimized === b.minimized ? b.z - a.z : a.minimized ? 1 : -1))[0] ?? null;
+    }
+    const newCount = current.length + 1 + (pair ? 1 : 0);
+    // A lone window may take either half (slot 0 or 1); for 2+ the slots
+    // run 0..newCount-1. Clamping to current.length would force a lone
+    // window dragged to the right edge back into the left half.
+    const maxSlot = newCount === 1 ? 1 : newCount - 1;
+    const target = Math.max(0, Math.min(maxSlot, slot));
+    if (pair) {
+      if (pair.minimized) dispatch({ type: "restore", id: pair.id });
+      const pr = splitRect(newCount, 1 - target, vw, vh, isPhone);
+      dispatch({ type: "split", id: pair.id, zone: 1 - target, x: pr.x, y: pr.y, w: pr.w, h: pr.h });
+    }
+    current.forEach((w, i) => {
+      const newSlot = i >= target ? i + 1 : i;
+      if ((w.splitZone ?? 0) !== newSlot) {
+        dispatch({ type: "split", id: w.id, zone: newSlot, x: w.x, y: w.y, w: w.w, h: w.h });
+      }
     });
+    const r = splitRect(newCount, target, vw, vh, isPhone);
+    dispatch({ type: "split", id, zone: target, x: r.x, y: r.y, w: r.w, h: r.h });
+    setActiveWin(id);
+  };
+
+  /** Header split button: snap the window into the next free zone, or
+   *  unsnap it if it is already split. */
+  const toggleSplit = (w: OsWindow) => {
+    if (w.splitZone != null) {
+      dispatch({ type: "unsplit", id: w.id });
+      return;
+    }
+    if (splitCount >= SPLIT_MAX) {
+      pushNotification("Split view is full", "4 apps max — close or unsnap one first.", "system");
+      return;
+    }
+    snapToSplit(w.id, splitCount);
   };
 
   /** Social in a small window pinned above everything else — the voice mini-player. */
@@ -1276,18 +1377,42 @@ export default function Desktop(props: DesktopProps) {
         x: Math.min(rect.width - 80, Math.max(-200, d.origX + (e.clientX - d.startX))),
         y: Math.min(rect.height - 110, Math.max(0, d.origY + (e.clientY - d.startY))),
       });
-      // Snap preview: corners tile quarters (#4), edges tile halves, top maximizes.
+      // Split view: dragging to a side edge offers a split slot (the zone
+      // preview shows where it lands); corners join the split grid when
+      // one is active, otherwise keep the old quarter tiles; top maximizes.
       const px = e.clientX - rect.left;
       const py = e.clientY - rect.top;
       const edge = 14;
-      if (px <= edge && py <= edge) setSnapPreview("tl");
-      else if (px >= rect.width - edge && py <= edge) setSnapPreview("tr");
-      else if (px <= edge && py >= rect.height - edge) setSnapPreview("bl");
-      else if (px >= rect.width - edge && py >= rect.height - edge) setSnapPreview("br");
-      else if (px <= edge) setSnapPreview("left");
-      else if (px >= rect.width - edge) setSnapPreview("right");
-      else if (py <= edge) setSnapPreview("max");
-      else setSnapPreview(null);
+      const atLeft = px <= edge;
+      const atRight = px >= rect.width - edge;
+      const atTop = py <= edge;
+      const atBottom = py >= rect.height - edge;
+      const sideEdge = (atLeft || atRight) && !atTop && !atBottom;
+      const corner = (atLeft || atRight) && (atTop || atBottom);
+      const newCount = Math.min(splitCount + 1, SPLIT_MAX);
+      if (splitCount < SPLIT_MAX && (sideEdge || (corner && splitCount > 0))) {
+        const slot = splitSlotForPoint(px, py, newCount, rect.width, rect.height, isPhone);
+        setSplitPreview({ slot, rect: splitRect(newCount, slot, rect.width, rect.height, isPhone) });
+        setSnapPreview(null);
+      } else if (corner && atLeft && atTop) {
+        setSnapPreview("tl");
+        setSplitPreview(null);
+      } else if (corner && atRight && atTop) {
+        setSnapPreview("tr");
+        setSplitPreview(null);
+      } else if (corner && atLeft && atBottom) {
+        setSnapPreview("bl");
+        setSplitPreview(null);
+      } else if (corner && atRight && atBottom) {
+        setSnapPreview("br");
+        setSplitPreview(null);
+      } else if (atTop && !atLeft && !atRight) {
+        setSnapPreview("max");
+        setSplitPreview(null);
+      } else {
+        setSnapPreview(null);
+        setSplitPreview(null);
+      }
     } else if (d.type === "widget") {
       const x = Math.min(92, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
       const y = Math.min(86, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100));
@@ -1314,10 +1439,19 @@ export default function Desktop(props: DesktopProps) {
   const onRootUp = (e: React.PointerEvent) => {
     const d = dragRef.current;
     dragRef.current = null;
+    setWinDragging(false);
     if (!d) return;
     if (d.type === "win") {
-      // Drop on a snap edge tiles / maximizes the window.
-      if (snapPreview) {
+      // A window drag may have changed the split set (drag-out unsnaps on
+      // pointerdown); re-run the reflow so the survivors fill the freed zone.
+      setDragSeq((s) => s + 1);
+      // Drop on a split zone snaps the window into it (shifting the
+      // occupant if any); a legacy snap edge tiles / maximizes instead.
+      if (splitPreview) {
+        snapToSplit(d.id, splitPreview.slot);
+        setSplitPreview(null);
+        setSnapPreview(null);
+      } else if (snapPreview) {
         const el = rootRef.current;
         const rect = el?.getBoundingClientRect();
         if (rect) {
@@ -1333,16 +1467,6 @@ export default function Desktop(props: DesktopProps) {
               y: snapPreview === "bl" || snapPreview === "br" ? halfH : 0,
               w: halfW,
               h: halfH,
-            });
-          } else {
-            const half = Math.floor(rect.width / 2);
-            dispatch({
-              type: "snap",
-              id: d.id,
-              x: snapPreview === "left" ? 0 : half,
-              y: 0,
-              w: half,
-              h: Math.floor(rect.height),
             });
           }
         }
@@ -3131,7 +3255,7 @@ export default function Desktop(props: DesktopProps) {
   return (
     <div
       ref={rootRef}
-      className={`oxos${settings.reduceMotion ? " oxos--reduced" : ""}${settings.themeMode === "light" ? " oxos--light" : ""}${settings.focusMode ? " oxos--focus" : ""}${settings.taskbarStyle === "bar" ? " oxos--taskbar-bar" : ""}${settings.windowBorder === "sharp" ? " oxos--sharp" : settings.windowBorder === "neon" ? " oxos--neon" : ""}${settings.showIconLabels === false ? " oxos--no-labels" : ""}${settings.uiScale === "s" ? " oxos--font-s" : settings.uiScale === "l" ? " oxos--font-l" : ""}${settings.iconShape === "circle" ? " oxos--shape-circle" : settings.iconShape === "hex" ? " oxos--shape-hex" : ""}${settings.wallAnim ? " oxos--wall-anim" : ""}${settings.highContrast ? " oxos--contrast" : ""}`}
+      className={`oxos${settings.reduceMotion ? " oxos--reduced" : ""}${settings.themeMode === "light" ? " oxos--light" : ""}${settings.focusMode ? " oxos--focus" : ""}${settings.taskbarStyle === "bar" ? " oxos--taskbar-bar" : ""}${settings.windowBorder === "sharp" ? " oxos--sharp" : settings.windowBorder === "neon" ? " oxos--neon" : ""}${settings.showIconLabels === false ? " oxos--no-labels" : ""}${settings.uiScale === "s" ? " oxos--font-s" : settings.uiScale === "l" ? " oxos--font-l" : ""}${settings.iconShape === "circle" ? " oxos--shape-circle" : settings.iconShape === "hex" ? " oxos--shape-hex" : ""}${settings.wallAnim ? " oxos--wall-anim" : ""}${settings.highContrast ? " oxos--contrast" : ""}${winDragging ? " oxos--dragging" : ""}`}
       style={
         {
           "--os-accent": settings.accent,
@@ -3150,6 +3274,7 @@ export default function Desktop(props: DesktopProps) {
       }
       onPointerMove={onRootMove}
       onPointerUp={onRootUp}
+      onPointerCancel={onRootUp}
       onClick={(e) => {
         if (settings.uiSounds && (e.target as HTMLElement).closest("button")) playUiBlip();
       }}
@@ -3674,7 +3799,17 @@ export default function Desktop(props: DesktopProps) {
               onPointerDown={(e) => {
                 if ((e.target as HTMLElement).closest("button")) return;
                 setWinMenuId(null);
-                dragRef.current = { type: "win", id: w.id, startX: e.clientX, startY: e.clientY, origX: w.x, origY: w.y };
+                // Dragging a split window out of its zone returns it to
+                // floating (Windows-style): restore its pre-split geometry
+                // first so the drag follows the cursor at its old size.
+                if (w.splitZone != null) {
+                  const prev = w.splitPrev;
+                  dispatch({ type: "unsplit", id: w.id });
+                  dragRef.current = { type: "win", id: w.id, startX: e.clientX, startY: e.clientY, origX: prev?.x ?? w.x, origY: prev?.y ?? w.y };
+                } else {
+                  dragRef.current = { type: "win", id: w.id, startX: e.clientX, startY: e.clientY, origX: w.x, origY: w.y };
+                }
+                setWinDragging(true);
               }}
             >
               {app && <AppMark app={app} className="oxos-window__mark" />}
@@ -3704,6 +3839,14 @@ export default function Desktop(props: DesktopProps) {
                 onClick={() => dispatch({ type: "toggle-pin", id: w.id })}
               >
                 📌
+              </button>
+              <button
+                type="button"
+                className={`oxos-window__ctl${w.splitZone != null ? " is-on" : ""}`}
+                title={w.splitZone != null ? "Exit split view" : "Split view: snap into a zone"}
+                onClick={() => toggleSplit(w)}
+              >
+                ◫
               </button>
               <button
                 type="button"
@@ -3753,7 +3896,7 @@ export default function Desktop(props: DesktopProps) {
               />
             )}
             <div className="oxos-window__body">{windowBody(w)}</div>
-            {!w.maximized && (
+            {!w.maximized && w.splitZone == null && (
               <span
                 className="oxos-window__resize"
                 onPointerDown={(e) => {
@@ -3767,6 +3910,13 @@ export default function Desktop(props: DesktopProps) {
 
       {/* Snap preview while dragging a window to an edge */}
       {snapPreview && <div className={`oxos-snap oxos-snap--${snapPreview}`} aria-hidden />}
+      {splitPreview && (
+        <div
+          className="oxos-snap"
+          style={{ left: splitPreview.rect.x, top: splitPreview.rect.y, width: splitPreview.rect.w, height: splitPreview.rect.h }}
+          aria-hidden
+        />
+      )}
 
       {/* Start menu */}
       {startOpen && (

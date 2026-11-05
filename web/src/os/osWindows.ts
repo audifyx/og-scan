@@ -50,6 +50,10 @@ export interface OsWindow {
   hrefOverride?: string;
   /** Virtual desktop this window lives on (undefined = all desktops). */
   desktopId?: string;
+  /** Split-view slot (0..3) or null/undefined = floating window. */
+  splitZone?: number | null;
+  /** Floating geometry to restore when the window leaves split view. */
+  splitPrev?: { x: number; y: number; w: number; h: number } | null;
 }
 
 export interface OsWindowsState {
@@ -70,10 +74,25 @@ export type OsWindowsAction =
   | { type: "move"; id: string; x: number; y: number }
   | { type: "resize"; id: string; w: number; h: number }
   | { type: "snap"; id: string; x: number; y: number; w: number; h: number }
+  | { type: "split"; id: string; zone: number; x: number; y: number; w: number; h: number }
+  | { type: "unsplit"; id: string }
   | { type: "accent"; id: string; accent: string | null }
   | { type: "opacity"; id: string; opacity: number }
   | { type: "tabgroup"; id: string; tabGroupId: string | null }
   | { type: "desktop"; id: string; desktopId: string | undefined };
+
+/** A window leaving split view: frees its zone and restores its floating geometry. */
+function leaveSplit(w: OsWindow): OsWindow {
+  if (w.splitZone == null) return w;
+  return {
+    ...w,
+    ...(w.splitPrev
+      ? { x: w.splitPrev.x, y: w.splitPrev.y, w: w.splitPrev.w, h: w.splitPrev.h }
+      : {}),
+    splitZone: null,
+    splitPrev: null,
+  };
+}
 
 export function osWindowsReducer(
   state: OsWindowsState,
@@ -114,7 +133,7 @@ export function osWindowsReducer(
       return {
         ...state,
         windows: state.windows.map((w) =>
-          w.id === action.id ? { ...w, minimized: true } : w,
+          w.id === action.id ? { ...leaveSplit(w), minimized: true } : w,
         ),
       };
     case "restore":
@@ -128,7 +147,9 @@ export function osWindowsReducer(
       return {
         ...state,
         windows: state.windows.map((w) =>
-          w.id === action.id ? { ...w, maximized: !w.maximized } : w,
+          w.id === action.id
+            ? { ...leaveSplit(w), maximized: !w.maximized }
+            : w,
         ),
       };
     case "toggle-pin":
@@ -167,6 +188,33 @@ export function osWindowsReducer(
         windows: state.windows.map((w) =>
           w.id === action.id ? { ...w, desktopId: action.desktopId } : w,
         ),
+      };
+    case "split":
+      return {
+        ...state,
+        windows: state.windows.map((w) =>
+          w.id === action.id
+            ? {
+                ...w,
+                splitZone: action.zone,
+                // Keep the original floating geometry when re-slotting.
+                splitPrev:
+                  w.splitZone != null
+                    ? w.splitPrev ?? null
+                    : { x: w.x, y: w.y, w: w.w, h: w.h },
+                x: action.x,
+                y: action.y,
+                w: action.w,
+                h: action.h,
+                maximized: false,
+              }
+            : w,
+        ),
+      };
+    case "unsplit":
+      return {
+        ...state,
+        windows: state.windows.map((w) => (w.id === action.id ? leaveSplit(w) : w)),
       };
     case "snap":
       return {

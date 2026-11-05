@@ -1405,6 +1405,10 @@
 .oxos-xview__row .oxos-input { flex: 1; min-width: 0; }
 .oxos-xembed { flex: 1; min-height: 0; }
 .oxos-xembed iframe { width: 100% !important; }
+/* While a window is being dragged, iframes must not swallow pointer
+ * events — otherwise the drag dies the moment the cursor crosses another
+ * app's iframe and the drop zone never registers. */
+.oxos--dragging iframe { pointer-events: none; }
 .oxos-xembed__fail { color: rgba(var(--os-text-rgb), 0.7); font-size: 13px; margin: 12px 0 0; }
 
 /* App Store + Theme Store. */
