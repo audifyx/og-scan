@@ -1,10 +1,12 @@
 /**
  * Private live analytics — lazy module under web.js (Vercel edition).
  * Routed via vercel.json: /stats-api/:action -> /api/web?path=stats/:action.
- * No Google Analytics, no third-party service, no cookies. Storage is the
+ * No Google Analytics, no third-party service. Storage is the
  * project's own Supabase Postgres (site_stats_views / site_stats_live),
  * written via the PostgREST REST API with the service-role key — the same
- * client pattern as _admin-tokens.ts.
+ * client pattern as _admin-tokens.ts. Visitor IDs are anonymous: a
+ * first-party cookie + localStorage UUID, or a one-way hash of the account
+ * ID for signed-in users (raw IDs never leave the device).
  *
  * Actions (mirrors the Cloudflare Worker spec exactly):
  *   POST /hit  — insert a view row + upsert the live row for this vid
@@ -85,13 +87,24 @@ export default async function handler(req, res) {
       if (!vid) return json(res, { ok: false }, 400);
       const path = String(body.path || "/").slice(0, 120);
       const country = String(req.headers["x-vercel-ip-country"] || "??").slice(0, 10);
+      const region = String(req.headers["x-vercel-ip-country-region"] || "").slice(0, 40);
+      let city = "";
+      try { city = decodeURIComponent(String(req.headers["x-vercel-ip-city"] || "")); } catch { city = String(req.headers["x-vercel-ip-city"] || ""); }
+      city = city.slice(0, 60);
+      const clean = (v, n) => String(v || "").replace(/[^A-Za-z0-9 _.\-+/]/g, "").slice(0, n);
+      const os = clean(body.os, 20) || "unknown";
+      const browser = clean(body.browser, 20) || "unknown";
+      const device = ["phone", "tablet", "desktop", "mobile"].includes(body.device) ? body.device : "desktop";
+      const screen = clean(body.screen, 12);
+      const tz = clean(body.tz, 40);
+      const utm_source = clean(body.utm_source, 40);
       const now = Date.now();
       if (action === "hit") {
         let ref = "";
         try { ref = body.ref ? new URL(body.ref).hostname : ""; } catch {}
-        await sb("site_stats_views", { ts: now, site, vid, path, ref: ref.slice(0, 80), country, device: body.device === "mobile" ? "mobile" : "desktop" }, "return=minimal");
+        await sb("site_stats_views", { ts: now, site, vid, path, ref: ref.slice(0, 80), country, device, os, browser, city, region, tz, utm_source, screen }, "return=minimal");
       }
-      await sb("site_stats_live", { site, vid, ts: now, path, country }, "return=minimal,resolution=merge-duplicates");
+      await sb("site_stats_live", { site, vid, ts: now, path, country, os, browser, city, region }, "return=minimal,resolution=merge-duplicates");
       return json(res, { ok: true });
     }
 

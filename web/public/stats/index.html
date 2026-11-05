@@ -1,73 +1,108 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><title>OrbitX Live stats</title>
 <style>
-:root{--bg:#07080d;--card:#10121b;--line:#1e2232;--tx:#e9ecf5;--mu:#8a90a6;--ac:#8b5cf6;--ok:#22c55e}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(1200px 600px at 50% -200px,#1b1340,transparent),var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:20px 16px calc(24px + env(safe-area-inset-bottom))}
+:root{--bg:#050508;--card:#101014;--line:#26262e;--tx:#f2f0ea;--mu:#9a978c;--ac:#e8b84a;--ac2:#c9d1d9;--ok:#22c55e}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:20px 16px calc(24px + env(safe-area-inset-bottom))}
 .w{max-width:1000px;margin:0 auto}h1{font-size:22px;margin:0 0 4px;display:flex;align-items:center;gap:10px}.sub{color:var(--mu);font-size:13px;margin-bottom:18px}
 .dot{width:10px;height:10px;border-radius:50%;background:var(--ok);animation:p 1.6s infinite}@keyframes p{0%{box-shadow:0 0 0 0 rgba(34,197,94,.6)}70%{box-shadow:0 0 0 10px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+.sec{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ac);margin:26px 0 10px}
 .g{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}@media(min-width:760px){.g{grid-template-columns:repeat(4,1fr)}}
 .c{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}.k{color:var(--mu);font-size:12px;text-transform:uppercase;letter-spacing:.06em}.v{font-size:30px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
 .live .v{color:var(--ok)}.row{display:grid;gap:12px;margin-top:12px;grid-template-columns:1fr}@media(min-width:760px){.row{grid-template-columns:1fr 1fr}}
 h2{font-size:14px;margin:0 0 10px;color:var(--mu);font-weight:600}.li{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:14px}.li:first-of-type{border-top:0}.li span:last-child{font-variant-numeric:tabular-nums;color:var(--mu)}
-.bars{display:flex;align-items:flex-end;gap:6px;height:140px;margin-top:6px}.b{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}.b i{display:block;width:100%;background:linear-gradient(var(--ac),#5b3cc4);border-radius:6px 6px 2px 2px;min-height:2px}.b s{text-decoration:none;font-size:10px;color:var(--mu)}.b em{font-style:normal;font-size:10px}
+.bar{margin:8px 0}.bar .bl{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px}.bar .bl span:last-child{color:var(--mu);font-variant-numeric:tabular-nums}.bar .bt{height:8px;background:#1c1c22;border-radius:4px;overflow:hidden}.bar .bt i{display:block;height:100%;background:linear-gradient(90deg,var(--ac),#f5d67a);border-radius:4px}
+.bars{display:flex;align-items:flex-end;gap:6px;height:140px;margin-top:6px}.b{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}.b i{display:block;width:100%;background:linear-gradient(var(--ac),#8a6d1f);border-radius:6px 6px 2px 2px;min-height:2px}.b s{text-decoration:none;font-size:10px;color:var(--mu)}.b em{font-style:normal;font-size:10px}
 .wide{margin-top:12px}.err{color:#f87171;font-size:13px;margin-top:8px}
-.vi{border-top:1px solid var(--line);padding:10px 0}.vi:first-of-type{border-top:0}.vh{display:flex;justify-content:space-between;gap:10px;font-size:14px}.vh span:last-child{font-variant-numeric:tabular-nums;color:var(--mu);font-size:12px}.vm{color:var(--mu);font-size:12px;margin-top:2px}.tr{margin:6px 0 0 0;padding:0;list-style:none}.tr li{font-size:12px;color:var(--mu);padding:2px 0;display:flex;justify-content:space-between;gap:10px}.tr li span:last-child{font-variant-numeric:tabular-nums}
+.vi{border-top:1px solid var(--line);padding:12px 0}.vi:first-of-type{border-top:0}.vh{display:flex;justify-content:space-between;gap:10px;font-size:14px}.vh span:last-child{font-variant-numeric:tabular-nums;color:var(--mu);font-size:12px}.vm{color:var(--mu);font-size:12px;margin-top:2px}.tr{margin:6px 0 0 0;padding:0;list-style:none}.tr li{font-size:12px;color:var(--mu);padding:2px 0;display:flex;justify-content:space-between;gap:10px}.tr li span:last-child{font-variant-numeric:tabular-nums}
+.tag{display:inline-block;background:#1c1c22;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:12px;color:var(--ac2);margin-right:4px}
 </style></head><body><div class="w">
-<h1><span class="dot"></span>Live stats</h1><div class="sub" id="as">Loading…</div>
+<h1><span class="dot"></span>OrbitX Live stats</h1><div class="sub" id="as">Loading…</div>
+
+<div class="sec">Overview</div>
 <div class="g">
 <div class="c live"><div class="k">Viewing now</div><div class="v" id="live">–</div></div>
 <div class="c"><div class="k">Views today</div><div class="v" id="vt">–</div></div>
 <div class="c"><div class="k">Visitors today</div><div class="v" id="ut">–</div></div>
+<div class="c"><div class="k">Sessions today</div><div class="v" id="ses">–</div></div>
+<div class="c"><div class="k">Returning today</div><div class="v" id="ret">–</div></div>
+<div class="c"><div class="k">New today</div><div class="v" id="nw">–</div></div>
 <div class="c"><div class="k">Last 24h views</div><div class="v" id="v24">–</div></div>
 <div class="c"><div class="k">All-time views</div><div class="v" id="tv">–</div></div>
 <div class="c"><div class="k">All-time visitors</div><div class="v" id="uv">–</div></div>
-<div class="c"><div class="k">Mobile</div><div class="v" id="mob">–</div></div>
-<div class="c"><div class="k">Desktop</div><div class="v" id="desk">–</div></div>
-</div>
-<div class="g" style="margin-top:12px">
-<div class="c"><div class="k">Sessions today</div><div class="v" id="ses">–</div></div>
 <div class="c"><div class="k">Avg session length</div><div class="v" id="asl">–</div></div>
 <div class="c"><div class="k">Pages per session</div><div class="v" id="pps">–</div></div>
 </div>
-<div class="c wide"><h2>Live visitors · what they're doing now</h2><div id="lv"></div></div>
-<div class="c wide"><h2>Last 14 days · views</h2><div class="bars" id="bars"></div></div>
-<div class="c wide"><h2>Last 24h by hour · views</h2><div class="bars" id="bars24"></div></div>
-<div class="row">
-<div class="c"><h2>Live right now, by page</h2><div id="lp"></div></div>
-<div class="c"><h2>Top pages</h2><div id="tp"></div></div>
-<div class="c"><h2>Countries (visitors)</h2><div id="co"></div></div>
-<div class="c"><h2>Referrers</h2><div id="rf"></div></div>
+
+<div class="sec">Live visitors · who is on the platform right now</div>
+<div class="c wide" style="margin-top:0"><div id="lv"></div></div>
+
+<div class="sec">Devices · what they use</div>
+<div class="row" style="margin-top:0">
+<div class="c"><h2>Operating system (visitors)</h2><div id="os"></div></div>
+<div class="c"><h2>Browser (visitors)</h2><div id="br"></div></div>
 </div>
 <div class="row">
+<div class="c"><h2>Device type (visitors)</h2><div id="dv"></div></div>
+<div class="c"><h2>Screen size (visitors)</h2><div id="sc"></div></div>
+</div>
+
+<div class="sec">Locations · where they are from</div>
+<div class="row" style="margin-top:0">
+<div class="c"><h2>Countries (visitors)</h2><div id="co"></div></div>
+<div class="c"><h2>Cities (visitors)</h2><div id="ct"></div></div>
+</div>
+
+<div class="sec">Traffic · when and where they come from</div>
+<div class="c wide" style="margin-top:0"><h2>Last 24h by hour · views</h2><div class="bars" id="bars24"></div></div>
+<div class="c wide"><h2>Last 14 days · views</h2><div class="bars" id="bars"></div></div>
+<div class="row">
+<div class="c"><h2>Referrers (views)</h2><div id="rf"></div></div>
+<div class="c"><h2>UTM campaigns (views)</h2><div id="utm"></div></div>
+</div>
+
+<div class="sec">Pages · what they look at</div>
+<div class="row" style="margin-top:0">
+<div class="c"><h2>Live right now, by page</h2><div id="lp"></div></div>
+<div class="c"><h2>Top pages (all time)</h2><div id="tp"></div></div>
 <div class="c"><h2>Entry pages</h2><div id="ep"></div></div>
 <div class="c"><h2>Exit pages</h2><div id="xp"></div></div>
 </div>
-<div class="c wide"><h2>Recent views</h2><div id="rc"></div></div>
+
+<div class="sec">Recent activity</div>
+<div class="c wide" style="margin-top:0"><div id="rc"></div></div>
 <div class="err" id="err"></div>
 </div>
 <script>
 var W="https://orbitx.world/stats-api/data?site=orbitx",TZ=-5,$=function(i){return document.getElementById(i)},f=function(n){return Number(n||0).toLocaleString()};
-function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function nm(p){return p==="/"?"Home":esc(p)}
 function flag(c){if(!c||c.length!==2||c==="XX"||c==="T1"||c==="??")return "🌐";return String.fromCodePoint.apply(null,[].map.call(c.toUpperCase(),function(x){return 127397+x.charCodeAt(0)}))}
+function unk(s){return s==null||s===""?"unknown":esc(s)}
 function list(el,rows,a,b,fa){$(el).innerHTML=rows.length?rows.map(function(r){return '<div class="li"><span>'+(fa?fa(r[a]):esc(r[a]))+'</span><span>'+f(r[b])+'</span></div>'}).join(""):'<div class="li"><span style="color:var(--mu)">Nothing yet</span><span></span></div>'}
+function bars(el,rows,a,b,fa){var mx=1;rows.forEach(function(r){if(r[b]>mx)mx=r[b]});$(el).innerHTML=rows.length?rows.map(function(r){return '<div class="bar"><div class="bl"><span>'+(fa?fa(r[a]):esc(r[a]))+'</span><span>'+f(r[b])+'</span></div><div class="bt"><i style="width:'+Math.max(2,Math.round(r[b]/mx*100))+'%"></i></div></div>'}).join(""):'<div class="li"><span style="color:var(--mu)">Nothing yet</span><span></span></div>'}
 function ago(t){var s=Math.round((Date.now()-t)/1000);return s<60?s+"s ago":s<3600?Math.round(s/60)+"m ago":Math.round(s/3600)+"h ago"}
 function tm(t){return new Date(t).toLocaleTimeString()}
 function dur(s){s=Math.round(s||0);if(s<60)return s+"s";if(s<3600)return Math.floor(s/60)+"m "+(s%60)+"s";return Math.floor(s/3600)+"h "+Math.floor(s%3600/60)+"m"}
+function loc(v){var c=v.city?esc(v.city)+", ":"";return c+flag(v.country)+" "+esc(v.country)+(v.region?" · "+esc(v.region):"")}
 function load(){fetch(W,{cache:"no-store"}).then(function(r){return r.json()}).then(function(d){
 $("err").textContent="";$("as").textContent="Updated "+new Date(d.asOf).toLocaleTimeString()+" · refreshes every 5s";
 $("live").textContent=f(d.liveNow);$("vt").textContent=f(d.viewsToday);$("ut").textContent=f(d.visitorsToday);$("v24").textContent=f(d.views24h);$("tv").textContent=f(d.totalViews);$("uv").textContent=f(d.uniqueVisitors);
-var dv={};d.devices.forEach(function(x){dv[x.device]=x.n});$("mob").textContent=f(dv.mobile);$("desk").textContent=f(dv.desktop);
 $("ses").textContent=f(d.sessionsToday);$("asl").textContent=dur(d.avgSessionSeconds);$("pps").textContent=(d.avgPagesPerSession==null?"–":d.avgPagesPerSession);
-var days=[],m={};d.daily.forEach(function(x){m[x.day]=x});var t=new Date(d.asOf+TZ*3600000);for(var i=13;i>=0;i--){var k=new Date(t.getTime()-i*86400000).toISOString().slice(0,10);days.push(m[k]||{day:k,views:0})}
+var rn=d.returningVsNew||{};$("ret").textContent=f(rn.returning);$("nw").textContent=f(rn.new);
+var days=[],m={};(d.daily||[]).forEach(function(x){m[x.day]=x});var t=new Date(d.asOf+TZ*3600000);for(var i=13;i>=0;i--){var k=new Date(t.getTime()-i*86400000).toISOString().slice(0,10);days.push(m[k]||{day:k,views:0})}
 var mx=Math.max.apply(null,days.map(function(x){return x.views}).concat([1]));$("bars").innerHTML=days.map(function(x){return '<div class="b"><em>'+(x.views||"")+'</em><i style="height:'+(x.views/mx*100)+'%"></i><s>'+x.day.slice(8)+'</s></div>'}).join("");
 var h24=d.hourly24||[],mx24=Math.max.apply(null,h24.map(function(x){return x.views}).concat([1]));$("bars24").innerHTML=h24.map(function(x){return '<div class="b"><em>'+(x.views||"")+'</em><i style="height:'+(x.views/mx24*100)+'%"></i><s>'+x.label.slice(6)+'</s></div>'}).join("");
-list("lp",d.livePages,"path","n",nm);list("tp",d.topPages,"path","n",nm);list("co",d.countries,"country","n",function(c){return flag(c)+" "+esc(c)});list("rf",d.referrers,"ref","n");
+bars("os",d.osBreakdown||[],"os","n",unk);bars("br",d.browserBreakdown||[],"browser","n",unk);bars("dv",d.devices||[],"device","n",unk);bars("sc",d.screens||[],"screen","n",unk);
+list("co",d.countries||[],"country","n",function(c){return flag(c)+" "+esc(c)});
+list("ct",d.cities||[],"city","n",function(c,r){return esc(c)});
+list("rf",d.referrers||[],"ref","n");list("utm",d.topUtm||[],"utm_source","n",unk);
+list("lp",d.livePages||[],"path","n",nm);list("tp",d.topPages||[],"path","n",nm);
 list("ep",d.topEntryPages||[],"path","n",nm);list("xp",d.topExitPages||[],"path","n",nm);
 $("lv").innerHTML=(d.liveVisitors||[]).length?(d.liveVisitors||[]).map(function(v){
 var tr=(v.trail||[]).map(function(s){return '<li><span>'+nm(s.path)+'</span><span>'+tm(s.ts)+'</span></li>'}).join("");
-return '<div class="vi"><div class="vh"><span>'+flag(v.country)+" "+esc(v.country)+" · "+v.device+" · "+nm(v.path)+'</span><span>'+esc(v.vid)+'</span></div><div class="vm">First seen '+tm(v.firstSeen)+' · Last seen '+tm(v.lastSeen)+' · '+f(v.pageCount)+' pages today</div>'+(tr?'<ul class="tr">'+tr+'</ul>':"")+'</div>';
+var tags='<span class="tag">'+unk(v.os)+'</span><span class="tag">'+unk(v.browser)+'</span><span class="tag">'+unk(v.device)+'</span>'+(v.screen?'<span class="tag">'+esc(v.screen)+'</span>':"");
+return '<div class="vi"><div class="vh"><span>'+loc(v)+'</span><span>'+esc(v.vid)+'</span></div><div class="vm" style="margin-top:4px">'+tags+'</div><div class="vm">Now on '+nm(v.path)+'</div><div class="vm">First seen '+tm(v.firstSeen)+' · Last seen '+tm(v.lastSeen)+' · '+f(v.pageCount)+' pages today</div>'+(tr?'<ul class="tr">'+tr+'</ul>':"")+'</div>';
 }).join(""):'<div class="li"><span style="color:var(--mu)">Nobody live right now</span><span></span></div>';
-$("rc").innerHTML=d.recent.length?d.recent.map(function(r){return '<div class="li"><span>'+flag(r.country)+" "+nm(r.path)+" · "+r.device+" · "+esc(r.vid)+'</span><span>'+ago(r.ts)+'</span></div>'}).join(""):'<div class="li"><span style="color:var(--mu)">Nothing yet</span><span></span></div>';
+$("rc").innerHTML=(d.recent||[]).length?d.recent.map(function(r){return '<div class="li"><span>'+flag(r.country)+" "+nm(r.path)+" · "+unk(r.os)+" · "+unk(r.browser)+(r.city?" · "+esc(r.city):"")+" · "+esc(r.vid)+'</span><span>'+ago(r.ts)+'</span></div>'}).join(""):'<div class="li"><span style="color:var(--mu)">Nothing yet</span><span></span></div>';
 }).catch(function(){$("err").textContent="Can't reach the stats server. Retrying…"})}
 load();setInterval(load,5000);
 </script></body></html>
