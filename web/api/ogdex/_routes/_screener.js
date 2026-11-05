@@ -49,8 +49,11 @@ const compact = (v) => {
 function normPump(t) {
   if (!t || !t.mint) return null;
   const complete = !!t.complete;
+  // pump.fun dropped real_*_reserves from its API response — when they are
+  // absent the bonding progress is unknown (null), never 0: 0 would read as
+  // "just launched" and would fail any bondingPct range filter.
   const rqr = num(t.real_quote_reserves) || num(t.real_sol_reserves) || 0;
-  const bondingPct = complete ? 100 : Math.min(100, Math.round((rqr / 85_000_000_000) * 100));
+  const bondingPct = complete ? 100 : (rqr > 0 ? Math.min(100, Math.round((rqr / 85_000_000_000) * 100)) : null);
   const total = num(t.total_supply) || 1_000_000_000;
   const mcap  = num(t.usd_market_cap);
   return {
@@ -70,6 +73,24 @@ function normPump(t) {
     lastTrade: t.last_trade_timestamp || null,
     _source: "pumpfun",
   };
+}
+
+// ── Pump.fun list filters (pure — unit-tested in _screener.test.js) ─────────
+// The pump.fun API dropped real_sol_reserves / real_quote_reserves, so the
+// old filters that required reserves matched nothing and both Pump tabs fell
+// back to stale hardcoded coins. `complete` is the reliable still-on-the-
+// curve signal; usd_market_cap still exists on every coin.
+export function filterUnbondedCoins(coins) {
+  return (Array.isArray(coins) ? coins : [])
+    .filter((c) => !c.complete && (c.usd_market_cap || 0) >= 1500 && (c.usd_market_cap || 0) <= 40000)
+    .map(normPump)
+    .filter(Boolean)
+    .sort((a, b) => (b.lastTrade || 0) - (a.lastTrade || 0));
+}
+
+export function filterNewPairCoins(coins, cutoffMs) {
+  return (Array.isArray(coins) ? coins : [])
+    .filter((c) => (c.created_timestamp ?? 0) >= cutoffMs && (c.usd_market_cap || 0) >= 2500);
 }
 
 // ── GeckoTerminal pool normalizer ─────────────────────────────────────────────
@@ -294,18 +315,9 @@ export default async function handler(req, res) {
     // ── Pump.fun: Unbonded (still on bonding curve, recently traded) ──────────
     if (type === "unbonded") {
       const coins = await fetchPump("last_trade_timestamp", 200);
-      rows = dedup(
-        coins
-          // still on the bonding curve, actively reserved, real size but below the
-          // ~graduation cap (mislabeled/migrated coins show huge mcap with 0 reserves)
-          .filter(c => !c.complete
-            && ((Number(c.real_sol_reserves) || 0) > 0 || (Number(c.real_quote_reserves) || 0) > 0)
-            && (c.usd_market_cap || 0) >= 1500 && (c.usd_market_cap || 0) <= 40000)
-          .map(normPump)
-          .filter(Boolean)
-          .filter(r => (r.bondingPct ?? 0) > 0 && (r.bondingPct ?? 0) < 100)
-          .sort((a, b) => (b.bondingPct ?? 0) - (a.bondingPct ?? 0))
-      ).slice(0, limit);
+      // Still on the curve (complete=false) with real size but below the
+      // ~graduation cap. Sorted by most recent trade first.
+      rows = dedup(filterUnbondedCoins(coins)).slice(0, limit);
 
     // ── Pump.fun: Migrated (graduated — DexScreener has real volume) ──────────
     } else if (type === "migrated") {
@@ -323,11 +335,10 @@ export default async function handler(req, res) {
       // ── Fetch pump.fun newest (created in last 24h, both bonded + unbonded) ──
       const cutoff24h = Date.now() - 86_400_000;
       const coins = await fetchPump("created_timestamp", 200);
-      const todayCoins = coins.filter(c =>
-        (c.created_timestamp ?? 0) >= cutoff24h &&
-        (c.usd_market_cap || 0) >= 2500 &&
-        ((Number(c.real_sol_reserves) || 0) > 0 || c.complete) // active / not abandoned
-      );
+      // Both bonded + unbonded, created in the last 24h with real size. The
+      // old reserves clause matched nothing since pump.fun dropped those
+      // fields; hidden/banned coins are excluded instead.
+      const todayCoins = filterNewPairCoins(coins, cutoff24h).filter((c) => !c.hidden && !c.is_banned);
       const normCoins = todayCoins.map(normPump).filter(Boolean);
 
       // ── Batch-enrich with DexScreener for real volume.h24 ─────────────────

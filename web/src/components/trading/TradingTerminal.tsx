@@ -208,24 +208,37 @@ function mapScreenerRow(row: any): TokenListItem | null {
   };
 }
 
-async function fetchOgdexMarkets(type: Exclude<MarketTab, "positions">): Promise<TokenListItem[]> {
-  try {
-    // Community listings use a separate endpoint (same as DEX home "Listed" tab)
-    if (type === "listed") {
-      const r = await fetch("/api/ogdex/listings");
-      const d = await r.json();
+/** Fetch a market tab from the ogdex backend, with retries on upstream
+ * failures (Jupiter 429s are transient). Returns the backend's error string
+ * when the source fails, so the UI can show an honest empty state instead of
+ * silently substituting stale coins. A clean empty result is not retried. */
+async function fetchOgdexMarkets(type: Exclude<MarketTab, "positions">): Promise<{ rows: TokenListItem[]; error: string | null }> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      // Community listings use a separate endpoint (same as DEX home "Listed" tab)
+      const url = type === "listed"
+        ? "/api/ogdex/listings"
+        : `/api/ogdex/screener?type=${encodeURIComponent(type)}&interval=${SCREEN_INTERVAL}&limit=${SCREEN_LIMIT}&chain=solana`;
+      const r = await fetch(url);
+      const d = await r.json().catch(() => ({}));
       const rows: any[] = Array.isArray(d?.rows) ? d.rows : [];
-      return rows.map(mapScreenerRow).filter(Boolean) as TokenListItem[];
+      const mapped = rows.map(mapScreenerRow).filter(Boolean) as TokenListItem[];
+      const error = typeof d?.error === "string" ? d.error : null;
+      // Retry only on upstream errors (e.g. Jupiter 429), not on clean empties.
+      if (error && attempt < 2) {
+        await new Promise((res) => setTimeout(res, 900 * (attempt + 1)));
+        continue;
+      }
+      return { rows: mapped, error };
+    } catch {
+      if (attempt < 2) {
+        await new Promise((res) => setTimeout(res, 900 * (attempt + 1)));
+        continue;
+      }
+      return { rows: [], error: "Network error" };
     }
-    const r = await fetch(
-      `/api/ogdex/screener?type=${encodeURIComponent(type)}&interval=${SCREEN_INTERVAL}&limit=${SCREEN_LIMIT}&chain=solana`,
-    );
-    const d = await r.json();
-    const rows: any[] = Array.isArray(d?.rows) ? d.rows : [];
-    return rows.map(mapScreenerRow).filter(Boolean) as TokenListItem[];
-  } catch {
-    return [];
   }
+  return { rows: [], error: "Upstream error" };
 }
 
 function dexScreenerEmbedUrl(ref: string, interval: string): string {
@@ -466,6 +479,9 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   const [chartReady, setChartReady] = useState(false);
   const [mountChart, setMountChart] = useState(false);
   const [loadingTokens, setLoadingTokens] = useState(!deskMode);
+  const [marketError, setMarketError] = useState<string | null>(null);
+  const [marketRetry, setMarketRetry] = useState(0);
+  const [mobileMarketsOpen, setMobileMarketsOpen] = useState(true);
   const [copied, setCopied] = useState(false);
   /** Prefetched Jupiter quote ? reused on Buy/Sell click when still fresh. */
   const quoteCacheRef = useRef<{
@@ -494,7 +510,9 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     unrealizedPct: number | null;
   } | null>(null);
 
-  /* ?? Load DEX markets (skip in desk mode ? trade a selected mint only) ?? */
+  /* Load DEX markets (skip in desk mode — trade a selected mint only).
+   * On failure the list stays empty with an honest error + retry: silently
+   * substituting hardcoded coins made every failing tab look identical. */
   useEffect(() => {
     if (deskMode) {
       setLoadingTokens(false);
@@ -504,13 +522,11 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     let cancelled = false;
     (async () => {
       setLoadingTokens(true);
-      let list = await fetchOgdexMarkets(marketTab);
-      if (!list.length) {
-        const fallback = await Promise.all(DEFAULT_MINTS.map((t) => fetchDexPair(t.mint)));
-        list = fallback.filter(Boolean) as TokenListItem[];
-      }
+      setMarketError(null);
+      const { rows: list, error } = await fetchOgdexMarkets(marketTab);
       if (cancelled) return;
       setTokens(list);
+      setMarketError(list.length ? null : (error || "No tokens right now"));
       setLoadingTokens(false);
       if (initialMint && list.some((t) => t.mint === initialMint)) {
         setSelectedMint(initialMint);
@@ -522,7 +538,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [marketTab, deskMode]);
+  }, [marketTab, deskMode, marketRetry]);
 
   /* Paint UI first, then mount DexScreener iframe (feels faster) */
   useEffect(() => {
@@ -1781,8 +1797,17 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     {renderWalletPickerOverlay()}
     <div className={`flex h-full min-h-0 bg-[var(--term-bg-deep)] ${deskMode ? "flex-col overflow-y-auto overscroll-contain lg:flex-row lg:overflow-hidden" : "min-h-[calc(100vh-68px)] flex-col overflow-y-auto lg:min-h-0 lg:flex-row lg:overflow-hidden"}`}>
 
-      {/* ??????????????? LEFT SIDEBAR (hidden in desk mode) ??????????????? */}
-      <aside className={`${deskMode ? "hidden" : "hidden lg:flex"} flex-col w-[300px] min-w-[300px] border-r border-white/10 bg-[var(--term-bg)]`}>
+      {/* LEFT SIDEBAR (hidden in desk mode; full-width collapsible on mobile) */}
+      <aside className={`${deskMode ? "hidden" : "flex"} flex-col w-full shrink-0 ${mobileMarketsOpen ? "h-[60vh]" : "h-auto"} max-h-[70vh] overflow-hidden border-b border-white/10 bg-[var(--term-bg)] lg:h-auto lg:w-[300px] lg:min-w-[300px] lg:max-h-none lg:border-b-0 lg:border-r`}>
+        {/* Mobile collapse toggle — the market browser must show up on phones */}
+        <button
+          type="button"
+          onClick={() => setMobileMarketsOpen((o) => !o)}
+          className="flex w-full items-center justify-between px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-white/80 lg:hidden"
+        >
+          <span>Markets</span>
+          <span>{mobileMarketsOpen ? "▾ Hide" : "▸ Show"}</span>
+        </button>
         {/* Category + market tabs (full DEX universe) */}
         <div className="border-b border-white/10">
           <div className="flex overflow-x-auto scrollbar-none">
@@ -1827,6 +1852,8 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           )}
         </div>
 
+        {/* Search + list collapse on mobile only (always open on desktop) */}
+        <div className={`${mobileMarketsOpen ? "flex" : "hidden"} lg:flex flex-col min-h-0 flex-1`}>
         {/* Search */}
         <div className="p-2 border-b border-white/[0.07]">
           <div className="relative">
@@ -1869,7 +1896,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         )}
 
         {/* Token list */}
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 min-h-0">
           {loadingTokens ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-5 w-5 animate-spin text-white/60" />
@@ -1879,7 +1906,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               <PulseFeed />
             </div>
           ) : marketTab !== "positions" ? (
-            tokens.map((token) => (
+            tokens.length > 0 ? tokens.map((token) => (
               <button
                 key={token.mint}
                 onClick={() => selectToken(token.mint)}
@@ -1917,7 +1944,15 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                   </p>
                 </div>
               </button>
-            ))
+            )) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                <p className="text-xs text-white/70">{marketError || "No tokens right now"}</p>
+                <p className="text-[11px] text-white/40 mt-1">Live feed — retry to reload</p>
+                <Button size="sm" type="button" onClick={() => setMarketRetry((n) => n + 1)} className="mt-3 bg-white text-black text-xs">
+                  Retry
+                </Button>
+              </div>
+            )
           ) : (
             tradeReady && positions.length > 0 ? (
               positions.slice(0, 30).map((pos) => {
@@ -1959,6 +1994,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             )
           )}
         </ScrollArea>
+        </div>
       </aside>
 
       {/* ??????????????? CENTER PANEL ??????????????? */}
