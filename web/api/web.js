@@ -28,6 +28,7 @@ const LAZY = {
   "orbitx-ai": () => import("./_orbitx-ai.js"),
   "token-feed": () => import("./_token-feed.js"),
   "social": () => import("./_social.js"),
+  "stats": () => import("./_stats.js"),
   "telegram-mcp": () => import("./_telegram-mcp.js"),
 };
 

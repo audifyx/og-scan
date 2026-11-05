@@ -284,6 +284,10 @@
       "destination": "/api/web?path=share-wallet&address=:address"
     },
     {
+      "source": "/stats-api/:action",
+      "destination": "/api/web?path=stats/:action"
+    },
+    {
       "source": "/[Oo][Rr][Bb][Ii][Tt][Xx]_[Dd][Ee][Xx]",
       "destination": "/ORBITX_DEX/index.html"
     },
