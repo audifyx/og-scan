@@ -15,6 +15,7 @@ import {
 import { clearPersistedSession, readPersistedSession } from "@/lib/authSession";
 import { autoUsernameFromPubkey } from "@/lib/usernameClaim";
 import { usernameFromSocialMeta } from "@/lib/xOAuth";
+import { clearStatsIdentity, setStatsIdentity } from "@/lib/statsIdentity";
 
 export interface Profile {
   id: string;
@@ -169,6 +170,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (persisted?.user) {
           setSession(persisted as Session);
           setUser(persisted.user as User);
+          void setStatsIdentity(String(persisted.user.id));
           if (!resolved) {
             resolved = true;
             clearTimeout(safetyTimeout);
@@ -181,12 +183,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(sess?.user ?? null);
       if (sess?.user) {
         setSentryUser(sess.user.id, sess.user.user_metadata?.username);
+        void setStatsIdentity(sess.user.id);
         setTimeout(() => {
           fetchProfile(sess.user.id, sess.user.email, sess.user.user_metadata);
           processPendingReferral(sess.user.id);
         }, 0);
       } else {
         clearSentryUser();
+        clearStatsIdentity();
         setProfile(null);
       }
       if (!resolved) {
@@ -202,6 +206,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (persisted?.user) {
           setSession(persisted as Session);
           setUser(persisted.user as User);
+          void setStatsIdentity(String(persisted.user.id));
           fetchProfile(String(persisted.user.id), persisted.user.email as string | undefined, persisted.user.user_metadata as Record<string, unknown> | undefined);
           if (!resolved) {
             resolved = true;
@@ -210,10 +215,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setLoading(false);
           return;
         }
+        clearStatsIdentity();
       }
       setSession(sess);
       setUser(sess?.user ?? null);
       if (sess?.user) {
+        void setStatsIdentity(sess.user.id);
         fetchProfile(sess.user.id, sess.user.email, sess.user.user_metadata);
         processPendingReferral(sess.user.id);
       }
@@ -281,6 +288,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
     }
     try { clearPersistedSession(); } catch { /* noop */ }
+    clearStatsIdentity();
     setProfile(null);
     setUser(null);
     setSession(null);

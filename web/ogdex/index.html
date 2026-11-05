@@ -61,10 +61,13 @@
     <script>(function(){try{
 var W="https://orbitx.world/stats-api",S="orbitx";
 if(location.pathname.indexOf("/stats")===0)return;
-var k="site_vid",v=localStorage.getItem(k);if(!v){v=crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now();localStorage.setItem(k,v)}
+function ck(n){try{var m=document.cookie.match(new RegExp("(?:^|; )"+n+"=([^;]*)"));return m?decodeURIComponent(m[1]):""}catch(e){return""}}
+function sk(v){var d=(location.hostname==="orbitx.world"||location.hostname.slice(-13)===".orbitx.world")?"; Domain=.orbitx.world":"";try{document.cookie="orbitx_vid="+encodeURIComponent(v)+"; Path=/; Max-Age=31536000; SameSite=Lax"+(location.protocol==="https:"?"; Secure":"")+d;localStorage.setItem("site_vid",v)}catch(e){try{localStorage.setItem("site_vid",v)}catch(e2){}}}
+var k="site_vid",v=ck("orbitx_vid")||localStorage.getItem(k);if(!v){v=crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now()}sk(v);
 var dev=(matchMedia("(pointer:coarse)").matches||innerWidth<1024)?"mobile":"desktop";
+function vid(){try{return localStorage.getItem("orbitx_uid")||v}catch(e){return v}}
 function pth(){var p=location.pathname||"/";if(location.hash.length>1)p+=location.hash.split("/").slice(0,2).join("/");return p}
-function send(e,b){b.vid=v;b.path=pth();var d=JSON.stringify(b),url=W+"/"+e+"?site="+S;if(e==="hit"&&navigator.sendBeacon){navigator.sendBeacon(url,new Blob([d],{type:"text/plain"}))}else{fetch(url,{method:"POST",body:d,keepalive:true}).catch(function(){})}}
+function send(e,b){b.vid=vid();b.path=pth();var d=JSON.stringify(b),url=W+"/"+e+"?site="+S;if(e==="hit"&&navigator.sendBeacon){navigator.sendBeacon(url,new Blob([d],{type:"text/plain"}))}else{fetch(url,{method:"POST",body:d,keepalive:true}).catch(function(){})}}
 var last="";function hit(r){var p=pth();if(p===last)return;last=p;send("hit",{ref:r||"",device:dev})}
 hit(document.referrer);
 var ps=history.pushState;history.pushState=function(){ps.apply(this,arguments);setTimeout(hit,0)};
