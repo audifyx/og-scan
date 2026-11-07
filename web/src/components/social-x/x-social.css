@@ -211,30 +211,32 @@
 .osc-dock {
   pointer-events: auto;
   display: flex; align-items: center; justify-content: center; gap: 2px;
-  width: fit-content; max-width: calc(100vw - 32px);
-  height: 66px; padding: 6px 10px; margin: 0 auto;
+  width: min(100%, 520px); max-width: calc(100vw - 32px);
+  height: 66px; padding: 6px 8px; margin: 0 auto;
   border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.1);
   background: rgba(8, 10, 14, 0.92);
   -webkit-backdrop-filter: blur(22px) saturate(1.4);
   backdrop-filter: blur(22px) saturate(1.4);
   box-shadow: 0 12px 36px rgba(0,0,0,0.55), 0 0 0 1px rgba(59,130,246,0.06), inset 0 1px 0 rgba(255,255,255,0.06);
+  overflow-x: auto; scrollbar-width: none;
 }
+.osc-dock::-webkit-scrollbar { display: none; }
 .osc-dock__item {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  min-width: 62px; height: 100%; padding: 0 8px; border-radius: 999px;
+  flex: 1 1 0; min-width: 0; height: 100%; padding: 0 4px; border-radius: 999px;
   color: var(--osc-faint); transition: color 0.15s, background 0.15s;
 }
 .osc-dock__item:active { transform: scale(0.94); }
 .osc-dock__icon { display: grid; place-items: center; position: relative; transition: transform 0.15s; }
-.osc-dock__label { font-size: 10px; font-weight: 700; letter-spacing: 0.02em; }
+.osc-dock__label { font-size: 10px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .osc-dock__item--on { color: #fff; }
 .osc-dock__item--on .osc-dock__icon { transform: translateY(-1px); }
 .osc-dock__item--on .osc-dock__label { color: var(--osc-blue-hi); }
 .osc-dock__dot { position: absolute; top: -2px; right: -6px; width: 8px; height: 8px; border-radius: 999px; background: var(--osc-blue); box-shadow: 0 0 8px var(--osc-blue); }
 .osc-dock__compose {
   display: grid; place-items: center; flex-shrink: 0;
-  width: 64px; height: 64px; margin: -18px 6px 0; border-radius: 999px;
+  width: 56px; height: 56px; margin: -14px 4px 0; border-radius: 999px;
   color: #fff; background: linear-gradient(135deg, var(--osc-blue), #2563eb);
   box-shadow: 0 6px 24px rgba(59,130,246,0.55), 0 0 0 4px rgba(8,10,14,0.9);
   transition: transform 0.12s, filter 0.15s;
@@ -274,6 +276,8 @@
 .osc-post__body .osc-mention:hover { text-decoration: underline; }
 .osc-post__body .osc-tag { color: var(--osc-gold); font-weight: 600; cursor: pointer; }
 .osc-post__body .osc-tag:hover { text-decoration: underline; }
+/* Hashtags render as buttons (clickable → in-app hashtag filter) — reset button chrome. */
+.osc-post__body button.osc-tag { background: none; border: 0; padding: 0; font: inherit; text-align: left; }
 .osc-verified { color: var(--osc-gold); flex-shrink: 0; align-self: center; }
 .osc-actions { display: flex; align-items: center; justify-content: space-between; margin: 4px -8px -4px; color: #71767b; }
 .osc-act { display: flex; align-items: center; gap: 1px; font-size: 13px; font-weight: 400; transition: color 0.12s; }
@@ -423,6 +427,21 @@ button.osc-chip:hover { background: rgba(255,255,255,0.1); color: #fff; }
   border-radius: 24px 24px 0 0; border: 1px solid var(--osc-border-strong); border-bottom: 0;
   background: #0a0e14; padding: 12px 16px calc(20px + env(safe-area-inset-bottom, 0px));
 }
+.osc-sheet__panel--scroll { max-height: 86dvh; overflow-y: auto; }
+/* Discover sheet body — stacks the shared right-rail content like the desktop aside. */
+.osc-discover { display: flex; flex-direction: column; gap: 16px; }
+
+/* ═══ Quote posts ═══ */
+.osc-quote {
+  display: block; width: 100%; margin-top: 10px; padding: 10px 12px;
+  border-radius: 16px; border: 1px solid var(--osc-border-strong);
+  background: rgba(255,255,255,0.03); cursor: pointer; text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.osc-quote:hover { border-color: rgba(232,184,74,0.5); background: rgba(232,184,74,0.04); }
+.osc-quote:focus-visible { outline: 2px solid var(--osc-gold); outline-offset: 2px; }
+.osc-quote--preview { margin-top: 0; margin-bottom: 8px; cursor: default; }
+.osc-quote--preview:hover { border-color: var(--osc-border-strong); background: rgba(255,255,255,0.03); }
 .osc-sheet__grab { width: 40px; height: 4px; border-radius: 999px; background: rgba(255,255,255,0.2); margin: 0 auto 12px; }
 .osc-sheet__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .osc-sheet__item {

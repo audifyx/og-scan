@@ -1,7 +1,10 @@
+import { useEffect, useState } from "react";
 import { Home, Users, Wrench, User, Globe, Rocket, MessageCircle, Gamepad2, Sparkles,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 
 /**
  * Canonical bottom nav — used on EVERY page (Index + external pages).
@@ -82,7 +85,7 @@ const routeToNav: Record<string, string> = {
 
   "/callouts": "/tools",
   "/listings": "/tools",
-  "/messages": "/community",
+  "/messages": "/messages",
 
   "/pumpv5": "/tools",
 
@@ -113,6 +116,34 @@ const triggerHaptic = () => {
 
 export const BottomNav = () => {
   const location = useLocation();
+  const { user } = useAuth();
+  const [unreadDm, setUnreadDm] = useState(0);
+
+  useEffect(() => {
+    if (!user) { setUnreadDm(0); return; }
+    let cancelled = false;
+    const refresh = async () => {
+      const { data: convos } = await supabase
+        .from("dm_conversations")
+        .select("id")
+        .or(`user_a.eq.${user.id},user_b.eq.${user.id}`);
+      const ids = (convos ?? []).map((c: { id: string }) => c.id);
+      if (!ids.length || cancelled) { if (!cancelled) setUnreadDm(0); return; }
+      const { count } = await supabase
+        .from("dm_messages")
+        .select("id", { count: "exact", head: true })
+        .in("conversation_id", ids)
+        .neq("sender_id", user.id)
+        .eq("read", false);
+      if (!cancelled) setUnreadDm(count || 0);
+    };
+    refresh();
+    const channel = supabase
+      .channel("bottomnav-dm-unread")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "dm_messages" }, refresh)
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [user, location.pathname]);
 
   const getActiveItem = (): string => {
     const path = location.pathname;
@@ -158,6 +189,11 @@ export const BottomNav = () => {
                 className={cn("h-[22px] w-[22px] transition-all duration-200", isActive && "drop-shadow-[0_0_8px_rgba(190,242,100,0.5)]")}
                 strokeWidth={isActive ? 2.4 : 1.8}
               />
+              {item.to === "/messages" && unreadDm > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#e8b84a] px-1 text-[10px] font-extrabold text-black">
+                  {unreadDm > 99 ? "99+" : unreadDm}
+                </span>
+              )}
               <span className={cn("text-[9px] font-bold uppercase tracking-wider leading-none", isActive ? "opacity-100" : "opacity-70")}>
                 {item.label}
               </span>

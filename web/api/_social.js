@@ -12,6 +12,17 @@
  *   POST /api/social/agent/post                        — AI agent posting API (X-Agent-Key header; { content, reply_to?, repost_of? })
  *   GET /api/social/oembed?url=...           — oEmbed JSON for a post URL
  *   GET /api/social/profile/:username        — public profile card JSON
+ *   POST /api/social/impression { postId, vid }        — record an anonymous post view (vid is hashed server-side; 1 view / viewer / post / day)
+ *   GET /api/social/analytics/post/:id                 — post views, reach, likes/replies/reposts/quotes, daily buckets (counts only)
+ *   GET /api/social/analytics/profile/:userId          — profile totals + top posts + daily buckets (userId or username)
+ *   GET|POST|DELETE /api/social/bookmarks              — synced bookmarks for the signed-in user (Bearer session)
+ *   GET|POST|DELETE /api/social/mutes                 — mute list for the signed-in user (Bearer session)
+ *   GET|POST|DELETE /api/social/blocks                — block list for the signed-in user (Bearer session)
+ *
+ * Privacy: impressions store ONLY a SHA-256 hash of the anonymous vid
+ * (salt "orbitx-social-impression:") — no raw IPs, no user-agents, no raw
+ * user ids. Bookmarks/mutes/blocks store the app's own user ids, like
+ * follows does. See social-overhaul-migration.sql.
  *
  * Documented for bot builders at the bottom of this file.
  */
@@ -61,6 +72,58 @@ function send(res, code, obj) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Cache-Control", "public, max-age=30, s-maxage=60");
   res.end(JSON.stringify(obj));
+}
+
+/** Private (authed / per-user) responses: never cached. */
+function sendPriv(res, code, obj) {
+  res.statusCode = code;
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Cache-Control", "no-store");
+  res.end(JSON.stringify(obj));
+}
+
+/** Verify a Supabase session (same pattern as _orbitx-presence.js). */
+async function authUser(req) {
+  const auth = String(req.headers?.authorization || "");
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!token) return null;
+  try {
+    const r = await fetch(`${SB_URL}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${token}`, apikey: SB_KEY },
+    });
+    if (!r.ok) return null;
+    const u = await r.json().catch(() => null);
+    return u && u.id ? u : null;
+  } catch {
+    return null;
+  }
+}
+
+/** One-way hash of the anonymous visitor id. Salted so the stored value
+ *  cannot be joined back to the stats vid or any account id. */
+function hashVid(vid) {
+  return createHash("sha256").update(`orbitx-social-impression:${vid}`).digest("hex");
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Resolve a user reference (uuid or username) to a uuid via profiles. */
+async function resolveUserId(ref) {
+  const r = String(ref || "").trim();
+  if (!r) return null;
+  if (UUID_RE.test(r)) return r;
+  try {
+    const rows = await sb(`profiles?select=user_id&username=eq.${encodeURIComponent(r)}&limit=1`);
+    return rows?.[0]?.user_id || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Call a SECURITY DEFINER analytics function via PostgREST RPC. */
+async function sbRpc(fn, args) {
+  return sbAdmin(`rpc/${fn}`, { method: "POST", body: JSON.stringify(args) });
 }
 
 const FEED_COLS = "id,user_id,username,avatar_url,content,likes_count,created_at,repost_of";
@@ -539,7 +602,186 @@ export default async function handler(req, res) {
       });
     }
 
-    return send(res, 404, { ok: false, error: "unknown_social_route", hint: "GET /api/social/feed/:username | /api/social/post/:id | /api/social/profile/:username | /api/social/tokengate | /api/social/leaderboard | /api/social/holdings?user_id= | /api/social/agents | POST /api/social/agent/post | /api/social/oembed?url=..." });
+    // ── POST /api/social/impression ──
+    // Anonymous post view. Body: { postId, vid }. vid is the client's
+    // anonymous per-browser id (orbitx_vid / hashed stats identity) — it is
+    // SHA-256 hashed server-side before storage. Unique (post, viewer, day)
+    // makes repeat views idempotent: returns 200 either way.
+    if (action === "impression") {
+      if (req.method !== "POST") return send(res, 405, { ok: false, error: "post_required" });
+      if (!SB_SERVICE) return send(res, 500, { ok: false, error: "server_not_configured" });
+      const body = bodyOf(req);
+      const postId = String(body.postId || body.post_id || "").trim();
+      const vid = String(body.vid || "").slice(0, 64);
+      if (!postId || !UUID_RE.test(postId)) return send(res, 400, { ok: false, error: "postId_required" });
+      if (!vid) return send(res, 400, { ok: false, error: "vid_required" });
+      try {
+        const exists = await sb(`social_messages?select=id&id=eq.${encodeURIComponent(postId)}&limit=1`);
+        if (!exists?.length) return send(res, 404, { ok: false, error: "post_not_found" });
+      } catch {
+        return send(res, 500, { ok: false, error: "post_lookup_failed" });
+      }
+      try {
+        await sbAdmin("post_impressions", {
+          method: "POST",
+          headers: { Prefer: "return=minimal,resolution=ignore-duplicates" },
+          body: JSON.stringify({ post_id: postId, viewer_hash: hashVid(vid) }),
+        });
+      } catch (e) {
+        // FK race (post deleted between check and insert) → treat as 404.
+        if (String(e.message || "").includes("409")) return send(res, 404, { ok: false, error: "post_not_found" });
+        return send(res, 500, { ok: false, error: "impression_failed" });
+      }
+      return send(res, 200, { ok: true, recorded: true });
+    }
+
+    // ── GET /api/social/analytics/post/:id ──
+    // Counts only — never returns viewer hashes. Public (same as the post).
+    if (action === "analytics" && parts[2] === "post" && parts[3]) {
+      if (!SB_SERVICE) return send(res, 500, { ok: false, error: "server_not_configured" });
+      const id = decodeURIComponent(parts[3]);
+      if (!UUID_RE.test(id)) return send(res, 400, { ok: false, error: "invalid_post_id" });
+      try {
+        const out = await sbRpc("social_post_analytics", { p_post_id: id });
+        if (out && out.ok === false) return send(res, 404, { ok: false, error: out.error || "post_not_found" });
+        return send(res, 200, out);
+      } catch {
+        return send(res, 500, { ok: false, error: "analytics_failed" });
+      }
+    }
+
+    // ── GET /api/social/analytics/profile/:userId ──
+    // :userId accepts a uuid or a username. Counts only.
+    if (action === "analytics" && parts[2] === "profile" && parts[3]) {
+      if (!SB_SERVICE) return send(res, 500, { ok: false, error: "server_not_configured" });
+      const userId = await resolveUserId(decodeURIComponent(parts[3]));
+      if (!userId) return send(res, 404, { ok: false, error: "user_not_found" });
+      try {
+        const out = await sbRpc("social_profile_analytics", { p_user_id: userId });
+        if (out && out.ok === false) return send(res, 404, { ok: false, error: out.error || "no_posts" });
+        return send(res, 200, out);
+      } catch {
+        return send(res, 500, { ok: false, error: "analytics_failed" });
+      }
+    }
+
+    // ── GET|POST|DELETE /api/social/bookmarks ──
+    // Signed-in user only (Bearer session). GET lists with post bodies,
+    // POST { postId } adds (idempotent), DELETE ?postId= removes.
+    if (action === "bookmarks") {
+      if (!SB_SERVICE) return sendPriv(res, 500, { ok: false, error: "server_not_configured" });
+      const user = await authUser(req);
+      if (!user) return sendPriv(res, 401, { ok: false, error: "auth_required" });
+      const uid = user.id;
+      if (req.method === "GET") {
+        const rows = await sbAdmin(
+          `user_bookmarks?select=post_id,created_at&user_id=eq.${encodeURIComponent(uid)}&order=created_at.desc&limit=100`
+        ).catch(() => []);
+        const ids = (rows || []).map((r) => r.post_id).filter(Boolean);
+        let postMap = {};
+        if (ids.length) {
+          const inList = ids.map((id) => `"${id}"`).join(",");
+          const posts = await sb(
+            `social_messages?select=${FEED_COLS},reply_to,quoted_post_id&id=in.(${inList})`
+          ).catch(() => []);
+          for (const p of posts || []) postMap[p.id] = p;
+        }
+        return sendPriv(res, 200, {
+          ok: true,
+          count: (rows || []).length,
+          bookmarks: (rows || []).map((r) => ({
+            post_id: r.post_id,
+            created_at: r.created_at,
+            post: postMap[r.post_id]
+              ? { ...postToJson(postMap[r.post_id]), quoted_post_id: postMap[r.post_id].quoted_post_id || null }
+              : null,
+          })),
+        });
+      }
+      if (req.method === "POST") {
+        const body = bodyOf(req);
+        const postId = String(body.postId || body.post_id || "").trim();
+        if (!postId || !UUID_RE.test(postId)) return sendPriv(res, 400, { ok: false, error: "postId_required" });
+        const exists = await sb(`social_messages?select=id&id=eq.${encodeURIComponent(postId)}&limit=1`).catch(() => []);
+        if (!exists?.length) return sendPriv(res, 404, { ok: false, error: "post_not_found" });
+        await sbAdmin("user_bookmarks", {
+          method: "POST",
+          headers: { Prefer: "return=minimal,resolution=ignore-duplicates" },
+          body: JSON.stringify({ user_id: uid, post_id: postId }),
+        }).catch(() => null);
+        return sendPriv(res, 200, { ok: true, bookmarked: true, post_id: postId });
+      }
+      if (req.method === "DELETE") {
+        const postId = String(req.query?.postId || req.query?.post_id || "").trim();
+        if (!postId || !UUID_RE.test(postId)) return sendPriv(res, 400, { ok: false, error: "postId_required" });
+        await sbAdmin(`user_bookmarks?user_id=eq.${encodeURIComponent(uid)}&post_id=eq.${encodeURIComponent(postId)}`, {
+          method: "DELETE",
+        }).catch(() => null);
+        return sendPriv(res, 200, { ok: true, bookmarked: false, post_id: postId });
+      }
+      return sendPriv(res, 405, { ok: false, error: "method_not_allowed" });
+    }
+
+    // ── GET|POST|DELETE /api/social/mutes + /api/social/blocks ──
+    // Signed-in user only. POST { userId | username } (never yourself),
+    // DELETE ?userId= / ?username=. GET returns the list with profile cards.
+    if (action === "mutes" || action === "blocks") {
+      if (!SB_SERVICE) return sendPriv(res, 500, { ok: false, error: "server_not_configured" });
+      const user = await authUser(req);
+      if (!user) return sendPriv(res, 401, { ok: false, error: "auth_required" });
+      const uid = user.id;
+      const table = action === "mutes" ? "user_mutes" : "user_blocks";
+      const selfCol = action === "mutes" ? "muter_id" : "blocker_id";
+      const otherCol = action === "mutes" ? "muted_user_id" : "blocked_user_id";
+      if (req.method === "GET") {
+        const rows = await sbAdmin(
+          `${table}?select=${otherCol},created_at&${selfCol}=eq.${encodeURIComponent(uid)}&order=created_at.desc&limit=200`
+        ).catch(() => []);
+        const ids = (rows || []).map((r) => r[otherCol]).filter(Boolean);
+        let profMap = {};
+        if (ids.length) {
+          const inList = ids.map((id) => `"${id}"`).join(",");
+          const profs = await sb(
+            `profiles?select=user_id,username,display_name,avatar_url&user_id=in.(${inList})`
+          ).catch(() => []);
+          for (const p of profs || []) profMap[p.user_id] = p;
+        }
+        return sendPriv(res, 200, {
+          ok: true,
+          count: (rows || []).length,
+          [action]: (rows || []).map((r) => ({
+            user_id: r[otherCol],
+            username: profMap[r[otherCol]]?.username || null,
+            display_name: profMap[r[otherCol]]?.display_name || null,
+            avatar_url: profMap[r[otherCol]]?.avatar_url || null,
+            created_at: r.created_at,
+          })),
+        });
+      }
+      if (req.method === "POST") {
+        const body = bodyOf(req);
+        const target = await resolveUserId(body.userId || body.user_id || body.username);
+        if (!target) return sendPriv(res, 404, { ok: false, error: "user_not_found" });
+        if (target === uid) return sendPriv(res, 400, { ok: false, error: "cannot_target_self" });
+        await sbAdmin(table, {
+          method: "POST",
+          headers: { Prefer: "return=minimal,resolution=ignore-duplicates" },
+          body: JSON.stringify({ [selfCol]: uid, [otherCol]: target }),
+        }).catch(() => null);
+        return sendPriv(res, 200, { ok: true, [action === "mutes" ? "muted" : "blocked"]: true, user_id: target });
+      }
+      if (req.method === "DELETE") {
+        const target = await resolveUserId(req.query?.userId || req.query?.user_id || req.query?.username);
+        if (!target) return sendPriv(res, 404, { ok: false, error: "user_not_found" });
+        await sbAdmin(`${table}?${selfCol}=eq.${encodeURIComponent(uid)}&${otherCol}=eq.${encodeURIComponent(target)}`, {
+          method: "DELETE",
+        }).catch(() => null);
+        return sendPriv(res, 200, { ok: true, [action === "mutes" ? "muted" : "blocked"]: false, user_id: target });
+      }
+      return sendPriv(res, 405, { ok: false, error: "method_not_allowed" });
+    }
+
+    return send(res, 404, { ok: false, error: "unknown_social_route", hint: "GET /api/social/feed/:username | /api/social/post/:id | /api/social/profile/:username | /api/social/tokengate | /api/social/leaderboard | /api/social/holdings?user_id= | /api/social/agents | POST /api/social/agent/post | /api/social/oembed?url=... | POST /api/social/impression | GET /api/social/analytics/post/:id | GET /api/social/analytics/profile/:userId | GET|POST|DELETE /api/social/bookmarks | /api/social/mutes | /api/social/blocks" });
   } catch (e) {
     return send(res, 500, { ok: false, error: "social_api_failed", detail: String((e && e.message) || e).slice(0, 200) });
   }
@@ -588,4 +830,24 @@ export default async function handler(req, res) {
  *   Errors: 401 agent_key_required | invalid_agent_key,
  *           400 content_required | content_too_long (max 500),
  *           429 rate_limited (1 post / 25s per agent)
+ *
+ * Post impressions + analytics (counts only, no viewer identities):
+ *   POST https://orbitx.world/api/social/impression
+ *   Body: { "postId": "<uuid>", "vid": "<anonymous per-browser id>" }
+ *   → 200 { ok, recorded: true } (idempotent — 1 view / viewer / post / day)
+ *   GET https://orbitx.world/api/social/analytics/post/<post-id>
+ *   → { ok, views, unique_viewers, likes, replies, reposts, quotes,
+ *       bookmarks, daily: [{ day, views, viewers }] }
+ *   GET https://orbitx.world/api/social/analytics/profile/<user-id|username>
+ *   → { ok, post_count, total_views, reach, total_likes, total_replies,
+ *       total_reposts, total_quotes, total_bookmarks, followers, following,
+ *       engagement, daily: [...], top_posts: [{ id, content, views, ... }] }
+ *
+ * Bookmarks / mutes / blocks (signed-in user; Authorization: Bearer <supabase-jwt>):
+ *   GET https://orbitx.world/api/social/bookmarks
+ *   POST https://orbitx.world/api/social/bookmarks  { "postId": "<uuid>" }
+ *   DELETE https://orbitx.world/api/social/bookmarks?postId=<uuid>
+ *   GET|POST|DELETE https://orbitx.world/api/social/mutes   { "userId" | "username" }
+ *   GET|POST|DELETE https://orbitx.world/api/social/blocks  { "userId" | "username" }
+ *   → GET lists with profile cards; POST/DELETE return { ok, muted|blocked|bookmarked }
  * ─────────────────────────────────────────────────────────────── */

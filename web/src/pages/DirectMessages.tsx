@@ -11,6 +11,7 @@ import {
   ImagePlus, Mic, Play, Pause,
   Pin, PinOff, Archive, Inbox,
 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { validateUploadFile, safeExtForMime, MEDIA_MIME_ALLOWLIST } from "@/lib/safeUpload";
 import { isUserOnline, usePresenceTick } from "@/lib/presence";
@@ -136,6 +137,7 @@ const TypingDots = () => (
    ═══════════════════════════════════════════════════════════════ */
 const DirectMessages: React.FC = () => {
   const { user, profile } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [convos, setConvos] = useState<Conversation[]>([]);
   const [activeConvo, setActiveConvo] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<DMMessage[]>([]);
@@ -471,15 +473,41 @@ const DirectMessages: React.FC = () => {
     [user],
   );
 
-  /* ─── Start DM ─── */
+  /* ─── Start DM ───
+     Finds the existing 1:1 conversation (state first, then a DB lookup so a
+     ?with=<userId> deep link works even before the list has loaded) or
+     creates one. */
   const startConversation = async (otherUserId: string) => {
-    if (!user) return;
+    if (!user || otherUserId === user.id) return;
     const existing = convos.find(
       (c) =>
         (c.user_a === user.id && c.user_b === otherUserId) ||
         (c.user_b === user.id && c.user_a === otherUserId),
     );
     if (existing) { setActiveConvo(existing); setShowNewDM(false); return; }
+
+    // DB lookup: covers conversations not in loaded state yet.
+    const { data: existingRow } = await supabase
+      .from("dm_conversations")
+      .select("*")
+      .or(`and(user_a.eq.${user.id},user_b.eq.${otherUserId}),and(user_a.eq.${otherUserId},user_b.eq.${user.id})`)
+      .maybeSingle();
+    if (existingRow) {
+      const { data: otherProfile } = await supabase
+        .from("profiles")
+        .select("user_id, username, avatar_url, is_online, last_active_at, badge")
+        .eq("user_id", otherUserId)
+        .single();
+      const found: Conversation = {
+        ...existingRow,
+        otherUser: otherProfile || { user_id: otherUserId, username: null, avatar_url: null, is_online: false, last_active_at: null, badge: null },
+        unreadCount: 0,
+      };
+      setConvos((prev) => (prev.some((c) => c.id === found.id) ? prev : [found, ...prev]));
+      setActiveConvo(found);
+      setShowNewDM(false);
+      return;
+    }
 
     const { data, error } = await supabase
       .from("dm_conversations")
@@ -504,6 +532,44 @@ const DirectMessages: React.FC = () => {
     setShowNewDM(false);
     toast.success("Conversation started!");
   };
+
+  /* ─── ?with=<userId> deep link (e.g. from a profile's Message button) ───
+     Opens (or creates) the 1:1 conversation, then clears the param so a
+     refresh doesn't re-trigger it. Signed-out users never reach this page:
+     the /messages route is behind ProtectedRoute, which sends them to
+     /auth?next=/messages%3Fwith%3D<id> and returns them here after login. */
+  const deepLinkHandledRef = useRef<string | null>(null);
+  const withUserId = searchParams.get("with");
+  useEffect(() => {
+    if (!user || !withUserId) return;
+    if (deepLinkHandledRef.current === withUserId) return;
+    deepLinkHandledRef.current = withUserId;
+    const clearParam = () => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("with");
+        return next;
+      }, { replace: true });
+    };
+    if (withUserId === user.id) { clearParam(); return; }
+    void (async () => {
+      const { data: target } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("user_id", withUserId)
+        .maybeSingle();
+      if (!target) {
+        toast.error("That user doesn't exist");
+        clearParam();
+        return;
+      }
+      await startConversation(withUserId);
+      clearParam();
+    })();
+    // startConversation is intentionally not a dep: the ref guard above
+    // makes this run once per ?with value even as the fn identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, withUserId, setSearchParams]);
 
   /* ─── Delete / Edit ─── */
   const deleteMessage = async (msgId: string) => {

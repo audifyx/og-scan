@@ -5,7 +5,7 @@ import {
   ArrowRight, Eye, EyeOff, Lock, Rocket, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@/hooks/useAuth";
+import { resolveAuthReturn, useAuth } from "@/hooks/useAuth";
 import { needsUsernameClaim } from "@/lib/usernameClaim";
 import { InjectWalletButtons } from "@/components/InjectWalletButtons";
 import { XSignInButton } from "@/components/XSignInButton";
@@ -18,7 +18,7 @@ export default function AuthWallet() {
   const { user, profile, loading, signIn, signUp, signOut } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const next = params.get("next") || "/app";
+  const next = resolveAuthReturn(params);
   const modeParam = params.get("mode");
 
   const [merge, setMerge] = useState(false);
@@ -237,6 +237,9 @@ export default function AuthWallet() {
 
         <Link to="/" className="ox-auth-back">
           Back to home <ArrowRight className="h-3 w-3" />
+        </Link>
+        <Link to={next === "/app" ? "/orbitx-social" : next} className="ox-auth-back">
+          Continue browsing without signing in <ArrowRight className="h-3 w-3" />
         </Link>
       </div>
       <MergeAccountModal open={merge} onClose={() => setMerge(false)} />

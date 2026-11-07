@@ -24,6 +24,7 @@ import {
   Loader2,
   MapPin,
   Medal,
+  MessageCircle,
   MoreHorizontal,
   Radio,
   Search,
@@ -1194,15 +1195,18 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
     setFollowBusy(true);
     try {
-      if (isFollowing) {
-        await supabase.from("followers").delete().eq("follower_id", user.id).eq("followee_id", targetUserId);
-        setIsFollowing(false);
-        toast.success("Unfollowed");
-      } else {
-        await supabase.from("followers").insert({ follower_id: user.id, followee_id: targetUserId });
-        setIsFollowing(true);
-        toast.success("Following");
+      // Shared path: useFriends is the single source of truth for follow
+      // state (profiles + feed lists). Direct supabase writes here used to
+      // leave useFriends consumers stale until their next refetch.
+      const ok = isFollowing
+        ? await friends.unfollow(targetUserId)
+        : await friends.follow(targetUserId);
+      if (!ok) {
+        toast.error("Could not update follow state");
+        return;
       }
+      setIsFollowing(!isFollowing);
+      toast.success(isFollowing ? "Unfollowed" : "Following");
       fetchProfile();
     } catch {
       toast.error("Could not update follow state");
@@ -1210,6 +1214,17 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
       setFollowBusy(false);
     }
   };
+
+  /* Keep the profile's follow button in sync with the shared useFriends
+     state (e.g. unfollowed from a feed list while this profile is open).
+     Only syncs once friends has loaded — isFollowing() is false while its
+     lists are still empty, which must not clobber the profile's own fetch. */
+  const friendsLoaded = !friends.loading;
+  const friendsFollowing = targetUserId ? friends.isFollowing(targetUserId) : false;
+  useEffect(() => {
+    if (!user || isOwnProfile || !friendsLoaded || !targetUserId) return;
+    setIsFollowing(friendsFollowing);
+  }, [user, isOwnProfile, friendsLoaded, friendsFollowing, targetUserId]);
 
   const saveProfile = async () => {
     if (!user) return;
@@ -1777,6 +1792,17 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                     >
                       {followBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                       {isFollowing ? "Following" : "Follow"}
+                    </Button>
+                    {/* DM entry point: the /messages page owns conversation
+                        creation via ?with= — this only navigates. Signed-out
+                        users hit ProtectedRoute and return here via /auth. */}
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate(`/messages?with=${encodeURIComponent(targetUserId)}`)}
+                      className="h-9 rounded-full border-[#e8b84a]/40 bg-transparent px-4 text-sm font-bold text-[#e8b84a] hover:bg-[#e8b84a]/10 hover:text-[#e8b84a]"
+                    >
+                      <MessageCircle className="mr-2 h-4 w-4" />
+                      Message
                     </Button>
                     <Button variant="outline" onClick={copyProfileLink} className="h-9 rounded-full border-white/20 bg-transparent px-4 text-sm font-bold text-white hover:bg-white/10 hover:text-white">Share</Button>
                     <Button variant="outline" onClick={openProfileLink} className="h-9 rounded-full border-white/20 bg-transparent px-4 text-sm font-bold text-white hover:bg-white/10 hover:text-white">View</Button>

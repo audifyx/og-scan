@@ -801,6 +801,33 @@ export default function Desktop(props: DesktopProps) {
     }
   };
 
+  /* Social notifications → OS notification center. NotificationListener
+     dispatches `orbitx:os-notification` on every realtime INSERT (and
+     mirrors it to localStorage for mounts that happen later); the stable
+     id `social-<notification id>` dedupes the two paths. No OS toast
+     popup here — the sonner toast already fires, the center just collects
+     (its unread badge is the signal). */
+  useEffect(() => {
+    const onSocialNotification = (e: Event) => {
+      const detail = (e as CustomEvent<{ id?: string; title?: string; body?: string }>).detail;
+      if (!detail?.id || !detail?.title) return;
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === detail.id)) return prev;
+        const n: OsNotification = {
+          id: detail.id,
+          title: detail.title,
+          body: detail.body ?? "",
+          kind: "social",
+          at: Date.now(),
+          read: false,
+        };
+        return [n, ...prev].slice(0, 100);
+      });
+    };
+    window.addEventListener("orbitx:os-notification", onSocialNotification);
+    return () => window.removeEventListener("orbitx:os-notification", onSocialNotification);
+  }, []);
+
   /* Price-alert poller: checks armed alerts every 30s, notifies once on cross. */
   useEffect(() => {
     const check = async () => {

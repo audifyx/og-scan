@@ -10,7 +10,27 @@ import {
   loadCharacter,
 } from "../components/gaming";
 import { useAuth } from "@/hooks/useAuth";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+// /os/settings toggles persist in localStorage (key below). The OS settings
+// store (osStore.ts, key "orbitxos:settings:v1") has no graphics-quality /
+// touch-controls fields — if those move into OsSettings, this key can go away
+// and OsSettingsPage should read loadOsSettings()/saveOsSettings() instead.
+const OS_HUB_SETTINGS_KEY = "orbitx-os-settings";
+
+function loadOsHubSettings(): { quality: "high" | "lite"; touch: boolean } {
+  try {
+    const raw = localStorage.getItem(OS_HUB_SETTINGS_KEY);
+    if (!raw) return { quality: "high", touch: false };
+    const parsed = JSON.parse(raw) as Partial<{ quality: string; touch: boolean }>;
+    return {
+      quality: parsed.quality === "lite" ? "lite" : "high",
+      touch: parsed.touch === true,
+    };
+  } catch {
+    return { quality: "high", touch: false };
+  }
+}
 
 export function OsUserHubPage() {
   const { profile, user } = useAuth();
@@ -145,8 +165,15 @@ export function OsRewardsPage() {
 }
 
 export function OsSettingsPage() {
-  const [quality, setQuality] = useState<"high" | "lite">("high");
-  const [touch, setTouch] = useState(false);
+  const [quality, setQuality] = useState<"high" | "lite">(() => loadOsHubSettings().quality);
+  const [touch, setTouch] = useState(() => loadOsHubSettings().touch);
+  useEffect(() => {
+    try {
+      localStorage.setItem(OS_HUB_SETTINGS_KEY, JSON.stringify({ quality, touch }));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [quality, touch]);
   return (
     <div className="ox-section" style={{ marginTop: 0 }}>
       <div className="ox-kicker">Settings</div>

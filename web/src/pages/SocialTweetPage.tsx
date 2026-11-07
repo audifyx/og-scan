@@ -176,7 +176,7 @@ export default function SocialTweetPage() {
                   onClick={goLogin}
                   className="osc-btn-primary mt-3 w-full"
                 >
-                  Sign in with X to join the conversation
+                  Sign in to OrbitX to join the conversation
                 </button>
               )}
             </article>

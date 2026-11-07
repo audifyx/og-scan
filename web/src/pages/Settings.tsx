@@ -22,6 +22,7 @@ import {
 // Credits removed
 import { ThemePicker } from "@/components/settings/ThemePicker";
 import { DeviceThemePicker } from "@/components/settings/DeviceThemePicker";
+import SocialSettingsPanel from "@/components/social-x/SocialSettingsPanel";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -404,6 +405,7 @@ const Settings = () => {
     { value: "themes",        icon: Palette,      label: "Themes",            mobileLabel: "Themes"    },
     { value: "invite",        icon: Gift,         label: "Invite & Referrals",mobileLabel: "Invite"    },
     { value: "notifications", icon: Bell,         label: "Notifications",     mobileLabel: "Alerts"    },
+    { value: "social",        icon: MessageCircle,label: "Social",            mobileLabel: "Social"    },
     { value: "webhooks",      icon: Webhook,      label: "Webhooks",          mobileLabel: "Webhooks"  },
     { value: "embed",         icon: Code2,        label: "Embed",             mobileLabel: "Embed"     },
   ] as const;
@@ -957,6 +959,17 @@ const Settings = () => {
               <h2 className="text-[20px] font-bold">Embed</h2>
             </div>
             <EmbedSettingsTab username={profile.username} />
+          </div>)}
+
+          {/* ── Social Tab ── */}
+          {activeTab === "social" && (<div className="tab-content">
+            <div className="hidden lg:flex items-center gap-3 mb-6 border-b border-white/[0.06] pb-4">
+              <MessageCircle className="h-5 w-5 text-white/40" />
+              <h2 className="text-[20px] font-bold">Social</h2>
+            </div>
+            <div className="max-w-2xl">
+              <SocialSettingsPanel />
+            </div>
           </div>)}
           </div>{/* end content area */}
         </div>{/* end right pane */}

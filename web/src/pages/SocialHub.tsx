@@ -77,6 +77,11 @@ const dicebear = (seed: string) =>
 const avatarSrc = (url: string | null | undefined, fallback: string) =>
   safeAvatarUrl(url) || dicebear(fallback);
 
+/** /auth link that returns to the current page after sign-in.
+    /auth reads `next` (see Auth.tsx) — the same param ProtectedRoute uses. */
+const authReturnHref = () =>
+  `/auth?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+
 const CHANNELS: { id: ChannelId; label: string; icon: React.ComponentType<{ className?: string }>; soon?: boolean }[] = [
   { id: "activity-feed", label: "activity-feed", icon: Zap },
   { id: "general-chat", label: "general-chat", icon: Hash },
@@ -97,6 +102,7 @@ const SocialHub = () => {
     Record<string, { user_id: string; username: string; avatar_url: string | null }>
   >({});
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showMobileMembers, setShowMobileMembers] = useState(false);
 
   /* Fetch all community members */
   useEffect(() => {
@@ -314,6 +320,44 @@ const SocialHub = () => {
               </button>
             );
           })}
+        </div>
+        {/* Mobile online members — parity with the sidebar "Active" list,
+            which is desktop-only (sidebar is hidden md:flex). */}
+        <div className="border-b border-white/[0.07] bg-card px-3 py-2 md:hidden">
+          <button
+            type="button"
+            onClick={() => setShowMobileMembers((v) => !v)}
+            className="flex w-full items-center gap-2 text-left"
+            aria-expanded={showMobileMembers}
+          >
+            <span className="h-2 w-2 shrink-0 rounded-full bg-og-lime" />
+            <span className="text-[11px] font-bold text-white/70">{activeMembersList.length} online</span>
+            <span className="text-[10px] text-white/30">tap to see who's here</span>
+            <ChevronRight className={cn("ml-auto h-3.5 w-3.5 shrink-0 text-white/30 transition-transform", showMobileMembers && "rotate-90")} />
+          </button>
+          {showMobileMembers && (
+            <div className="mt-2 max-h-44 space-y-1 overflow-y-auto">
+              {activeMembersList.length === 0 ? (
+                <p className="px-1 py-2 text-[11px] text-white/30">No members online right now.</p>
+              ) : (
+                activeMembersList.slice(0, 12).map((m) => (
+                  <div key={m.user_id} className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-white/[0.03]">
+                    <div className="relative flex-shrink-0">
+                      <img
+                        src={avatarSrc(m.avatar_url, m.username || m.user_id)}
+                        alt="" className="h-6 w-6 rounded-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).src = dicebear("fallback"); }}
+                      />
+                      <span className="absolute -bottom-px -right-px h-2 w-2 rounded-full border border-card bg-og-lime" />
+                    </div>
+                    <span className="truncate text-[10px] font-medium text-white/50">
+                      {m.user_id === user?.id ? "You" : m.username || "Anon"}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
         {activeChannel === "activity-feed" ? (
           <div className="flex-1 overflow-y-auto">
@@ -931,7 +975,10 @@ const GeneralChat = () => {
           </button>
         </div>
         {!user && (
-          <p className="mt-1.5 text-center text-[10px] text-white/25">Sign in to send messages</p>
+          <p className="mt-1.5 text-center text-[10px] text-white/25">
+            <a href={authReturnHref()} className="font-bold text-og-gold underline underline-offset-2 hover:text-og-gold/80">Sign in</a>
+            {" "}to send messages
+          </p>
         )}
       </div>
     </div>
@@ -1040,7 +1087,7 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
 
   /* ─── Connect to a LiveKit room ─── */
   const connectToRoom = useCallback(async (lkRoomName: string, label: string) => {
-    if (!user) { toast.error("Sign in to join voice"); return; }
+    if (!user) { toast.error("Sign in to join voice", { action: { label: "Sign in", onClick: () => { window.location.href = authReturnHref(); } }, duration: 5000 }); return; }
     // If already in this room, leave
     if (connected && activeRoomLabel === label) { await disconnect(); return; }
     // Disconnect old room first
@@ -1280,11 +1327,13 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
         </div>
       )}
 
-      {/* Error */}
+      {/* Error — the "Sign in to join voice" failure links to /auth so the
+          user can actually fix it instead of just reading about it. */}
       {error && (
         <div className="mx-4 mt-2 flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/10 p-2.5">
           <p className="text-[10px] text-red-400">{error}</p>
           <div className="flex items-center gap-2">
+            {!user && <a href={authReturnHref()} className="text-[9px] font-bold text-og-gold underline">Sign in</a>}
             <button onClick={() => setError(null)} className="text-[9px] text-white/30 underline">Dismiss</button>
             <button onClick={() => { if (activeRoomLabel) connectToRoom(activeRoomLabel === "lobby" ? "social-voice-lobby" : `social-room-${activeRoomLabel}`, activeRoomLabel); }} className="text-[9px] font-bold text-og-lime underline">Retry</button>
           </div>
@@ -1311,7 +1360,10 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
               </div>
               <p className="mb-5 text-[11px] text-white/40">Community voice channel powered by LiveKit. Talk live with OrbitX traders.</p>
               {!user ? (
-                <p className="text-center text-[11px] text-white/25">Sign in to join voice</p>
+                <p className="text-center text-[11px] text-white/25">
+                  <a href={authReturnHref()} className="font-bold text-og-gold underline underline-offset-2 hover:text-og-gold/80">Sign in</a>
+                  {" "}to join voice
+                </p>
               ) : (
                 <button onClick={joinLobby} disabled={connecting} className={cn(
                   "flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-xs font-bold uppercase tracking-wide transition disabled:opacity-50",
@@ -1406,7 +1458,7 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
                 <p className="mt-0.5 text-[10px] text-white/25">{rooms.length} rooms</p>
               </div>
               {!showCreateRoom && (
-                <button onClick={() => { if (!user) { toast.error("Sign in to create a room"); return; } setShowCreateRoom(true); }} className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-og-lime/80 to-og-gold/60 px-3 py-1.5 text-[10px] font-bold text-black transition hover:shadow-[0_0_16px_hsl(var(--og-lime)/0.3)]">
+                <button onClick={() => { if (!user) { toast.error("Sign in to create a room", { action: { label: "Sign in", onClick: () => { window.location.href = authReturnHref(); } }, duration: 5000 }); return; } setShowCreateRoom(true); }} className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-og-lime/80 to-og-gold/60 px-3 py-1.5 text-[10px] font-bold text-black transition hover:shadow-[0_0_16px_hsl(var(--og-lime)/0.3)]">
                   <Plus className="h-3 w-3" /> New Room
                 </button>
               )}
@@ -1600,7 +1652,10 @@ function LiveChat() {
               className="flex-1 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-white outline-none placeholder:text-white/25 focus:border-og-cyan/40" />
             <button onClick={send} disabled={!text.trim()} className="grid h-9 w-9 place-items-center rounded-full bg-og-cyan text-background transition hover:brightness-110 disabled:opacity-40"><Send className="h-4 w-4" /></button>
           </div>
-        ) : <p className="text-center text-[11px] text-white/30">Sign in to chat</p>}
+        ) : <p className="text-center text-[11px] text-white/30">
+          <a href={authReturnHref()} className="font-bold text-og-gold underline underline-offset-2 hover:text-og-gold/80">Sign in</a>
+          {" "}to chat
+        </p>}
       </div>
     </div>
   );
@@ -1773,8 +1828,11 @@ const LiveStream = () => {
         )}
       </div>
 
-      {error && <div className="border-b border-red-500/20 bg-red-500/10 px-4 py-2 text-[12px] text-red-400">{error}</div>}
-      {!user && <div className="border-b border-white/[0.06] px-4 py-2 text-[12px] text-white/40">Sign in to go live, watch, and chat.</div>}
+      {error && <div className="flex items-center justify-between gap-2 border-b border-red-500/20 bg-red-500/10 px-4 py-2 text-[12px] text-red-400"><span>{error}</span>{!user && <a href={authReturnHref()} className="shrink-0 font-bold text-og-gold underline">Sign in</a>}</div>}
+      {!user && <div className="border-b border-white/[0.06] px-4 py-2 text-[12px] text-white/40">
+        <a href={authReturnHref()} className="font-bold text-og-gold underline underline-offset-2 hover:text-og-gold/80">Sign in</a>
+        {" "}to go live, watch, and chat.
+      </div>}
 
       {/* Stage + chat */}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">

@@ -55,6 +55,21 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * Resolve the post-sign-in destination from an auth page's query params.
+ * Social callers link `/auth?return=/social/t/<id>`, but the auth pages only
+ * read `?next=` — so `return` is accepted as an alias (`next` wins when both
+ * are present). Only same-origin paths are honored (must start with a single
+ * "/"); anything else falls back. Auth pages should navigate to this value
+ * after sign-in (and after the X OAuth round-trip) instead of always
+ * landing on the default.
+ */
+export function resolveAuthReturn(search: URLSearchParams, fallback = "/app"): string {
+  const raw = search.get("next") || search.get("return") || "";
+  if (raw.startsWith("/") && !raw.startsWith("//")) return raw;
+  return fallback;
+}
+
 function processPendingReferral(userId: string) {
   const refCode = localStorage.getItem("og_ref_code");
   if (!refCode) return;

@@ -987,6 +987,25 @@ const CommunityRooms: React.FC = () => {
     localStorage.setItem(getSavedMessagesStorageKey(user.id), JSON.stringify(nextIds));
   }, [user?.id]);
 
+  /* Mobile create entry: the sidebar (and its desktop Create button) is
+     hidden below md, so phones had no way to create a room. The FAB + the
+     empty-state button below both funnel through here. */
+  const openCreateRoom = () => {
+    if (!user) {
+      toast.error("Sign in to create a room", {
+        action: {
+          label: "Sign in",
+          onClick: () => {
+            window.location.href = `/auth?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+          },
+        },
+        duration: 5000,
+      });
+      return;
+    }
+    setShowCreateModal(true);
+  };
+
   const createRoom = async () => {
     if (!user || !newRoom.name.trim()) return;
 
@@ -1437,7 +1456,7 @@ const CommunityRooms: React.FC = () => {
             <h1 className="text-sm font-black tracking-tight text-white">Rooms</h1>
             <p className="text-[10px] text-white/30">{rooms.length} active</p>
           </div>
-          <button onClick={() => setShowCreateModal(true)} className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-2 text-emerald-300 transition hover:bg-emerald-500/20 max-md:hidden" title="Create room">
+          <button onClick={openCreateRoom} className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-2 text-emerald-300 transition hover:bg-emerald-500/20 max-md:hidden" title="Create room">
             <Plus className="h-4 w-4" />
           </button>
         </div>
@@ -1680,10 +1699,24 @@ const CommunityRooms: React.FC = () => {
               <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-emerald-400/20 bg-emerald-500/10 text-emerald-300"><MessageSquare className="h-6 w-6" /></div>
               <p className="mt-3 text-sm font-bold text-white/55">Pick a room to start chatting</p>
               <p className="mt-1 text-xs text-white/30">Choose a room on the left, or create a new one.</p>
+              <button onClick={openCreateRoom} className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-br from-emerald-500 to-green-400 px-4 py-2 text-xs font-black text-white shadow-lg shadow-emerald-500/30 transition hover:brightness-110 md:hidden">
+                <Plus className="h-3.5 w-3.5" /> Create room
+              </button>
             </div>
           </div>
         )}
       </main>
+
+      {/* Mobile create FAB — the sidebar create button is hidden below md. */}
+      <button
+        type="button"
+        onClick={openCreateRoom}
+        aria-label="Create room"
+        title="Create room"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+88px)] right-4 z-40 grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-green-400 text-white shadow-lg shadow-emerald-500/40 transition hover:brightness-110 active:scale-95 md:hidden"
+      >
+        <Plus className="h-5 w-5" />
+      </button>
 
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">

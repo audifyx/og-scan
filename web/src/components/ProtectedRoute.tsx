@@ -10,7 +10,7 @@ interface ProtectedRouteProps {
 /**
  * Wraps any route that requires authentication.
  * - While auth is resolving → show a centered spinner (avoids flash-redirect).
- * - Unauthenticated → 404-style page with a prominent "Log in with X" button
+ * - Unauthenticated → 404-style page with a prominent "Sign in to OrbitX" button
  *   (deep-links /auth?next=<path>). No silent redirects.
  * - Authenticated → render children normally.
  */
@@ -50,13 +50,13 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         <p className="text-[64px] font-extrabold tracking-tight text-white">404</p>
         <p className="text-[17px] font-bold text-white/85">This page doesn't exist or requires login</p>
         <p className="max-w-xs text-[13px] leading-relaxed text-white/45">
-          Sign in with X to access this page.
+          Sign in to OrbitX to access this page.
         </p>
         <a
           href={`/auth?next=${next}`}
           className="mt-4 rounded-full bg-white px-8 py-3 text-[15px] font-extrabold text-black transition hover:bg-white/85"
         >
-          Log in with X
+          Sign in to OrbitX
         </a>
         <a href="/" className="mt-1 text-[13px] font-bold text-white/50 hover:text-white/80 hover:underline">
           Back to home

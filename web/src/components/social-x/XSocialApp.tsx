@@ -14,8 +14,16 @@ import {
   ArrowDownRight, Users, Bookmark, LogOut, Settings, Coins, Image as ImageIcon, Smile,
   Sparkles, Zap, Shield, Wallet, ChevronRight, Check, BarChart3, ExternalLink,
   Gift, ArrowLeftRight, TrendingDown, Siren, Lock, Gem, CandlestickChart,
-  Flame, Rocket, Skull, Vote,
+  Flame, Rocket, Skull, Vote, Quote, Eye, Compass,
 } from "lucide-react";
+import { PlatformThemeButton } from "@/components/theme/PlatformThemeButton";
+/* Social settings panel — owned by worker W3 (default export, props
+ * { onClose?: () => void }). Also exports getSocialFeedPrefs(), which the
+ * feed reads so the panel's feed-tuning toggles actually take effect. */
+import SocialSettingsPanel, { getSocialFeedPrefs } from "./SocialSettingsPanel";
+import PostAnalytics, { formatCount } from "./PostAnalytics";
+import ProfileAnalyticsCard from "./ProfileAnalyticsCard";
+import { usePostImpressionObserver } from "./usePostImpressions";
 import { supabase } from "@/lib/supabase";
 import { validateUploadFile, safeExtForMime, compressImageFile, supabaseTransformUrl } from "@/lib/safeUpload";
 import { useAuth } from "@/hooks/useAuth";
@@ -58,6 +66,11 @@ interface Post {
   id: string; user_id: string; username: string | null; avatar_url: string | null;
   content: string; likes_count: number | null; liked_by: string[] | null; created_at: string; reply_to?: string | null; repost_of?: string | null;
   gate_meta?: GateMeta | null; nft_mint?: string | null; nft_price_usd?: number | null;
+  /* Quote posts (W3: social_messages.quoted_post_id) — read defensively: the
+   * column may not exist yet, so these are only ever set when present. */
+  quoted_post_id?: string | null; quotedPost?: Post | null;
+  /* Post view counts (analytics API) — rendered only when present. */
+  viewCount?: number | null; view_count?: number | null;
 }
 /** Token gate for a "Holders only" post (social_messages.gate_meta JSONB).
  *  The same JSONB also carries engagement extras — polls (#203) and
@@ -96,8 +109,9 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-/* Token mentions ($SYMBOL) → blue, #tags → gold, @users → blue, mints → mono link. */
-function renderContent(text: string, onMint?: (m: string) => void) {
+/* Token mentions ($SYMBOL) → blue, #tags → gold, @users → blue, mints → mono link.
+ * Hashtags are clickable buttons that open the in-app hashtag filter (onHashtag). */
+function renderContent(text: string, onMint?: (m: string) => void, onHashtag?: (tag: string) => void) {
   const parts: (string | JSX.Element)[] = [];
   const tokenRe = /(\$[A-Za-z][A-Za-z0-9]{1,14}|@[A-Za-z0-9_]{2,20}|#[A-Za-z0-9_]{2,30}|https?:\/\/[^\s]+|[1-9A-HJ-NP-Za-km-z]{32,44})/g;
   let last = 0; let m: RegExpExecArray | null; let i = 0;
@@ -110,7 +124,7 @@ function renderContent(text: string, onMint?: (m: string) => void) {
       if (mint) parts.push(<a key={i++} href={`/trade/token/${mint}`} onClick={(e) => e.stopPropagation()} className="osc-mention" title={`Trade $${tok.slice(1)} on OrbitX`}>{tok}</a>);
       else parts.push(<span key={i++} className="osc-mention">{tok}</span>);
     }
-    else if (tok.startsWith("#")) parts.push(<span key={i++} className="osc-tag">{tok}</span>);
+    else if (tok.startsWith("#")) parts.push(<button key={i++} type="button" onClick={(e) => { e.stopPropagation(); onHashtag?.(tok); }} className="osc-tag" title={`Show posts tagged ${tok}`}>{tok}</button>);
     else if (tok.startsWith("@")) parts.push(<span key={i++} className="osc-mention">{tok}</span>);
     else if (tok.startsWith("http")) parts.push(<a key={i++} href={tok} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="osc-mention break-all">{tok}</a>);
     else if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(tok)) parts.push(<button key={i++} type="button" onClick={(e) => { e.stopPropagation(); onMint?.(tok); }} className="font-mono text-[12px] text-[#60a5fa] hover:underline">{tok.slice(0, 4)}…{tok.slice(-4)}</button>);
@@ -126,6 +140,40 @@ function loadBookmarks(): Set<string> {
 }
 function saveBookmarks(s: Set<string>) {
   try { localStorage.setItem(BOOKMARKS_KEY, JSON.stringify([...s])); } catch { /* ignore */ }
+}
+
+/* ── Synced bookmarks: GET/POST/DELETE /api/social/bookmarks (W3). The API
+ * response shape is normalised defensively — array of ids, array of objects
+ * with post_id/postId/id, or { bookmarks: [...] } / { postIds: [...] }.
+ * localStorage stays as the offline fallback when the endpoint is down. ── */
+const BOOKMARKS_API = "/api/social/bookmarks";
+function normalizeBookmarkIds(d: unknown): string[] | null {
+  if (!d) return null;
+  const arr = Array.isArray(d) ? d : (d as { bookmarks?: unknown; postIds?: unknown; post_ids?: unknown }).bookmarks
+    ?? (d as { postIds?: unknown }).postIds ?? (d as { post_ids?: unknown }).post_ids;
+  if (!Array.isArray(arr)) return null;
+  return arr
+    .map((b) => (typeof b === "string" ? b : (b as { post_id?: string; postId?: string; id?: string })?.post_id ?? (b as { postId?: string })?.postId ?? (b as { id?: string })?.id))
+    .filter((x): x is string => typeof x === "string" && x.length > 0);
+}
+async function fetchServerBookmarks(): Promise<Set<string> | null> {
+  try {
+    const r = await fetch(BOOKMARKS_API, { headers: await socialAuthHeaders() });
+    if (!r.ok) return null;
+    const ids = normalizeBookmarkIds(await r.json());
+    return ids ? new Set(ids) : null;
+  } catch { return null; }
+}
+
+/* The /api/social/* endpoints take the signed-in Supabase session JWT
+ * (Authorization: Bearer). Without it they 401 and the caller falls back
+ * to the local copy — never a hard failure. */
+async function socialAuthHeaders(): Promise<Record<string, string>> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch { return {}; }
 }
 
 /* ── $cashtag → mint map (powers trade deep-links) ── */
@@ -226,9 +274,10 @@ const NAV: { id: XTab; label: string; Icon: NavIcon }[] = [
   { id: "profile", label: "Profile", Icon: User },
 ];
 
-/* Mobile dock: 4 core tabs + More sheet (Communities, Bookmarks, Profile). */
-const CORE_TABS: XTab[] = ["home", "explore", "notifications", "messages"];
-const MORE_TABS: XTab[] = ["communities", "bookmarks", "profile"];
+/* Mobile dock: all six tabs are real dock tabs — Communities, Bookmarks and
+ * Profile were previously buried in the More sheet. Notifications stays
+ * reachable via the top-bar bell (it navigates to the notifications tab). */
+const CORE_TABS: XTab[] = ["home", "explore", "messages", "communities", "bookmarks", "profile"];
 
 const TAB_SHORT: Record<XTab, string> = {
   home: "Home",
@@ -591,7 +640,23 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [searching, setSearching] = useState(false);
   const [commView, setCommView] = useState<"groups" | "rooms" | "spaces">("groups");
   const [msgView, setMsgView] = useState<"direct" | "groups">("direct");
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [discoverOpen, setDiscoverOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  /* Feed-tuning prefs from the settings panel (localStorage, W3-owned key). */
+  const [feedPrefs, setFeedPrefs] = useState(() => {
+    try { return getSocialFeedPrefs(); } catch { return { hideReposts: false, hideReplies: false, onlyFollowing: false }; }
+  });
+  useEffect(() => {
+    if (settingsOpen) return;
+    try { setFeedPrefs(getSocialFeedPrefs()); } catch { /* ignore */ }
+  }, [settingsOpen]);
+  const [hashtagFilter, setHashtagFilter] = useState<string | null>(null);
+  const [quoteOf, setQuoteOf] = useState<Post | null>(null);
+  const [quoteOriginals, setQuoteOriginals] = useState<Record<string, Post>>({});
+  const [mobileComposerOpen, setMobileComposerOpen] = useState(false);
+  /* @-mention autocomplete — mirrors the $cashtag pattern (detect/pick + debounced search). */
+  const [mention, setMention] = useState<{ query: string; results: Suggestion[]; index: number; busy: boolean } | null>(null);
+  const mentionTimer = useRef<number | null>(null);
   const [notifFilter, setNotifFilter] = useState<"all" | "mentions" | "likes" | "follows">("all");
   const [newPosts, setNewPosts] = useState(0);
   const [onboardOpen, setOnboardOpen] = useState(false);
@@ -620,6 +685,9 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [agentMap, setAgentMap] = useState<Map<string, { username: string; vibe: string | null }>>(new Map());
   const { wallet: deskWallet } = useOrbitxBilling();
   const feedScrollRef = useRef<HTMLDivElement>(null);
+  /* Anonymous view counting: posts ≥40% visible get one impression each
+   * (usePostImpressions — W3). Attached to the PostCard <article>. */
+  const observePost = usePostImpressionObserver();
   const tabRef = useRef(tab); tabRef.current = tab;
   const uidRef = useRef(user?.id); uidRef.current = user?.id;
 
@@ -665,6 +733,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   }, []);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const modalRef = useRef<HTMLTextAreaElement>(null);
+  const mobileComposerRef = useRef<HTMLTextAreaElement>(null);
   const composerFileRef = useRef<HTMLInputElement>(null);
   const exploreSearchRef = useRef<HTMLInputElement>(null);
 
@@ -789,6 +858,20 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   }, [user, tab === "notifications"]);
 
   /* ── Bookmarks ── */
+  /* Synced bookmarks: pull the server list once per sign-in and replace the
+   * local set with it. If the endpoint isn't live yet (or the fetch fails),
+   * the localStorage copy stays as the offline fallback. */
+  const bookmarksSyncedRef = useRef(false);
+  useEffect(() => {
+    if (!user || bookmarksSyncedRef.current) return;
+    bookmarksSyncedRef.current = true;
+    void fetchServerBookmarks().then((server) => {
+      if (!server) return;
+      setBookmarks(server);
+      saveBookmarks(server);
+    });
+  }, [user]);
+
   useEffect(() => {
     if (tab !== "bookmarks") return;
     const ids = [...bookmarks].filter((id) => !id.startsWith("tmp-"));
@@ -865,11 +948,20 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     } catch { /* best-effort */ }
   };
 
+  /* Sign-in returns to wherever the user actually was (the post/action they
+   * were on), not always /orbitx-social. */
+  const authReturnUrl = (): string => {
+    try {
+      const here = `${window.location.pathname}${window.location.search}`;
+      return here && here !== "/" ? here : "/orbitx-social";
+    } catch { return "/orbitx-social"; }
+  };
+
   /* Public by default: writes need X auth. SSO — if already authed via /auth, they're in. */
   const requireAuth = (action: string): boolean => {
     if (user) return true;
     toast.error(`Sign in to ${action}`, {
-      action: { label: "Sign in", onClick: () => { window.location.href = `/auth?return=${encodeURIComponent("/orbitx-social")}`; } },
+      action: { label: "Sign in", onClick: () => { window.location.href = `/auth?return=${encodeURIComponent(authReturnUrl())}`; } },
       duration: 5000,
     });
     return false;
@@ -881,6 +973,16 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     const { error } = await supabase.from("followers").insert({ follower_id: user.id, followee_id: uid });
     if (error) setFollowingSet((prev) => { const n = new Set(prev); n.delete(uid); return n; });
     else void notify(uid, "follow", "New follower", `@${handle} followed you`);
+  };
+
+  /* Unfollow — same delete pattern as useFriends.unfollow (followers table,
+   * optimistic removal + rollback on error). Used by feed FollowCards. */
+  const unfollow = async (uid: string) => {
+    if (!user) return;
+    setFollowingSet((prev) => { const n = new Set(prev); n.delete(uid); return n; });
+    const { error } = await supabase.from("followers").delete()
+      .eq("follower_id", user.id).eq("followee_id", uid);
+    if (error) setFollowingSet((prev) => new Set(prev).add(uid));
   };
 
   const uploadComposerImage = async (files: FileList | null) => {
@@ -914,13 +1016,21 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     setPosting(true); setText("");
     const imgsSnapshot = pendingImages;
     setPendingImages([]);
-    const optimistic: Post = { id: `tmp-${Date.now()}`, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url || null, content, likes_count: 0, liked_by: [], created_at: new Date().toISOString(), gate_meta: meta };
+    const optimistic: Post = { id: `tmp-${Date.now()}`, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url || null, content, likes_count: 0, liked_by: [], created_at: new Date().toISOString(), gate_meta: meta, quoted_post_id: quoteOf?.id ?? null, quotedPost: quoteOf ?? null };
     setPosts((prev) => [optimistic, ...prev]);
     const payload: Record<string, unknown> = { channel: FEED_CHANNEL, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url, content, likes_count: 0, liked_by: [] };
     if (meta) payload.gate_meta = meta;
+    if (quoteOf) payload.quoted_post_id = quoteOf.id;
     let res = await supabase.from("social_messages")
       .insert(payload)
       .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at").single();
+    if (res.error && quoteOf && /quoted_post_id/i.test(res.error.message || "")) {
+      // Pre-migration: quoted_post_id column doesn't exist yet — post without the quote.
+      delete payload.quoted_post_id;
+      res = await supabase.from("social_messages")
+        .insert(payload)
+        .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at").single();
+    }
     if (res.error && meta && /gate_meta/i.test(res.error.message || "")) {
       // Pre-migration: gate_meta column doesn't exist yet — post without the gate/poll.
       delete payload.gate_meta;
@@ -930,8 +1040,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     }
     const { data, error } = res;
     if (error) { toast.error("Could not post. Try again."); setPosts((prev) => prev.filter((p) => p.id !== optimistic.id)); setText(base); setPendingImages(imgsSnapshot); }
-    else if (data) setPosts((prev) => prev.map((p) => p.id === optimistic.id ? ({ ...(data as Post), gate_meta: meta } as Post) : p));
-    if (!error) { setGateOn(false); setGateToken(null); setGateMin("1"); setPollOn(false); setPollOptions(["", ""]); }
+    else if (data) setPosts((prev) => prev.map((p) => p.id === optimistic.id ? ({ ...(data as Post), gate_meta: meta, quoted_post_id: quoteOf?.id ?? null, quotedPost: quoteOf ?? null } as Post) : p));
+    if (!error) { setGateOn(false); setGateToken(null); setGateMin("1"); setPollOn(false); setPollOptions(["", ""]); setQuoteOf(null); setMobileComposerOpen(false); }
     setPosting(false);
     setComposeOpen(false);
   };
@@ -1048,9 +1158,32 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     } catch { /* pre-migration: columns don't exist yet */ }
   }, []);
 
+  /** Quote ids via a separate query so the feed keeps rendering before the
+   *  quoted_post_id migration lands — failures are silent. */
+  const fetchQuoteExtras = useCallback(async (ids: string[]) => {
+    if (!ids.length) return;
+    try {
+      const { data, error } = await supabase.from("social_messages").select("id,quoted_post_id").in("id", ids.slice(0, 100));
+      if (error || !data) return;
+      const m: Record<string, string | null> = {};
+      for (const r of data as Array<{ id: string; quoted_post_id?: string | null }>) {
+        if (r.quoted_post_id) m[r.id] = r.quoted_post_id;
+      }
+      if (Object.keys(m).length === 0) return;
+      setPosts((prev) => prev.map((p) => (m[p.id] ? { ...p, quoted_post_id: m[p.id] } : p)));
+      setDetailPost((prev) => (prev && m[prev.id] ? { ...prev, quoted_post_id: m[prev.id] } : prev));
+    } catch { /* pre-migration: column doesn't exist yet */ }
+  }, []);
+
   useEffect(() => {
     const ids = posts.map((p) => p.id).filter((id) => !id.startsWith("tmp-"));
     if (ids.length) void fetchPostExtras(ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedIdsKey]);
+
+  useEffect(() => {
+    const ids = posts.map((p) => p.id).filter((id) => !id.startsWith("tmp-"));
+    if (ids.length) void fetchQuoteExtras(ids);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feedIdsKey]);
 
@@ -1070,7 +1203,9 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   }, []);
 
   useEffect(() => {
-    const ids = [...new Set(posts.filter((p) => p.repost_of).map((p) => p.repost_of as string))].filter((id) => !repostOriginals[id]);
+    const repostIds = [...new Set(posts.filter((p) => p.repost_of).map((p) => p.repost_of as string))].filter((id) => !repostOriginals[id]);
+    const quoteIds = [...new Set(posts.filter((p) => p.quoted_post_id && !p.quotedPost).map((p) => p.quoted_post_id as string))].filter((id) => !quoteOriginals[id]);
+    const ids = [...new Set([...repostIds, ...quoteIds])];
     if (ids.length === 0) return;
     let cancelled = false;
     supabase.from("social_messages").select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,repost_of,gate_meta").in("id", ids)
@@ -1078,7 +1213,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         if (cancelled) return;
         const m: Record<string, Post> = {};
         ((data as Post[]) || []).forEach((pp) => { m[pp.id] = pp; });
-        setRepostOriginals((prev) => ({ ...prev, ...m }));
+        if (repostIds.length) setRepostOriginals((prev) => ({ ...prev, ...m }));
+        if (quoteIds.length) setQuoteOriginals((prev) => ({ ...prev, ...m }));
       });
     return () => { cancelled = true; };
   }, [posts]);
@@ -1140,14 +1276,27 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     void updateGateMeta(post, { ...(post.gate_meta ?? {}), reactions: next });
   };
 
+  /* Synced bookmarks: optimistic local update (localStorage is the offline
+   * fallback) + best-effort server sync. If the endpoint isn't live yet the
+   * local copy is what the Bookmarks tab reads, so nothing is lost. */
   const toggleBookmark = (p: Post) => {
+    const adding = !bookmarks.has(p.id);
     setBookmarks((prev) => {
       const next = new Set(prev);
-      if (next.has(p.id)) { next.delete(p.id); toast.success("Removed from bookmarks"); }
-      else { next.add(p.id); toast.success("Added to bookmarks"); }
+      if (adding) next.add(p.id); else next.delete(p.id);
       saveBookmarks(next);
       return next;
     });
+    toast.success(adding ? "Added to bookmarks" : "Removed from bookmarks");
+    void (async () => {
+      try {
+        const headers = { ...(await socialAuthHeaders()), "Content-Type": "application/json" };
+        const r = adding
+          ? await fetch(BOOKMARKS_API, { method: "POST", headers, body: JSON.stringify({ postId: p.id }) })
+          : await fetch(`${BOOKMARKS_API}?postId=${encodeURIComponent(p.id)}`, { method: "DELETE", headers: await socialAuthHeaders() });
+        if (!r.ok) throw new Error("bookmark sync failed");
+      } catch { /* offline / endpoint not live yet — local copy already saved */ }
+    })();
   };
 
   const deletePost = async (p: Post) => {
@@ -1177,8 +1326,20 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     setTimeout(() => composerRef.current?.focus(), 60);
   };
 
+  /* Native share first (Web Share API), clipboard link as the fallback. */
   const share = async (p: Post) => {
-    try { await navigator.clipboard.writeText(`${window.location.origin}/social/t/${p.id}`); toast.success("Link copied to clipboard"); } catch { toast.error("Copy failed"); }
+    const url = `${window.location.origin}/social/t/${p.id}`;
+    const text = (p.content || "").slice(0, 200);
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: `OrbitX post by @${p.username || "anon"}`, text, url });
+        return;
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        /* fall through to clipboard */
+      }
+    }
+    try { await navigator.clipboard.writeText(url); toast.success("Link copied to clipboard"); } catch { toast.error("Copy failed"); }
   };
 
   /* ── Feed superpowers: one-tap trade / tip / copy-trade / rug flag ── */
@@ -1235,9 +1396,27 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
   /* ── Derived ── */
   const shownPosts = useMemo(() => {
-    if (feedMode === "following") return posts.filter((p) => followingSet.has(p.user_id) || (user && p.user_id === user.id));
-    return posts;
-  }, [posts, feedMode, followingSet, user]);
+    let list = feedMode === "following"
+      ? posts.filter((p) => followingSet.has(p.user_id) || (user && p.user_id === user.id))
+      : posts;
+    /* Feed-tuning prefs from the settings panel. */
+    if (feedPrefs.hideReposts) list = list.filter((p) => !p.repost_of);
+    if (feedPrefs.hideReplies) list = list.filter((p) => !p.reply_to);
+    if (feedPrefs.onlyFollowing) list = list.filter((p) => followingSet.has(p.user_id) || (user && p.user_id === user.id));
+    if (hashtagFilter) {
+      const needle = hashtagFilter.toLowerCase();
+      list = list.filter((p) => (p.content || "").toLowerCase().includes(needle));
+    }
+    return list;
+  }, [posts, feedMode, followingSet, user, hashtagFilter, feedPrefs]);
+
+  /* Open the in-app hashtag view: home feed filtered to the tag. */
+  const openHashtag = useCallback((tag: string) => {
+    setHashtagFilter(tag);
+    setFeedMode("foryou");
+    setTab("home");
+    feedScrollRef.current?.scrollTo({ top: 0 });
+  }, []);
 
   const trendingTags = useMemo(() => {
     const counts = new Map<string, number>();
@@ -1288,7 +1467,6 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const isNarrow = NARROW_TABS.includes(tab);
   const unread = notifs.filter((n) => !n.is_read).length;
   const tabLabel = NAV.find((n) => n.id === tab)?.label ?? "Social";
-  const dockOnMore = MORE_TABS.includes(tab) || moreOpen;
 
   /* ═══════════ Sub-renderers ═══════════ */
 
@@ -1323,6 +1501,45 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     requestAnimationFrame(() => {
       ta.focus();
       const np = start + coin.symbol!.length + 2;
+      ta.setSelectionRange(np, np);
+    });
+  };
+
+  /* ── @-mention autocomplete: mirrors the $cashtag pattern (detect before the
+   *  cursor → debounced profile search → keyboard/mouse pick). ── */
+  const detectMention = (ta: HTMLTextAreaElement | null) => {
+    if (!ta) { setMention(null); return; }
+    const pos = ta.selectionStart ?? 0;
+    const before = ta.value.slice(0, pos);
+    const m = /(?:^|\s)@([A-Za-z0-9_]{2,20})$/.exec(before);
+    if (!m) { setMention(null); return; }
+    const query = m[1];
+    setMention((prev) => ({ query, results: prev?.query === query ? prev.results : [], index: 0, busy: true }));
+    if (mentionTimer.current) window.clearTimeout(mentionTimer.current);
+    mentionTimer.current = window.setTimeout(async () => {
+      const like = `%${query.replace(/[%,()]/g, "")}%`;
+      const { data } = await supabase.from("profiles")
+        .select("user_id,username,display_name,avatar_url,is_official_account,bio")
+        .or(`username.ilike.${like},display_name.ilike.${like}`)
+        .not("username", "is", null).limit(8);
+      const results = (data as Suggestion[]) || [];
+      setMention((prev) => (prev && prev.query === query ? { ...prev, results, busy: false } : prev));
+    }, 250);
+  };
+
+  const pickMention = (s: Suggestion, ta: HTMLTextAreaElement | null) => {
+    if (!ta || !s.username) { setMention(null); return; }
+    const pos = ta.selectionStart ?? 0;
+    const before = ta.value.slice(0, pos);
+    const m = /(?:^|\s)@([A-Za-z0-9_]{2,20})$/.exec(before);
+    if (!m) { setMention(null); return; }
+    const atPos = m.index + (m[0].startsWith(" ") ? 1 : 0);
+    const next = ta.value.slice(0, atPos) + "@" + s.username + " " + ta.value.slice(pos);
+    setText(next.slice(0, MAX_LEN));
+    setMention(null);
+    requestAnimationFrame(() => {
+      ta.focus();
+      const np = atPos + s.username!.length + 2;
       ta.setSelectionRange(np, np);
     });
   };
@@ -1366,9 +1583,9 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           <span className="osc-topbar__mark" style={{ width: 40, height: 40 }}>O</span>
           <div className="min-w-0 flex-1">
             <div className="text-[15px] font-bold text-white">Join the conversation</div>
-            <div className="mt-0.5 text-[13px] text-white/45">Sign in with X to post, like and reply — reading is free for everyone.</div>
-            <button type="button" onClick={() => { window.location.href = `/auth?return=${encodeURIComponent("/orbitx-social")}`; }} className="osc-btn-primary mt-3">
-              Sign in with X
+            <div className="mt-0.5 text-[13px] text-white/45">Sign in to OrbitX to post, like and reply — reading is free for everyone.</div>
+            <button type="button" onClick={() => { window.location.href = `/auth?return=${encodeURIComponent(authReturnUrl())}`; }} className="osc-btn-primary mt-3">
+              Sign in to OrbitX
             </button>
           </div>
         </div>
@@ -1378,23 +1595,41 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     <div className="osc-composer">
       <img src={myAvatar} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
       <div className="min-w-0 flex-1">
+        {quoteOf && (
+          <div className="osc-quote osc-quote--preview">
+            <div className="flex items-center gap-2">
+              <Quote className="h-3.5 w-3.5 shrink-0 text-[#f0c75e]" />
+              <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-white/70">
+                Quoting @{quoteOf.username || "anon"}: {(quoteOf.content || "").slice(0, 80)}{(quoteOf.content || "").length > 80 ? "…" : ""}
+              </span>
+              <button type="button" onClick={() => setQuoteOf(null)} className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white" aria-label="Remove quote">
+                <XIcon className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
         <div className="relative">
         <textarea
           ref={refEl}
           value={text}
-          onChange={(e) => { setText(e.target.value.slice(0, MAX_LEN)); detectCashtag(e.target); }}
-          onKeyUp={(e) => detectCashtag(e.currentTarget)}
-          onClick={(e) => detectCashtag(e.currentTarget)}
+          onChange={(e) => { setText(e.target.value.slice(0, MAX_LEN)); detectCashtag(e.target); detectMention(e.target); }}
+          onKeyUp={(e) => { detectCashtag(e.currentTarget); detectMention(e.currentTarget); }}
+          onClick={(e) => { detectCashtag(e.currentTarget); detectMention(e.currentTarget); }}
           placeholder="What's happening?"
           rows={inline ? 2 : 4}
           onKeyDown={(e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { submit(); return; }
-            if (cashtag && cashtag.results.length > 0) {
+            if (mention && mention.results.length > 0) {
+              if (e.key === "ArrowDown") { e.preventDefault(); setMention((p) => p && ({ ...p, index: (p.index + 1) % p.results.length })); }
+              else if (e.key === "ArrowUp") { e.preventDefault(); setMention((p) => p && ({ ...p, index: (p.index - 1 + p.results.length) % p.results.length })); }
+              else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pickMention(mention.results[mention.index], e.currentTarget); }
+              else if (e.key === "Escape") { setMention(null); }
+            } else if (cashtag && cashtag.results.length > 0) {
               if (e.key === "ArrowDown") { e.preventDefault(); setCashtag((p) => p && ({ ...p, index: (p.index + 1) % p.results.length })); }
               else if (e.key === "ArrowUp") { e.preventDefault(); setCashtag((p) => p && ({ ...p, index: (p.index - 1 + p.results.length) % p.results.length })); }
               else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pickCashtag(cashtag.results[cashtag.index], e.currentTarget); }
               else if (e.key === "Escape") { setCashtag(null); }
-            } else if (e.key === "Escape") setCashtag(null);
+            } else if (e.key === "Escape") { setCashtag(null); setMention(null); }
           }}
         />
         {cashtag && (cashtag.busy || cashtag.results.length > 0) && (
@@ -1418,6 +1653,30 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                 <span className="text-right">
                   <span className="block text-[12.5px] font-extrabold text-white">{fmtPrice(r.priceUsd)}</span>
                   {r.change24h != null && <span className={cn("block text-[10.5px] font-bold", r.change24h >= 0 ? "text-emerald-400" : "text-rose-400")}>{r.change24h >= 0 ? "+" : ""}{r.change24h.toFixed(1)}%</span>}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        {mention && (mention.busy || mention.results.length > 0) && (
+          <div className="osc-cashtag">
+            {mention.busy && mention.results.length === 0 ? (
+              <div className="px-4 py-3 text-[13px] text-white/40">Searching people…</div>
+            ) : mention.results.map((r, i) => (
+              <button
+                key={r.user_id}
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); pickMention(r, refEl.current); }}
+                onMouseEnter={() => setMention((p) => p && ({ ...p, index: i }))}
+                className={cn("osc-cashtag__row", i === mention.index && "osc-cashtag__row--on")}
+              >
+                <img src={avatarOf(r.avatar_url, r.user_id)} alt="" className="h-8 w-8 rounded-full object-cover ring-1 ring-white/10" />
+                <span className="min-w-0 flex-1 text-left">
+                  <span className="block truncate text-[13.5px] font-extrabold text-white">
+                    {r.display_name || r.username}
+                    {r.is_official_account && <BadgeCheck className="ml-1 inline h-3.5 w-3.5 text-[#f0c75e]" />}
+                  </span>
+                  <span className="block truncate text-[11px] text-white/40">@{r.username}</span>
                 </span>
               </button>
             ))}
@@ -1777,6 +2036,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     }
     const p = (original ?? raw) as Post;
     const liked = Boolean(user && (p.liked_by || []).includes(user.id));
+    const quoted = p.quotedPost ?? (p.quoted_post_id ? quoteOriginals[p.quoted_post_id] : undefined) ?? null;
+    const views = p.viewCount ?? p.view_count ?? null;
     const marked = bookmarks.has(p.id);
     const own = user && p.user_id === user.id;
     const isOfficial = officialIds.has(p.user_id);
@@ -1791,7 +2052,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     }
     const callTokens = extractCallTokens(p.content);
     return (
-      <article onClick={() => onOpen?.(p.id)} className={cn("osc-post x-fade-in group/post relative", onOpen && "osc-post--click")}>
+      <article ref={observePost(p.id)} onClick={() => onOpen?.(p.id)} className={cn("osc-post x-fade-in group/post relative", onOpen && "osc-post--click")}>
         <img src={avatarOf(p.avatar_url, p.user_id)} alt="" loading="lazy" width={40} height={40} className="osc-post__avatar transition group-hover/post:ring-[#3b82f6]/50" />
         <div className="min-w-0 flex-1">
           {isRepost && <div className="mb-0.5 flex items-center gap-1.5 text-[12px] font-bold text-white/40"><Repeat2 className="h-3.5 w-3.5" /> @{raw.username || "someone"} reposted</div>}
@@ -1799,7 +2060,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             <span className="osc-post__name">{p.username || "Anon"}</span>
             {(isOfficial || officialIds.has(p.user_id)) && <BadgeCheck className="osc-verified h-4 w-4" />}
             {agent && <AgentBadge vibe={agent.vibe} />}
-            <span className="osc-post__meta">@{(p.username || "anon").toLowerCase().replace(/\s+/g, "")} · {timeAgo(p.created_at)}</span>
+            <span className="osc-post__meta">@{(p.username || "anon").toLowerCase().replace(/\s+/g, "")} · {timeAgo(p.created_at)}{views != null && views > 0 && (<> · <Eye className="inline h-3 w-3 -mt-0.5" /> {formatCount(views)}</>)}</span>
             <button type="button" onClick={(e) => { e.stopPropagation(); setMenuId(menuId === p.id ? null : p.id); }} className="ml-auto rounded-full p-1.5 text-white/30 transition hover:bg-[#3b82f6]/10 hover:text-[#60a5fa]">
               <MoreHorizontal className="h-4 w-4" />
             </button>
@@ -1823,7 +2084,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             </div>
           ) : ((() => { const { text: chartStripped, charts } = splitCharts(p.content); const { text: posStripped, positions } = splitPositions(chartStripped); const { text: body, imgs } = splitMedia(posStripped); return (
             <>
-              {body && <div className="osc-post__body">{renderContent(body, onSelectMint)}</div>}
+              {body && <div className="osc-post__body">{renderContent(body, onSelectMint, openHashtag)}</div>}
               {imgs.length > 0 && (
                 <div className={cn("mt-2 grid gap-1.5 overflow-hidden rounded-2xl border border-white/[0.08]", imgs.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
                   {imgs.map((u, i) => (
@@ -1847,6 +2108,16 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             </>
           ); })())}
           {!gateLocked && <PollCard p={p} />}
+          {!gateLocked && quoted && (
+            <div role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); if (onOpen) onOpen(quoted.id); }} onKeyDown={(e) => { if (e.key === "Enter" && onOpen) onOpen(quoted.id); }} className="osc-quote">
+              <span className="flex items-center gap-2">
+                <img src={avatarOf(quoted.avatar_url, quoted.user_id)} alt="" loading="lazy" className="h-5 w-5 rounded-full object-cover" />
+                <span className="truncate text-[13px] font-extrabold text-white">{quoted.username || "Anon"}</span>
+                <span className="shrink-0 text-[12px] text-white/35">· {timeAgo(quoted.created_at)}</span>
+              </span>
+              <span className="mt-1 block text-left text-[14px] leading-snug text-white/75">{renderContent((quoted.content || "").slice(0, 280), onSelectMint, openHashtag)}</span>
+            </div>
+          )}
           {callTokens.length > 0 && (
             <div className="osc-tradebar" onClick={(e) => e.stopPropagation()}>
               {callTokens.map((ct) => (
@@ -1905,6 +2176,14 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             <button type="button" onClick={() => { navigator.clipboard.writeText(p.content).catch(() => {}); setMenuId(null); toast.success("Text copied"); }} className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-[13px] font-bold text-white/70 transition hover:bg-white/[0.04]">
               <Copy className="h-4 w-4" /> Copy text
             </button>
+            <button type="button" onClick={() => { setMenuId(null); setQuoteOf(p); setComposeOpen(true); setTimeout(() => modalRef.current?.focus(), 60); }} className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-[13px] font-bold text-white/70 transition hover:bg-white/[0.04]">
+              <Quote className="h-4 w-4" /> Quote post
+            </button>
+            {!own && (
+              <button type="button" onClick={() => { setMenuId(null); if (!requireAuth("message")) return; window.location.href = `/messages?with=${encodeURIComponent(p.user_id)}`; }} className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-[13px] font-bold text-white/70 transition hover:bg-white/[0.04]">
+                <Mail className="h-4 w-4" /> Message
+              </button>
+            )}
             {!p.id.startsWith("tmp-") && (
               <button type="button" onClick={() => { navigator.clipboard.writeText(embedSnippet("post", p.id)).catch(() => {}); setMenuId(null); toast.success("Embed code copied — paste it on any website"); }} className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-[13px] font-bold text-white/70 transition hover:bg-white/[0.04]">
                 <ExternalLink className="h-4 w-4" /> Copy embed
@@ -1924,7 +2203,9 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     );
   };
 
-  const FollowCard = ({ s }: { s: Suggestion }) => (
+  const FollowCard = ({ s }: { s: Suggestion }) => {
+    const isFollowing = followingSet.has(s.user_id);
+    return (
     <div className="osc-row osc-row--hover">
       <img src={avatarOf(s.avatar_url, s.user_id)} alt="" loading="lazy" className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10" />
       <div className="min-w-0 flex-1">
@@ -1936,11 +2217,18 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         <div className="truncate text-[13px] text-white/35">@{s.username}</div>
         {s.bio && <div className="mt-0.5 line-clamp-1 text-[12px] text-white/50">{s.bio}</div>}
       </div>
-      <button type="button" onClick={() => follow(s.user_id)} className="rounded-full bg-white px-4 py-1.5 text-[13px] font-extrabold text-black transition hover:bg-white/85 active:scale-95">
-        Follow
-      </button>
+      {isFollowing ? (
+        <button type="button" onClick={() => void unfollow(s.user_id)} title="Unfollow" className="rounded-full border border-white/15 bg-transparent px-4 py-1.5 text-[13px] font-extrabold text-white transition hover:border-rose-400/60 hover:text-rose-300 active:scale-95">
+          Following
+        </button>
+      ) : (
+        <button type="button" onClick={() => follow(s.user_id)} className="rounded-full bg-white px-4 py-1.5 text-[13px] font-extrabold text-black transition hover:bg-white/85 active:scale-95">
+          Follow
+        </button>
+      )}
     </div>
-  );
+    );
+  };
 
   const TrendRow = ({ t, i }: { t: Ticker; i: number }) => {
     const up = (t.change24h ?? 0) >= 0;
@@ -1988,14 +2276,14 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         {label} doesn't exist
       </div>
       <p className="mx-auto mt-2 max-w-xs text-[14px] leading-relaxed text-white/45">
-        This page requires login. Sign in with X to access your {label.toLowerCase()}.
+        This page requires login. Sign in to OrbitX to access your {label.toLowerCase()}.
       </p>
       <button
         type="button"
-        onClick={() => { window.location.href = `/auth?return=${encodeURIComponent(window.location.pathname)}`; }}
+        onClick={() => { window.location.href = `/auth?return=${encodeURIComponent(authReturnUrl())}`; }}
         className="osc-btn-primary mt-6"
       >
-        Log in with X
+        Sign in to OrbitX
       </button>
       <button
         type="button"
@@ -2033,7 +2321,36 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               </div>
             </div>
 
+            {hashtagFilter && (
+              <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-2.5">
+                <span className="rounded-full bg-[#e8b84a]/15 px-3 py-1 text-[13px] font-extrabold text-[#e8b84a] ring-1 ring-[#e8b84a]/40">{hashtagFilter}</span>
+                <span className="text-[12.5px] font-bold text-white/40">{shownPosts.length} post{shownPosts.length === 1 ? "" : "s"}</span>
+                <button type="button" onClick={() => setHashtagFilter(null)} className="ml-auto grid h-6 w-6 place-items-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white" aria-label="Clear hashtag filter">
+                  <XIcon className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+
             <div className="hidden lg:block"><Composer inline refEl={composerRef} /></div>
+
+            {/* Mobile: compact inline composer — tap the prompt to expand it in
+                place at the top of the feed (the FAB + full modal still work). */}
+            <div className="lg:hidden">
+              {mobileComposerOpen ? (
+                <div className="relative">
+                  <Composer inline refEl={mobileComposerRef} />
+                  <button type="button" onClick={() => setMobileComposerOpen(false)} className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white" aria-label="Collapse composer">
+                    <XIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => { setMobileComposerOpen(true); setTimeout(() => mobileComposerRef.current?.focus(), 60); }} className="flex w-full items-center gap-3 border-b border-white/[0.06] px-4 py-3 text-left">
+                  <img src={myAvatar} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+                  <span className="min-w-0 flex-1 truncate text-[15px] text-white/40">What's happening?</span>
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#3b82f6]/15 text-[#60a5fa]"><Feather className="h-4 w-4" /></span>
+                </button>
+              )}
+            </div>
 
             {feedMode === "money" ? (
               <MoneyTab
@@ -2070,14 +2387,20 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               <div className="osc-empty">
                 <div className="osc-empty__icon"><Sparkles className="h-6 w-6 text-[#f0c75e]" /></div>
                 <div className="mt-4 text-[20px] font-extrabold text-white">
-                  {feedMode === "following" ? "Nothing here yet" : "Welcome to OrbitX Social Center"}
+                  {hashtagFilter ? `No posts tagged ${hashtagFilter}` : feedMode === "following" ? "Nothing here yet" : "Welcome to OrbitX Social Center"}
                 </div>
                 <p className="mx-auto mt-2 max-w-xs text-[14px] leading-relaxed text-white/40">
-                  {feedMode === "following"
+                  {hashtagFilter
+                    ? "Nobody has posted with this tag yet — be the first."
+                    : feedMode === "following"
                     ? "Follow people to see their posts in your timeline."
                     : "The place to chat, discover and find what's happening on chain. Your first post kicks off the feed."}
                 </p>
-                {feedMode === "foryou" && (
+                {hashtagFilter ? (
+                  <button type="button" onClick={() => setHashtagFilter(null)} className="osc-btn-primary mt-5">
+                    Clear filter
+                  </button>
+                ) : feedMode === "foryou" && (
                   <button type="button" onClick={() => { setComposeOpen(true); setTimeout(() => modalRef.current?.focus(), 60); }} className="osc-btn-primary mt-5">
                     Write your first post
                   </button>
@@ -2407,7 +2730,14 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       case "profile":
         return (
           <Suspense fallback={<Spinner />}>
-            <div className="h-full min-h-0 overflow-y-auto"><ProfilePage /></div>
+            <div className="h-full min-h-0 overflow-y-auto">
+              {user && (
+                <div className="px-4 pt-4">
+                  <ProfileAnalyticsCard userId={user.id} />
+                </div>
+              )}
+              <ProfilePage />
+            </div>
           </Suspense>
         );
     }
@@ -2415,10 +2745,85 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
   /* ═══════════ Layout ═══════════ */
   const goTab = (id: XTab) => {
-    setMoreOpen(false);
+    setDiscoverOpen(false);
+    setSettingsOpen(false);
     if (tab === id) feedScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     else setTab(id);
   };
+
+  /* ── Right rail content (search + market pulse + trends + who-to-follow).
+   * Shared by the desktop aside and the mobile Discover sheet, so phone gets
+   * the same content the rail hides below 1100px. ── */
+  const AsideContent = () => (
+    <>
+      {tab !== "explore" && (
+        <div className="osc-search">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+          <input
+            value={searchQ}
+            onChange={(e) => { setSearchQ(e.target.value); if (e.target.value.trim()) { setDiscoverOpen(false); setTab("explore"); } }}
+            placeholder="Search OrbitX"
+          />
+        </div>
+      )}
+
+      <div className="osc-aside__card x-rise">
+        <div className="flex items-center justify-between px-4 pt-3.5 pb-1">
+          <span className="osc-aside__card-head" style={{ padding: 0 }}>Market pulse</span>
+          <span className={cn("flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-extrabold", marketPulse.avg >= 0 ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400")}>
+            {marketPulse.avg >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+            {marketPulse.avg >= 0 ? "+" : ""}{marketPulse.avg.toFixed(1)}%
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-px bg-white/[0.06] mt-2">
+          {([
+            { k: "SOL", v: marketPulse.sol?.priceUsd != null ? "$" + marketPulse.sol.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—", c: "text-white" },
+            { k: "Gainers", v: String(marketPulse.gainers), c: "text-emerald-400" },
+            { k: "Losers", v: String(marketPulse.losers), c: "text-rose-400" },
+          ]).map((cell) => (
+            <div key={cell.k} className="bg-[#0a0e14] px-3 py-2.5">
+              <div className="text-[9px] font-bold uppercase tracking-widest text-white/35">{cell.k}</div>
+              <div className={cn("text-[14px] font-extrabold", cell.c)}>{cell.v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="osc-aside__card x-rise" style={{ animationDelay: "80ms" }}>
+        <div className="osc-aside__card-head">What's happening</div>
+        {ticker.length === 0 ? (
+          <div className="space-y-2.5 px-4 pb-3 pt-1">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="space-y-1.5">
+                <div className="x-shim h-3 w-24 rounded-full" />
+                <div className="x-shim h-3 w-16 rounded-full" />
+              </div>
+            ))}
+          </div>
+        ) : ticker.slice(0, 5).map((t, i) => <TrendRow key={t.mint} t={t} i={i} />)}
+        <button type="button" onClick={() => { setDiscoverOpen(false); setTab("explore"); }} className="w-full px-4 py-3 text-left text-[14px] font-bold text-[#60a5fa] transition hover:bg-white/[0.03]">
+          Show more
+        </button>
+      </div>
+
+      <div className="osc-aside__card x-rise" style={{ animationDelay: "160ms" }}>
+        <div className="osc-aside__card-head">Who to follow</div>
+        {whoToFollow.slice(0, 3).map((s) => <FollowCard key={s.user_id} s={s} />)}
+        <button type="button" onClick={() => { setDiscoverOpen(false); setTab("explore"); }} className="w-full px-4 py-3 text-left text-[14px] font-bold text-[#60a5fa] transition hover:bg-white/[0.03]">
+          Show more
+        </button>
+      </div>
+
+      <footer className="osc-footer">
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/whitepaper">Whitepaper</a>
+        <a href="/api">API</a>
+        <a href="https://x.com/orbitxwrld" target="_blank" rel="noreferrer">X</a>
+        <div className="mt-1">© 2026 OrbitX Social Center · The place to chat, discover and find what's happening on chain.</div>
+      </footer>
+    </>
+  );
 
   return (
     <div className="osc-shell ox-x-social">
@@ -2436,10 +2841,18 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             <div className="osc-topbar__sub">{tabLabel}</div>
           </div>
         </div>
-        <button type="button" onClick={() => goTab("notifications")} aria-label="Notifications" className="osc-topbar__bell">
-          <Bell className="h-5 w-5" />
-          {unread > 0 && <span className="osc-topbar__badge">{unread > 9 ? "9+" : unread}</span>}
-        </button>
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={() => setDiscoverOpen(true)} aria-label="Discover" title="Discover — search, trends, who to follow" className="osc-topbar__bell">
+            <Compass className="h-5 w-5" />
+          </button>
+          <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" title="Settings" className="osc-topbar__bell">
+            <Settings className="h-5 w-5" />
+          </button>
+          <button type="button" onClick={() => goTab("notifications")} aria-label="Notifications" className="osc-topbar__bell">
+            <Bell className="h-5 w-5" />
+            {unread > 0 && <span className="osc-topbar__badge">{unread > 9 ? "9+" : unread}</span>}
+          </button>
+        </div>
       </header>
 
       {/* ── Desktop left sidebar ── */}
@@ -2465,6 +2878,14 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               <span className="osc-rail__label">{n.label}</span>
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="osc-rail__link"
+          >
+            <Settings className="h-6 w-6" strokeWidth={2} />
+            <span className="osc-rail__label">Settings</span>
+          </button>
           <button
             type="button"
             onClick={() => { setComposeOpen(true); setTimeout(() => modalRef.current?.focus(), 60); }}
@@ -2510,79 +2931,14 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       {/* ── Desktop right sidebar ── */}
       {isNarrow && (
         <aside className="osc-aside">
-          {tab !== "explore" && (
-            <div className="osc-search">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-              <input
-                value={searchQ}
-                onChange={(e) => { setSearchQ(e.target.value); if (e.target.value.trim()) setTab("explore"); }}
-                placeholder="Search OrbitX"
-              />
-            </div>
-          )}
-
-          <div className="osc-aside__card x-rise">
-            <div className="flex items-center justify-between px-4 pt-3.5 pb-1">
-              <span className="osc-aside__card-head" style={{ padding: 0 }}>Market pulse</span>
-              <span className={cn("flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-extrabold", marketPulse.avg >= 0 ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400")}>
-                {marketPulse.avg >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-                {marketPulse.avg >= 0 ? "+" : ""}{marketPulse.avg.toFixed(1)}%
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-px bg-white/[0.06] mt-2">
-              {([
-                { k: "SOL", v: marketPulse.sol?.priceUsd != null ? "$" + marketPulse.sol.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—", c: "text-white" },
-                { k: "Gainers", v: String(marketPulse.gainers), c: "text-emerald-400" },
-                { k: "Losers", v: String(marketPulse.losers), c: "text-rose-400" },
-              ]).map((cell) => (
-                <div key={cell.k} className="bg-[#0a0e14] px-3 py-2.5">
-                  <div className="text-[9px] font-bold uppercase tracking-widest text-white/35">{cell.k}</div>
-                  <div className={cn("text-[14px] font-extrabold", cell.c)}>{cell.v}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="osc-aside__card x-rise" style={{ animationDelay: "80ms" }}>
-            <div className="osc-aside__card-head">What's happening</div>
-            {ticker.length === 0 ? (
-              <div className="space-y-2.5 px-4 pb-3 pt-1">
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="space-y-1.5">
-                    <div className="x-shim h-3 w-24 rounded-full" />
-                    <div className="x-shim h-3 w-16 rounded-full" />
-                  </div>
-                ))}
-              </div>
-            ) : ticker.slice(0, 5).map((t, i) => <TrendRow key={t.mint} t={t} i={i} />)}
-            <button type="button" onClick={() => setTab("explore")} className="w-full px-4 py-3 text-left text-[14px] font-bold text-[#60a5fa] transition hover:bg-white/[0.03]">
-              Show more
-            </button>
-          </div>
-
-          <div className="osc-aside__card x-rise" style={{ animationDelay: "160ms" }}>
-            <div className="osc-aside__card-head">Who to follow</div>
-            {whoToFollow.slice(0, 3).map((s) => <FollowCard key={s.user_id} s={s} />)}
-            <button type="button" onClick={() => setTab("explore")} className="w-full px-4 py-3 text-left text-[14px] font-bold text-[#60a5fa] transition hover:bg-white/[0.03]">
-              Show more
-            </button>
-          </div>
-
-          <footer className="osc-footer">
-            <a href="/terms">Terms</a>
-            <a href="/privacy">Privacy</a>
-            <a href="/whitepaper">Whitepaper</a>
-            <a href="/api">API</a>
-            <a href="https://x.com/orbitxwrld" target="_blank" rel="noreferrer">X</a>
-            <div className="mt-1">© 2026 OrbitX Social Center · The place to chat, discover and find what's happening on chain.</div>
-          </footer>
+          <AsideContent />
         </aside>
       )}
 
       {/* ── Mobile bottom tab bar — centered ── */}
       <nav className="osc-dock-wrap" aria-label="Social navigation">
         <div className="osc-dock">
-          {CORE_TABS.slice(0, 2).map((id) => {
+          {CORE_TABS.slice(0, 3).map((id) => {
             const n = NAV.find((x) => x.id === id)!;
             const on = tab === id;
             return (
@@ -2610,7 +2966,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           >
             <Feather className="h-7 w-7" />
           </button>
-          {CORE_TABS.slice(2).map((id) => {
+          {CORE_TABS.slice(3).map((id) => {
             const n = NAV.find((x) => x.id === id)!;
             const on = tab === id;
             return (
@@ -2629,43 +2985,64 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               </button>
             );
           })}
-          <button
-            type="button"
-            onClick={() => setMoreOpen((v) => !v)}
-            className={cn("osc-dock__item", dockOnMore && "osc-dock__item--on")}
-            aria-expanded={moreOpen}
-            aria-label="More"
-          >
-            <span className="osc-dock__icon">
-              <MoreHorizontal className="h-[20px] w-[20px]" strokeWidth={dockOnMore ? 2.4 : 2} />
-            </span>
-            <span className="osc-dock__label">More</span>
-          </button>
         </div>
       </nav>
 
-      {/* ── More sheet ── */}
-      {moreOpen && (
+      {/* ── Discover sheet (mobile) — the right-rail content: search, market
+          pulse, trends, who to follow. Same content as the desktop aside. ── */}
+      {discoverOpen && (
         <div className="osc-sheet">
-          <div className="osc-sheet__backdrop" onClick={() => setMoreOpen(false)} />
-          <div className="osc-sheet__panel x-fade-in">
+          <div className="osc-sheet__backdrop" onClick={() => setDiscoverOpen(false)} />
+          <div className="osc-sheet__panel osc-sheet__panel--scroll x-fade-in">
             <div className="osc-sheet__grab" />
-            <div className="osc-sheet__grid">
-              {MORE_TABS.map((id) => {
-                const n = NAV.find((x) => x.id === id)!;
-                const on = tab === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => goTab(id)}
-                    className={cn("osc-sheet__item", on && "osc-sheet__item--on")}
-                  >
-                    <n.Icon className="h-6 w-6" />
-                    <span>{n.label}</span>
-                  </button>
-                );
-              })}
+            <div className="mb-2 flex items-center justify-between px-1">
+              <span className="text-[17px] font-extrabold text-white" style={{ fontFamily: "var(--osc-font-display)" }}>Discover</span>
+              <button type="button" onClick={() => setDiscoverOpen(false)} className="rounded-full p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white" aria-label="Close discover">
+                <XIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="osc-discover">
+              <AsideContent />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Settings sheet — SocialSettingsPanel (W3) + theme toggle + sign in/out.
+          Theme lives here on phone (the page-level toggle is desktop-only). ── */}
+      {settingsOpen && (
+        <div className="osc-sheet">
+          <div className="osc-sheet__backdrop" onClick={() => setSettingsOpen(false)} />
+          <div className="osc-sheet__panel osc-sheet__panel--scroll x-fade-in">
+            <div className="osc-sheet__grab" />
+            <div className="mb-2 flex items-center justify-between px-1">
+              <span className="text-[17px] font-extrabold text-white" style={{ fontFamily: "var(--osc-font-display)" }}>Settings</span>
+              <span className="flex items-center gap-1">
+                <PlatformThemeButton compact />
+                <button type="button" onClick={() => setSettingsOpen(false)} className="rounded-full p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white" aria-label="Close settings">
+                  <XIcon className="h-5 w-5" />
+                </button>
+              </span>
+            </div>
+            <SocialSettingsPanel onClose={() => setSettingsOpen(false)} />
+            <div className="mt-4 border-t border-white/[0.08] pt-3">
+              {user ? (
+                <button
+                  type="button"
+                  onClick={() => { setSettingsOpen(false); signOut?.(); }}
+                  className="flex w-full items-center gap-2 rounded-2xl px-3 py-3 text-left text-[14px] font-bold text-rose-300 transition hover:bg-white/[0.04]"
+                >
+                  <LogOut className="h-4 w-4" /> Log out @{handle}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { window.location.href = `/auth?return=${encodeURIComponent(authReturnUrl())}`; }}
+                  className="osc-btn-primary w-full"
+                >
+                  Sign in to OrbitX
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -2699,7 +3076,12 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                   <span className="text-white/30">↑</span> Replying to <span className="font-bold text-[#60a5fa]">@{detailParent.username || "post"}</span>
                 </button>
               )}
-              {detailPost ? <PostCard p={detailPost} /> : <div className="px-4 py-8 text-center text-sm text-white/40">Loading…</div>}
+              {detailPost ? <PostCard p={detailPost} onOpen={setOpenPostId} /> : <div className="px-4 py-8 text-center text-sm text-white/40">Loading…</div>}
+              {detailPost && !detailPost.id.startsWith("tmp-") && (
+                <div className="border-b border-white/[0.06] px-4 py-3">
+                  <PostAnalytics postId={detailPost.id} />
+                </div>
+              )}
               {user && (
                 <div className="osc-composer" style={{ borderBottom: "1px solid var(--osc-border)" }}>
                   <img src={myAvatar} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-white/10" />

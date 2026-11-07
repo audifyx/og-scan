@@ -112,21 +112,36 @@ export const useFriends = () => {
     fetchFollowers();
   }, [fetchFollowers]);
 
-  const follow = async (targetUserId: string) => {
-    if (!user) return;
-    await supabase.from("followers").insert({
+  /* Shared follow path used by profiles AND feed lists: write, then await a
+     full refresh so every consumer of this hook sees the same state. Returns
+     false when the write fails so callers can roll back optimistic UI. */
+  const follow = async (targetUserId: string): Promise<boolean> => {
+    if (!user || targetUserId === user.id) return false;
+    if (isFollowing(targetUserId)) return true;
+    const { error } = await supabase.from("followers").insert({
       follower_id: user.id,
       followee_id: targetUserId,
     });
-    fetchFollowers();
+    if (error) {
+      console.error("Failed to follow user", error);
+      return false;
+    }
+    await fetchFollowers();
+    return true;
   };
 
-  const unfollow = async (targetUserId: string) => {
-    if (!user) return;
-    await supabase.from("followers").delete()
+  const unfollow = async (targetUserId: string): Promise<boolean> => {
+    if (!user) return false;
+    if (!isFollowing(targetUserId)) return true;
+    const { error } = await supabase.from("followers").delete()
       .eq("follower_id", user.id)
       .eq("followee_id", targetUserId);
-    fetchFollowers();
+    if (error) {
+      console.error("Failed to unfollow user", error);
+      return false;
+    }
+    await fetchFollowers();
+    return true;
   };
 
   const isFollowing = (targetUserId: string) =>

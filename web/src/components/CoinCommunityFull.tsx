@@ -101,7 +101,7 @@ const SignInBanner = ({ onSignIn, signing }: { onSignIn: () => void; signing: bo
     className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-white/[0.03] hover:border-primary/40 hover:bg-primary/5 transition-all text-white/50 hover:text-primary text-[11px] font-mono uppercase tracking-widest"
   >
     <Twitter className="h-3 w-3" />
-    {signing ? "Connecting…" : "Sign in with X to interact"}
+    {signing ? "Connecting…" : "Sign in to OrbitX to interact"}
   </button>
 );
 

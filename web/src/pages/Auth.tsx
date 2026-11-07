@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, AtSign, Eye, EyeOff, Loader2, Lock, Mail, Rocket, ShieldCheck } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { resolveAuthReturn, useAuth } from "@/hooks/useAuth";
 import { getDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
 import { SliderCaptcha } from "@/components/SliderCaptcha";
 import { toast } from "sonner";
@@ -31,7 +31,7 @@ const Auth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, loading, signIn, signUp, resetPassword, updatePassword } = useAuth();
-  const next = searchParams.get("next") || "/app";
+  const next = resolveAuthReturn(searchParams);
 
   const [mode, setMode] = useState<AuthMode>((searchParams.get("mode") as AuthMode) || "signin");
   const [email, setEmail] = useState("");

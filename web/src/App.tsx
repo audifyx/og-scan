@@ -1,10 +1,10 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { OrbitAtmosphereProvider } from "@/hooks/useOrbitAtmosphere";
@@ -310,6 +310,26 @@ function OgdexRedirect({ to }: { to: string | ((p: Record<string, string | undef
   return null;
 }
 
+// Auth pages only read ?next=, but social callers link ?return=/social/t/<id>
+// (requireAuth, tweet pages). Normalize return -> next here so the destination
+// survives sign-in — including the X OAuth round-trip, which carries ?next=
+// via sessionStorage (see startSignInWithX / takeAuthNext). Only same-origin
+// paths are honored. `next` wins when both params are present.
+function AuthRoute({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const [params] = useSearchParams();
+  const ret = params.get("return");
+  const next = params.get("next");
+  if (ret && !next && ret.startsWith("/") && !ret.startsWith("//")) {
+    const rest = new URLSearchParams(params);
+    rest.delete("return");
+    rest.set("next", ret);
+    const search = rest.toString();
+    return <Navigate to={{ pathname: location.pathname, search: search ? `?${search}` : "" }} replace />;
+  }
+  return <>{children}</>;
+}
+
 
 const App = () => (
   <ErrorBoundary>
@@ -344,8 +364,8 @@ const App = () => (
             <Route path="/beta" element={<BetaHome />} />
             <Route path="/splash" element={<Splash />} />
             <Route path="/waitlist" element={<OgdexRedirect to="/auth?mode=signup" />} />
-            <Route path="/auth" element={<AuthWallet />} />
-            <Route path="/auth/email" element={<Auth />} />
+            <Route path="/auth" element={<AuthRoute><AuthWallet /></AuthRoute>} />
+            <Route path="/auth/email" element={<AuthRoute><Auth /></AuthRoute>} />
             <Route path="/setup" element={<Setup />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
@@ -829,7 +849,7 @@ const App = () => (
             <Route path="/advanced/:mint" element={<OgdexRedirect to={(p) => `/ORBITX_DEX/token/${p.mint}`} />} />
             <Route path="/intelligence-admin" element={<NotFound />} />
             <Route path="/ox-desk-m4k9q/intel" element={<AdminRoute><IntelligenceAdmin /></AdminRoute>} />
-            <Route path="/alert-settings" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
+            <Route path="/alert-settings" element={<ProtectedRoute><AlertSettings /></ProtectedRoute>} />
             {/* Public shell — page handles wallet sign-in (avoids mobile auth spinner traps) */}
             <Route path="/supercomputer" element={<Suspense fallback={<RouteFallback label="Supercomputer" />}><McpSuperComputer /></Suspense>} />
             <Route path="/mcp" element={<Suspense fallback={<RouteFallback label="MCP" />}><McpSetupPage /></Suspense>} />
