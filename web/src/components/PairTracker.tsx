@@ -99,6 +99,8 @@ type Quality = {
   requireVerified: boolean;
   maxTop10: number;
   maxAgeDays: number;
+  /** Max market cap in USD; 0 = no cap. */
+  maxMcap: number;
 };
 
 const DEFAULT_QUALITY: Quality = {
@@ -108,6 +110,7 @@ const DEFAULT_QUALITY: Quality = {
   requireVerified: false,
   maxTop10: 100,
   maxAgeDays: 30,
+  maxMcap: 0,
 };
 
 const GOOD_QUALITY: Quality = {
@@ -117,6 +120,7 @@ const GOOD_QUALITY: Quality = {
   requireVerified: false,
   maxTop10: 65,
   maxAgeDays: 14,
+  maxMcap: 0,
 };
 
 const STRICT_QUALITY: Quality = {
@@ -126,6 +130,21 @@ const STRICT_QUALITY: Quality = {
   requireVerified: false,
   maxTop10: 45,
   maxAgeDays: 7,
+  maxMcap: 0,
+};
+
+// Khan's beginner filters (onchaincope Terminal): fresh migrated coins only —
+// audit age max 1440 min (1 day), market cap max $50k. Khan sets no min liq /
+// holders / top-10, so those stay at OPEN. Fees ≥ 2 SOL + Bonk.fun / stonk.fun
+// aren't identifiable in the DexScreener feed, so they're not faked here either.
+const KHAN_QUALITY: Quality = {
+  minLiq: 0,
+  minHolders: 0,
+  requireAudit: false,
+  requireVerified: false,
+  maxTop10: 100,
+  maxAgeDays: 1,
+  maxMcap: 50_000,
 };
 
 function qualityEquals(a: Quality, b: Quality): boolean {
@@ -135,7 +154,8 @@ function qualityEquals(a: Quality, b: Quality): boolean {
     a.requireAudit === b.requireAudit &&
     a.requireVerified === b.requireVerified &&
     a.maxTop10 === b.maxTop10 &&
-    a.maxAgeDays === b.maxAgeDays
+    a.maxAgeDays === b.maxAgeDays &&
+    a.maxMcap === b.maxMcap
   );
 }
 
@@ -164,6 +184,9 @@ function passesQuality(t: JupTokenInfo, q: Quality): boolean {
     const ageDays = (Date.now() - created) / 86_400_000;
     if (ageDays > q.maxAgeDays) return false;
   }
+
+  // maxMcap 0 = no cap; a token with no mcap figure can't prove it's under the cap.
+  if (q.maxMcap > 0 && (t.mcap ?? Infinity) > q.maxMcap) return false;
 
   return true;
 }
@@ -732,6 +755,7 @@ export const PairTracker = ({ onSelect }: Props) => {
               <PresetButton label="OPEN" active={qualityEquals(quality, DEFAULT_QUALITY)} onClick={() => setQuality(DEFAULT_QUALITY)} />
               <PresetButton label="GOOD" active={qualityEquals(quality, GOOD_QUALITY)} onClick={() => setQuality(GOOD_QUALITY)} />
               <PresetButton label="STRICT" active={qualityEquals(quality, STRICT_QUALITY)} onClick={() => setQuality(STRICT_QUALITY)} />
+              <PresetButton label="KHAN" active={qualityEquals(quality, KHAN_QUALITY)} onClick={() => setQuality(KHAN_QUALITY)} />
               <button
                 onClick={() => setQuality(DEFAULT_QUALITY)}
                 className="ml-auto border border-og-grid px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-foreground/60 transition hover:border-og-lime hover:text-og-lime"
@@ -739,12 +763,18 @@ export const PairTracker = ({ onSelect }: Props) => {
                 RESET
               </button>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-7">
               <FilterNum
                 label="MIN LIQ ($)"
                 value={quality.minLiq}
                 onChange={(v) => setQuality({ ...quality, minLiq: v })}
                 step={1000}
+              />
+              <FilterNum
+                label="MAX MCAP ($)"
+                value={quality.maxMcap}
+                onChange={(v) => setQuality({ ...quality, maxMcap: v })}
+                step={5000}
               />
               <FilterNum
                 label="MIN HOLDERS"

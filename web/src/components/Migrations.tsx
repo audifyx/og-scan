@@ -81,7 +81,7 @@ function pairToToken(p: DSPair): JupTokenInfo {
 }
 
 type Source = {
-  id: "pumpfun" | "moonshot" | "jupiter" | "all";
+  id: "pumpfun" | "moonshot" | "jupiter" | "uniswap" | "all";
   label: string;
   Icon: typeof Rocket;
   color: string;
@@ -158,18 +158,28 @@ type Quality = {
   minVol: number;
   maxAgeHours: number;
   minBuys: number;
+  /** Max market cap in USD; 0 = no cap. */
+  maxMcap: number;
 };
 
-const DEFAULT_Q: Quality = { minLiq: 0, minVol: 0, maxAgeHours: 168, minBuys: 0 };
-const GOOD_Q: Quality = { minLiq: 5_000, minVol: 1_000, maxAgeHours: 72, minBuys: 10 };
-const STRICT_Q: Quality = { minLiq: 25_000, minVol: 10_000, maxAgeHours: 24, minBuys: 50 };
+const DEFAULT_Q: Quality = { minLiq: 0, minVol: 0, maxAgeHours: 168, minBuys: 0, maxMcap: 0 };
+const GOOD_Q: Quality = { minLiq: 5_000, minVol: 1_000, maxAgeHours: 72, minBuys: 10, maxMcap: 0 };
+const STRICT_Q: Quality = { minLiq: 25_000, minVol: 10_000, maxAgeHours: 24, minBuys: 50, maxMcap: 0 };
+// Khan's beginner filters (onchaincope Terminal): fresh migrated coins only —
+// audit age max 1440 min (24h), market cap max $50k, Pump.fun source. Khan sets
+// no min liq / vol / buys, so those stay at OPEN (0). Total fees min 2 SOL is NOT
+// in here: DexScreener pair data carries no total-fees figure, and Bonk.fun /
+// stonk.fun pairs carry no launchpad tag in the feed either (verified live
+// 2026-11-07: q=bonkfun returns 0 pairs, no bonkfun dexId/label anywhere).
+const KHAN_Q: Quality = { minLiq: 0, minVol: 0, maxAgeHours: 24, minBuys: 0, maxMcap: 50_000 };
 
 function qualityEquals(a: Quality, b: Quality): boolean {
   return (
     a.minLiq === b.minLiq &&
     a.minVol === b.minVol &&
     a.maxAgeHours === b.maxAgeHours &&
-    a.minBuys === b.minBuys
+    a.minBuys === b.minBuys &&
+    a.maxMcap === b.maxMcap
   );
 }
 
@@ -183,6 +193,8 @@ function passes(p: DSPair, q: Quality): boolean {
   if (vol < q.minVol) return false;
   if (ageH > q.maxAgeHours) return false;
   if (buys < q.minBuys) return false;
+  // maxMcap 0 = no cap; a pair with no mcap figure can't prove it's under the cap.
+  if (q.maxMcap > 0 && (p.marketCap ?? Infinity) > q.maxMcap) return false;
   return true;
 }
 
@@ -290,15 +302,22 @@ export const Migrations = ({ onSelect }: Props) => {
           <PresetButton label="OPEN" active={qualityEquals(q, DEFAULT_Q)} onClick={() => setQ(DEFAULT_Q)} />
           <PresetButton label="GOOD" active={qualityEquals(q, GOOD_Q)} onClick={() => setQ(GOOD_Q)} />
           <PresetButton label="STRICT" active={qualityEquals(q, STRICT_Q)} onClick={() => setQ(STRICT_Q)} />
+          <PresetButton label="KHAN" active={qualityEquals(q, KHAN_Q) && src === "pumpfun"} onClick={() => { setQ(KHAN_Q); setSrc("pumpfun"); }} />
           <span className="font-mono text-[10px] uppercase tracking-widest text-white/40"><span className="text-emerald-300">{filtered.length}</span> shown · <span className="text-red-400">{dropped}</span> filtered</span>
           <button onClick={() => setQ(DEFAULT_Q)} className="ml-auto rounded-lg border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/55 transition hover:border-emerald-400/40 hover:text-emerald-300">RESET</button>
         </div>
-        <div className="grid gap-2 sm:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-5">
           <Range label="LIQ" value={q.minLiq} suffix="$" step={1000} onChange={(v) => setQ({ ...q, minLiq: v })} />
           <Range label="VOL24H" value={q.minVol} suffix="$" step={500} onChange={(v) => setQ({ ...q, minVol: v })} />
           <Range label="AGE" value={q.maxAgeHours} suffix="h" step={6} max={168} onChange={(v) => setQ({ ...q, maxAgeHours: v })} />
           <Range label="BUYS" value={q.minBuys} step={5} onChange={(v) => setQ({ ...q, minBuys: v })} />
+          <Range label="MCAP MAX" value={q.maxMcap} suffix="$" step={5000} onChange={(v) => setQ({ ...q, maxMcap: v })} />
         </div>
+        {qualityEquals(q, KHAN_Q) && src === "pumpfun" && (
+          <div className="mt-2 font-mono text-[9px] uppercase tracking-[0.2em] text-white/35">
+            KHAN · Pump.fun · ≤24h · mcap ≤ $50k · fees ≥ 2 SOL + Bonk.fun / stonk.fun not identifiable in this feed — not faked
+          </div>
+        )}
       </div>
       )}
 
@@ -444,6 +463,7 @@ const PairRow = ({ p, token, onSelect }: { p: DSPair; token?: JupTokenInfo; onSe
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-white/[0.06] pt-2.5 font-mono text-[9px] uppercase tracking-widest">
         <span className="rounded-full border border-white/10 px-2 py-0.5 text-white/45">LIQ {fmtUsd(p.liquidity?.usd)}</span>
         <span className="rounded-full border border-white/10 px-2 py-0.5 text-white/45">VOL24H {fmtUsd(p.volume?.h24)}</span>
+        <span className="rounded-full border border-white/10 px-2 py-0.5 text-white/45">MCAP {p.marketCap ? fmtUsd(p.marketCap) : "—"}</span>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-2 py-0.5 text-white/45">
           <span className="text-emerald-300">{fmtNum(buys)}</span>/<span className="text-red-400">{fmtNum(sells)}</span>
           <span className="hidden h-1 w-12 overflow-hidden rounded-full bg-white/10 sm:block"><span className="block h-full bg-emerald-400" style={meterWidth} /></span>
