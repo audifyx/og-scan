@@ -310,16 +310,16 @@ export function loadDeskWidgets(): DeskWidget[] {
     // grid. A saved layout (even an empty one the user cleared) wins over
     // these defaults, so removing them sticks.
     return [
-      { id: "wdg-default-feargreed", type: "feargreed", x: 3, y: 12 },
+      { id: "wdg-default-feargreed", type: "feargreed", x: 3, y: 8 },
       {
         id: "wdg-default-miniswap",
         type: "miniswap",
         x: 3,
-        y: 40,
+        y: 36,
         mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
         swapMode: "buy",
       },
-      { id: "wdg-default-portfolio", type: "portfolio", x: 3, y: 68 },
+      { id: "wdg-default-portfolio", type: "portfolio", x: 3, y: 72 },
     ];
   }
   return saved.filter(
