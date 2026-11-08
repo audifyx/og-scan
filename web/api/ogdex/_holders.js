@@ -110,6 +110,10 @@ async function largestAccounts(mint, attempts = 3) {
   for (let i = 0; i < attempts; i++) {
     const { result, error } = await rpc("getTokenLargestAccounts", [mint], 8000);
     if (result?.value?.length) return result.value;
+    // Success-shaped reply with no accounts (e.g. Helius answered but the
+    // index returned empty) — record it so the UI doesn't just say
+    // "unreachable" when the RPC actually answered.
+    if (result && !error) lastRpcError = "helius returned no top accounts for this mint";
     // Mega tokens (millions of accounts) get a persistent "index overloaded" /
     // "too many accounts" error that won't clear within this request — give it
     // one quick retry then bail so we don't burn the whole function timeout.

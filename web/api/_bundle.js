@@ -387,11 +387,11 @@ export async function analyzeBundles(mint, opts = {}) {
     const lastErr = String(holdersRes?.lastError || "");
     const reason = /no helius key/i.test(lastErr)
       ? "Helius API key missing in Vercel env — holder data unavailable."
-      : /401|unauthorized/i.test(lastErr)
-        ? "Helius rejected the API key (401) — holder data unavailable."
+      : /401|unauthorized|invalid.*(api.?key|key)/i.test(lastErr)
+        ? "Helius rejected the API key — holder data unavailable."
         : /429|rate.?limit/i.test(lastErr)
           ? "Helius rate-limited (429) — holder data unavailable, try again shortly."
-          : "Top-holder data unavailable (Helius index / RPC unreachable). Try again shortly.";
+          : `Top-holder data unavailable (Helius index / RPC unreachable${lastErr ? ` — last RPC error: ${lastErr.slice(0, 120)}` : ""}). Try again shortly.`;
     const analysis = summarizeBundleAnalysis({
       mint,
       traces: [],
