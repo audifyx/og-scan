@@ -116,10 +116,18 @@ export default async function handler(req, res) {
   cache(res, 60, 300);
 
   try {
-    const [paid, pump, intel] = await Promise.all([
+    const [paid, pump, intel, dexPairs] = await Promise.all([
       dexPaid(mint),
       pumpCoin(mint),
       callFn(INTEL_FN, { mint }).catch(() => null),
+      // DexScreener pairs: a migrated pump token has an AMM pair (PumpSwap /
+      // Raydium / Meteora / Orca). A bonding-curve token has none. This is
+      // the deterministic migration proof — the holder-sample pool check
+      // below flakes when the sampled holders happen to include no pool
+      // vault, which used to drop LP lock from 100% to the intel feed's
+      // ~14% on the same token minutes apart.
+      fetch(`https://api.dexscreener.com/tokens/v1/solana/${mint}`, { headers: { Accept: "application/json" } })
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ]);
 
     const safety = intel?.safety || {};
@@ -186,8 +194,16 @@ export default async function handler(req, res) {
         : safety.launchpad) || (pump ? "pump.fun" : null);
     const isPumpLaunch =
       typeof launchpadName === "string" && /pump/i.test(launchpadName);
+    const AMM_DEXS = new Set(["pumpswap", "raydium", "meteora", "orca", "whirlpool", "lifinity", "phoenix", "openbook"]);
+    const hasAmmPair =
+      Array.isArray(dexPairs) &&
+      dexPairs.some(
+        (p) =>
+          AMM_DEXS.has(String(p?.dexId || "").toLowerCase()) &&
+          Number(p?.liquidity?.usd || 0) > 0,
+      );
     const pumpMigrated =
-      (!!pump && !!pump.complete) || (isPumpLaunch && pools.length > 0);
+      (!!pump && !!pump.complete) || (isPumpLaunch && (pools.length > 0 || hasAmmPair));
     const lpLockedPct = pumpMigrated ? 100 : (safety.lpLockedPct ?? null);
     const lpBurnedPct = pumpMigrated ? 100 : null;
 
