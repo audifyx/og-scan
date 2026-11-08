@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import "../crypto.css"; // Standalone /scanner mounts bypass IntelLayout, the only other importer — without this the oxc grid/panel/stat/factor classes never load and the page renders unstyled (stacked stats, adjacent factor spans) on mobile.
 import { dexChartUrl } from "@/trade/tradeFmt";
 import { useTokenIntel } from "../hooks/useTokenIntel";
 import { useScanVault } from "../hooks/useScanVault";

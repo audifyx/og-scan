@@ -240,7 +240,7 @@ export function TokenOverview({
 
       <div className="oxc-panel" style={termPanel}>
         <h3 style={termH3}>Market</h3>
-        <div className="oxc-grid oxc-grid-2">
+        <div className="oxc-grid oxc-stat-grid">
           <div className="oxc-stat">
             <div className="label">Price</div>
             <div className="value">{Number.isFinite(price) ? `$${price < 0.01 ? price.toExponential(2) : price.toFixed(4)}` : "—"}</div>
