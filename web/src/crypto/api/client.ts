@@ -49,7 +49,15 @@ export type ForensicsPayload = {
   } | null;
   dexPaid?: {
     paid?: boolean;
+    ok?: boolean;
+    error?: string;
     services?: Array<{ type?: string; status?: string; at?: number | null }>;
+    boosts?: Array<{ id?: string | null; amount?: number | null; at?: number | null }>;
+    profilePaid?: boolean;
+    communityTakeoverPaid?: boolean;
+    adsPaid?: boolean;
+    boostsPaid?: boolean;
+    boostAmount?: number;
   } | null;
   isPumpFun?: boolean | null;
   bondingComplete?: boolean | null;

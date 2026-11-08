@@ -77,8 +77,9 @@ import { ScanFeedAlerts } from "../components/SocialPanels";
 import { SmartWalletWatch } from "../components/SmartWalletWatch";
 
 /**
- * Scanner v2 — dedicated route /intel/scanner-v2 (+ /scanner-v2) and
- * /intel/scan keeps serving the same page, so old links keep working.
+ * Scanner v2 — canonical route /scanner (aliases: /scanner-v2,
+ * /intel/scanner-v2, /os/scanner-v2) and /intel/scan keeps serving the
+ * classic page, so old links keep working.
  *
  * Sections: quick-scan input · LIVE risk score · bundle detection + holder
  * graph · dev wallet lineage / funding chain · same-dev + dev history ·
@@ -139,6 +140,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
  *  gets a full intel pass; unknowns stay Unknown. */
 function CompareView({ mintA, compareMints }: { mintA: string; compareMints: string[] }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const base = location.pathname.startsWith("/os/") ? "/os/scanner-v2" : "/scanner";
   const intelA = useTokenIntel(mintA);
   const intelB = useTokenIntel(compareMints[0] ?? null);
   const intelC = useTokenIntel(compareMints[1] ?? null);
@@ -163,7 +166,7 @@ function CompareView({ mintA, compareMints }: { mintA: string; compareMints: str
   const summaries = intels.slice(0, 1 + compareMints.length).map(summarize);
   const title = summaries.map((s) => s.symbol ?? "token").join(" vs ");
   const goCompare = (mints: string[]) =>
-    navigate(mints.length ? `/intel/scanner-v2/${mintA}?compare=${mints.join(",")}` : `/intel/scanner-v2/${mintA}`);
+    navigate(mints.length ? `${base}/${mintA}?compare=${mints.join(",")}` : `${base}/${mintA}`);
   return (
     <Section title={`Cross-scan compare — ${title}`}>
       <CrossScanComparePanel
@@ -173,7 +176,7 @@ function CompareView({ mintA, compareMints }: { mintA: string; compareMints: str
           if (m === mintA) {
             const [next, ...rest] = compareMints;
             if (!next) return;
-            navigate(`/intel/scanner-v2/${next}${rest.length ? `?compare=${rest.join(",")}` : ""}`);
+            navigate(`${base}/${next}${rest.length ? `?compare=${rest.join(",")}` : ""}`);
           } else {
             goCompare(compareMints.filter((x) => x !== m));
           }
@@ -183,15 +186,117 @@ function CompareView({ mintA, compareMints }: { mintA: string; compareMints: str
   );
 }
 
+/** Verdict strip — the answer above the fold: the 7 numbers that decide
+ *  "is this a rug" in one row, so a scan never needs a scroll to judge.
+ *  Unknowns stay Unknown — never a fake zero. */
+function VerdictStrip({ intel }: { intel: ReturnType<typeof useTokenIntel> }) {
+  const flags = intel.forensics?.safetyFlags;
+  const bundled = intel.bundle?.bundledSupplyPct ?? null;
+  const lpLocked = flags?.lpLockedPct ?? null;
+  const honeypot =
+    intel.safety?.canBuy === true && intel.safety?.canSell === false
+      ? true
+      : intel.safety?.canSell === true
+        ? false
+        : null;
+  type Tone = "good" | "bad" | "warn" | "muted";
+  const chip = (label: string, value: string, tone: Tone) => {
+    const color =
+      tone === "good" ? "var(--term-gold)" : tone === "bad" ? "var(--oxc-red)" : tone === "warn" ? "#e8c15a" : "#9a9a9a";
+    return (
+      <div
+        key={label}
+        style={{ flex: "1 1 0", minWidth: 92, padding: "0.6rem 0.7rem", border: "1px solid #2a2a2a", borderRadius: 8, background: "#0d0d0d" }}
+      >
+        <div style={{ fontSize: "0.68rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#9a9a9a" }}>{label}</div>
+        <div
+          style={{ fontSize: "1.05rem", fontWeight: 800, color, marginTop: "0.15rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+        >
+          {value}
+        </div>
+      </div>
+    );
+  };
+  const symbol = (intel.token?.symbol as string) || (intel.token?.name as string) || null;
+  const price = Number(intel.token?.priceUsd ?? intel.token?.price ?? NaN);
+  const mcap = Number(intel.token?.marketCap ?? intel.token?.mcap ?? NaN);
+  return (
+    <div className="oxc-panel" style={{ ...termPanel, marginBottom: "1rem" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem", alignItems: "baseline", marginBottom: "0.7rem" }}>
+        <span style={{ fontSize: "1.25rem", fontWeight: 800, color: "#ffffff" }}>{symbol ?? "Token"}</span>
+        {Number.isFinite(price) && (
+          <span style={{ color: "var(--term-gold)", fontWeight: 700 }}>
+            ${price.toLocaleString(undefined, { maximumSignificantDigits: 6 })}
+          </span>
+        )}
+        {Number.isFinite(mcap) && (
+          <span style={{ color: "#9a9a9a" }}>
+            MCAP ${mcap >= 1e6 ? `${(mcap / 1e6).toFixed(2)}M` : mcap >= 1e3 ? `${(mcap / 1e3).toFixed(1)}K` : mcap.toFixed(0)}
+          </span>
+        )}
+        {intel.ogScore?.label && (
+          <span style={{ marginLeft: "auto", fontWeight: 800, color: "var(--term-gold)" }}>{intel.ogScore.label}</span>
+        )}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem" }}>
+        {chip(
+          "OG score",
+          intel.ogScore?.score != null ? `${intel.ogScore.score}/100` : "Unknown",
+          intel.ogScore?.score == null ? "muted" : intel.ogScore.score >= 60 ? "good" : intel.ogScore.score >= 40 ? "warn" : "bad",
+        )}
+        {chip("Risk", intel.risk?.score != null ? `${intel.risk.score}${intel.risk.label ? ` · ${intel.risk.label}` : ""}` : "Unknown", "muted")}
+        {chip("Bundled", bundled != null ? `${bundled.toFixed(1)}%` : "Unknown", bundled == null ? "muted" : bundled >= 20 ? "bad" : bundled >= 5 ? "warn" : "good")}
+        {chip("LP locked", lpLocked != null ? `${lpLocked.toFixed(0)}%` : "Unknown", lpLocked == null ? "muted" : lpLocked >= 80 ? "good" : lpLocked >= 50 ? "warn" : "bad")}
+        {chip("Mint", flags?.mintRenounced === true ? "Renounced" : flags?.mintRenounced === false ? "Live" : "Unknown", flags?.mintRenounced === true ? "good" : flags?.mintRenounced === false ? "bad" : "muted")}
+        {chip("Freeze", flags?.freezeRenounced === true ? "Renounced" : flags?.freezeRenounced === false ? "Live" : "Unknown", flags?.freezeRenounced === true ? "good" : flags?.freezeRenounced === false ? "bad" : "muted")}
+        {chip("Honeypot", honeypot === true ? "Honeypot" : honeypot === false ? "Sellable" : "Unknown", honeypot === true ? "bad" : honeypot === false ? "good" : "muted")}
+      </div>
+    </div>
+  );
+}
+
 export default function TokenScanner() {
   const { mint: routeMint } = useParams<{ mint?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const isV2 = location.pathname.includes("scanner-v2");
+  // v2 = the new scanner, wherever it is mounted: canonical /scanner,
+  // legacy /scanner-v2, /intel/scanner-v2, /os/scanner-v2. /intel/scan
+  // (no "scanner" in the path) stays the classic v1 page.
+  const isV2 =
+    location.pathname.includes("scanner-v2") ||
+    location.pathname === "/scanner" ||
+    location.pathname.startsWith("/scanner/");
+  // Canonical home for the new scanner. Inside the OS desktop the scan
+  // stays in the OS window (/os/scanner-v2); everywhere else a scan goes
+  // to /scanner so the page has one real URL.
+  const inOs = location.pathname.startsWith("/os/");
+  const scannerBase = inOs ? "/os/scanner-v2" : "/scanner";
   const [draft, setDraft] = useState(routeMint || "");
   const intel = useTokenIntel(routeMint || null);
   const teamA = intel as unknown as TeamAIntel;
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Tabbed dashboard — one group visible at a time so the verdict is
+  // above the fold instead of 45 stacked sections. Synced to ?tab= so
+  // a tab deep-links.
+  const TABS = ["overview", "risk", "dev", "trading", "launch", "community"] as const;
+  type ScannerTab = (typeof TABS)[number];
+  const TAB_LABELS: Record<ScannerTab, string> = {
+    overview: "Overview",
+    risk: "Risk",
+    dev: "Dev",
+    trading: "Trading",
+    launch: "Launch",
+    community: "Community",
+  };
+  const tabParam = searchParams.get("tab");
+  const tab: ScannerTab = (TABS as readonly string[]).includes(tabParam ?? "")
+    ? (tabParam as ScannerTab)
+    : "overview";
+  const setTab = (t: ScannerTab) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", t);
+    setSearchParams(next, { replace: true });
+  };
   const compareMints = parseCompareMints(searchParams.get("compare"));
   const rugCheck = intel.rugCheck;
 
@@ -199,7 +304,7 @@ export default function TokenScanner() {
     e.preventDefault();
     const m = draft.trim();
     if (!isValidMint(m)) return;
-    navigate(isV2 ? `/intel/scanner-v2/${m}` : `/intel/scan/${m}`);
+    navigate(isV2 ? `${scannerBase}/${m}` : `/intel/scan/${m}`);
   }
 
   const mcap = Number(intel.token?.marketCap ?? intel.token?.mcap ?? NaN);
@@ -360,23 +465,70 @@ export default function TokenScanner() {
 
   return (
     <div>
-      <header className="oxc-hero">
-        <h1 style={{ fontFamily: "var(--term-hand)", color: "var(--term-gold)", fontSize: "2.6rem" }}>
-          Token scanner{isV2 ? " v2" : ""}
-        </h1>
-        <p>OG score, contract, liquidity, holders, deployer, market, bundle detection, X intel, rug &amp; clone signals — every check sourced, unknowns shown as unknown.{" "}
-          <a href="/intel/vault" style={{ color: "var(--term-gold)" }}>Scan history vault</a>
-        </p>
-        {isV2 && (
-          <p style={{ fontSize: "0.85rem" }}>
-            v2 adds live risk, bundle map, dev funding lineage, same-dev detection, trade tape, whale alerts, launch
-            replay and shareable scan cards — plus sniper radar, liquidity health, dev fingerprint, rug timeline,
-            token DNA, graduation tracking, sell simulators, slippage and exit-liquidity tools, and cross-scan
-            compare (<span className="oxc-mono">?compare=&lt;mint&gt;[,&lt;mint&gt;,&lt;mint&gt;]</span> — up to 4 tokens).{" "}
-            <a href="/intel/scan" style={{ color: "var(--term-gold)" }}>Classic scanner</a>
+      {/* Standalone chrome for the canonical /scanner route — the page is
+        * a real destination now, not a fragment of the Terminal. Inside
+        * /intel or /os the shell already provides nav, so skip it there. */}
+      {location.pathname.startsWith("/scanner") && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "1rem",
+            padding: "0.75rem 0",
+            marginBottom: "0.5rem",
+            borderBottom: "1px solid #2a2a2a",
+            overflowX: "auto",
+          }}
+        >
+          <a href="/scanner" style={{ fontWeight: 900, fontSize: "1.2rem", color: "var(--term-gold)", textDecoration: "none", whiteSpace: "nowrap" }}>
+            OrbitX
+          </a>
+          <a href="/scanner" style={{ color: "#ffffff", textDecoration: "none", fontWeight: 700, whiteSpace: "nowrap" }}>
+            Scanner
+          </a>
+          <a href="/intel/vault" style={{ color: "#9a9a9a", textDecoration: "none", whiteSpace: "nowrap" }}>
+            Vault
+          </a>
+          <a href="/ORBITX_DEX" style={{ color: "#9a9a9a", textDecoration: "none", whiteSpace: "nowrap" }}>
+            DEX
+          </a>
+          <a href="/orbitx-social" style={{ color: "#9a9a9a", textDecoration: "none", whiteSpace: "nowrap" }}>
+            Social
+          </a>
+          <a href="/app" style={{ color: "#9a9a9a", textDecoration: "none", marginLeft: "auto", whiteSpace: "nowrap" }}>
+            OrbitX OS
+          </a>
+        </div>
+      )}
+
+      {/* Full hero only on the empty state. Once a token is loaded the
+        * verdict strip below carries the page — no more scrolling past
+        * paragraphs of description to reach the scan. */}
+      {!intel.mint && (
+        <header className="oxc-hero">
+          <h1 style={{ fontFamily: "var(--term-hand)", color: "var(--term-gold)", fontSize: "2.6rem" }}>
+            Token scanner{isV2 ? " v2" : ""}
+          </h1>
+          <p>
+            OG score, contract, liquidity, holders, deployer, market, bundle detection, X intel, rug &amp; clone signals — every check
+            sourced, unknowns shown as unknown.{" "}
+            <a href="/intel/vault" style={{ color: "var(--term-gold)" }}>
+              Scan history vault
+            </a>
           </p>
-        )}
-      </header>
+          {isV2 && (
+            <p style={{ fontSize: "0.85rem" }}>
+              v2 adds live risk, bundle map, dev funding lineage, same-dev detection, trade tape, whale alerts, launch replay and shareable
+              scan cards — plus sniper radar, liquidity health, dev fingerprint, rug timeline, token DNA, graduation tracking, sell
+              simulators, slippage and exit-liquidity tools, and cross-scan compare (
+              <span className="oxc-mono">?compare=&lt;mint&gt;[,&lt;mint&gt;,&lt;mint&gt;]</span> — up to 4 tokens).{" "}
+              <a href="/intel/scan" style={{ color: "var(--term-gold)" }}>
+                Classic scanner
+              </a>
+            </p>
+          )}
+        </header>
+      )}
 
       <form className="oxc-panel" onSubmit={onSubmit} style={{ ...termPanel, marginBottom: "1rem", position: "sticky", top: 0, zIndex: 30 }}>
         <div className="oxc-input-row">
@@ -400,203 +552,155 @@ export default function TokenScanner() {
 
       {!intel.mint && <p className="oxc-empty">Enter a mint to run the full intelligence pass.</p>}
       {intel.loading && <p className="oxc-empty oxc-pulse">Composing safety · forensics · market…</p>}
-      {intel.error && <p className="oxc-empty" style={{ color: "var(--oxc-red)" }}>{intel.error}</p>}
+      {intel.error && (
+        <p className="oxc-empty" style={{ color: "var(--oxc-red)" }}>
+          {intel.error}
+        </p>
+      )}
 
       {intel.mint && !intel.loading && (
-        <div className="oxc-grid" style={{ gap: "1rem" }}>
-          {/* LIVE risk score + OG score */}
-          <div className="oxc-grid oxc-grid-2">
-            <Section title="Live risk score">
-              <LiveRiskPanel risk={intel.risk} riskLive={teamA.riskLive} loading={intel.loading} />
-            </Section>
-            <Section title="OG score">
-              <OgScorePanel ogScore={intel.ogScore} />
-            </Section>
+        <>
+          {/* The verdict first — the 7 numbers that decide "is this a rug". */}
+          <VerdictStrip intel={intel} />
+
+          {/* One group at a time. ?tab= deep-links; the tab bar scrolls
+            * horizontally on phones. */}
+          <div
+            role="tablist"
+            aria-label="Scanner sections"
+            style={{ display: "flex", gap: "0.4rem", overflowX: "auto", marginBottom: "1rem", paddingBottom: "0.2rem" }}
+          >
+            {TABS.map((t) => (
+              <button
+                key={t}
+                role="tab"
+                aria-selected={tab === t}
+                type="button"
+                onClick={() => setTab(t)}
+                style={{
+                  flex: "0 0 auto",
+                  padding: "0.55rem 1rem",
+                  borderRadius: 999,
+                  border: tab === t ? "1px solid var(--term-gold)" : "1px solid #2a2a2a",
+                  background: tab === t ? "#1a1503" : "#0d0d0d",
+                  color: tab === t ? "var(--term-gold)" : "#ffffff",
+                  fontWeight: tab === t ? 800 : 600,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {TAB_LABELS[t]}
+              </button>
+            ))}
           </div>
 
-          <ScannerChart mint={intel.mint} />
-          <TokenOverview mint={intel.mint} token={intel.token} safety={intel.safety} forensics={intel.forensics} />
+          {tab === "overview" && (
+            <div className="oxc-grid" style={{ gap: "1rem" }}>
+              <ScannerChart mint={intel.mint} />
+              <TokenOverview mint={intel.mint} token={intel.token} safety={intel.safety} forensics={intel.forensics} />
 
-          <div className="oxc-grid oxc-grid-2">
-            <Section title="Risk score & safety rating">
-              {intel.risk ? <RiskGauge risk={intel.risk} /> : <p className="oxc-empty">No score</p>}
-            </Section>
-            <Section title="Bundle detection">
-              <BundlePanel bundle={intel.bundle} loading={intel.bundleLoading} />
-            </Section>
-          </div>
-
-          {/* Holder graph (Team C) */}
-          <Section title="Holder graph — bundle map">
-            <HolderGraphPanel bundle={intel.bundle} token={intel.token} />
-          </Section>
-
-          {/* Dev lineage: funding chain + same-dev + live position */}
-          <div className="oxc-grid oxc-grid-2">
-            <Section title="Dev wallet lineage — funding chain">
-              <FundingChainPanel bundle={intel.bundle} forensics={intel.forensics} />
-            </Section>
-            <Section title="Same-dev & dev history">
-              <SameDevPanel forensics={intel.forensics} sameDev={teamA.sameDev} devHistory={teamA.devHistory} />
-            </Section>
-          </div>
-
-          <Section title="Dev wallet — live position">
-            <DevWalletPanel forensics={intel.forensics} devWallet={intel.devWallet} />
-          </Section>
-
-          <div className="oxc-grid oxc-grid-2">
-            <Section title="Contract">
-              <ContractPanel forensics={intel.forensics} safety={intel.safety} token={intel.token} />
-            </Section>
-            <Section title="Liquidity">
-              <LiquidityPanel token={intel.token} forensics={intel.forensics} dexPairs={intel.dexPairs} />
-            </Section>
-          </div>
-
-          <Section title="Market">
-            <MarketPanel token={intel.token} dexPairs={intel.dexPairs} />
-          </Section>
-
-          <div className="oxc-grid oxc-grid-2">
-            <Section title="Holders">
-              <HolderTable token={intel.token} forensics={intel.forensics} />
-            </Section>
-            <Section title="Deployer">
-              <DevHistoryPanel forensics={intel.forensics} />
-            </Section>
-          </div>
-
-          {/* X signals */}
-          <Section title="X / Twitter signals">
-            <XPanel x={intel.x} loading={intel.xLoading} onRetry={intel.refresh} />
-          </Section>
-
-          {/* Live trade tape + whale alerts */}
-          <div className="oxc-grid oxc-grid-2">
-            <Section title="Live trade tape">
-              <TradeTapePanel dexPairs={intel.dexPairs} tradeTape={teamA.tradeTape} />
-            </Section>
-            <Section title="Whale alerts">
-              <WhaleAlertsPanel forensics={intel.forensics} token={intel.token} whaleAlerts={teamA.whaleAlerts} />
-            </Section>
-          </div>
-
-          {/* Sandbox launch replay (Team F) */}
-          <Section title="Sandbox launch replay">
-            <SandboxReplayPanel mint={intel.mint} token={intel.token} />
-          </Section>
-
-          {/* Shareable scan card + community notes + signal voting (Team E) */}
-          <Section title="Share scan — card, notes & voting">
-            <SocialScanPanel mint={intel.mint} token={intel.token} ogScore={intel.ogScore} riskScore={intel.risk?.score ?? null} riskLabel={intel.risk?.label ?? null} flags={shareFlags} />
-          </Section>
-
-          {/* W4 — rules that fired locally when this scan completed */}
-          <Section title="Fired alerts — this scan">
-            {firedAlerts.length > 0 ? (
-              <ScanFeedAlerts
-                mint={intel.mint}
-                symbol={intel.token?.symbol ?? null}
-                ogScore={intel.ogScore?.score ?? null}
-                devWallet={intel.forensics?.dev?.wallet ?? null}
-                signals={[]}
-                firedAlerts={firedAlerts}
-              />
-            ) : (
-              <p className="oxc-empty">
-                No alert rules fired on this scan. Rules are checked locally in
-                your browser when a scan completes — nothing is delivered by
-                the backend, and a rule inside its cooldown does not re-fire.
-              </p>
-            )}
-          </Section>
-
-          <div className="oxc-grid oxc-grid-2">
-            <Section title="Clone signals">
-              <ClonesPanel research={intel.research} ownMcap={Number.isFinite(mcap) ? mcap : null} mint={intel.mint} />
-            </Section>
-            <Section title="Links">
-              <LinksPanel token={intel.token} research={intel.research} mint={intel.mint} />
-            </Section>
-          </div>
-
-          <Section title="Risk factors">
-            {intel.risk ? <RiskFactors risk={intel.risk} /> : null}
-          </Section>
-
-          {isV2 && (
-            <>
-              {/* B2 — sniper radar, liquidity health, fingerprint, timeline, alerts */}
               <div className="oxc-grid oxc-grid-2">
-                <Section title="Sniper radar">
-                  <SniperRadarPanel forensics={intel.forensics} token={intel.token} />
+                <Section title="Live risk score">
+                  <LiveRiskPanel risk={intel.risk} riskLive={teamA.riskLive} loading={intel.loading} />
                 </Section>
+                <Section title="OG score">
+                  <OgScorePanel ogScore={intel.ogScore} />
+                </Section>
+              </div>
+
+              <Section title="Market">
+                <MarketPanel token={intel.token} dexPairs={intel.dexPairs} />
+              </Section>
+
+              <div className="oxc-grid oxc-grid-2">
+                <Section title="Holders">
+                  <HolderTable token={intel.token} forensics={intel.forensics} />
+                </Section>
+                <Section title="Links">
+                  <LinksPanel token={intel.token} research={intel.research} mint={intel.mint} />
+                </Section>
+              </div>
+
+              {isV2 && compareMints.length > 0 && <CompareView mintA={intel.mint} compareMints={compareMints} />}
+
+              <div className="oxc-panel" style={termPanel}>
+                <h3 style={termH3}>Tradeability note</h3>
+                <p className="oxc-muted" style={{ margin: 0, fontSize: "0.85rem" }}>
+                  {intel.safety?.note || "Run completed — see Jupiter verdict above."}
+                </p>
+                <div style={{ marginTop: "0.75rem" }}>
+                  <a className="oxc-btn" href={`/intel/trade`} style={{ textDecoration: "none", display: "inline-block" }}>
+                    Trade this token
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === "risk" && (
+            <div className="oxc-grid" style={{ gap: "1rem" }}>
+              <div className="oxc-grid oxc-grid-2">
+                <Section title="Risk score & safety rating">
+                  {intel.risk ? <RiskGauge risk={intel.risk} /> : <p className="oxc-empty">No score</p>}
+                </Section>
+                <Section title="Bundle detection">
+                  <BundlePanel bundle={intel.bundle} loading={intel.bundleLoading} />
+                </Section>
+              </div>
+
+              <Section title="Holder graph — bundle map">
+                <HolderGraphPanel bundle={intel.bundle} token={intel.token} />
+              </Section>
+
+              <div className="oxc-grid oxc-grid-2">
+                <Section title="Contract">
+                  <ContractPanel forensics={intel.forensics} safety={intel.safety} token={intel.token} />
+                </Section>
+                <Section title="Liquidity">
+                  <LiquidityPanel token={intel.token} forensics={intel.forensics} dexPairs={intel.dexPairs} />
+                </Section>
+              </div>
+
+              <div className="oxc-grid oxc-grid-2">
                 <Section title="Liquidity health">
                   <LiquidityHealthPanel token={intel.token} forensics={intel.forensics} dexPairs={intel.dexPairs} safety={intel.safety} />
                 </Section>
-              </div>
-              <div className="oxc-grid oxc-grid-2">
-                <Section title="Dev fingerprint">
-                  <DevFingerprintPanel forensics={intel.forensics} sameDev={teamA.sameDev} devHistory={teamA.devHistory} />
+                <Section title="RugCheck">
+                  <RugCheckPanel rugCheck={rugCheck} safety={intel.safety} mint={intel.mint} />
                 </Section>
+              </div>
+
+              <div className="oxc-grid oxc-grid-2">
                 <Section title="Rug timeline">
                   <RugTimelinePanel forensics={intel.forensics} token={intel.token} devHistory={teamA.devHistory} />
                 </Section>
+                <Section title="Rug autopsy">
+                  <RugAutopsyPanel forensics={intel.forensics} token={intel.token} />
+                </Section>
               </div>
-              <Section title="Alert builder">
-                <AlertBuilderPanel mint={intel.mint} devWallet={intel.forensics?.dev?.wallet ?? null} />
+
+              <Section title="Risk factors">
+                {intel.risk ? <RiskFactors risk={intel.risk} /> : null}
               </Section>
 
-              {/* B3 — DNA, graduation, age tags, contract diff, copycat, conviction, whales, radar */}
               <div className="oxc-grid oxc-grid-2">
-                <Section title="Token DNA">
-                  <TokenDnaPanel token={intel.token} research={intel.research} mint={intel.mint} tokenDna={intel.tokenDna} />
+                <Section title="LP drain alert">
+                  <LpDrainAlertPanel forensics={intel.forensics} token={intel.token} mint={intel.mint} />
                 </Section>
-                <Section title="Graduation tracker">
-                  <GraduationTrackerPanel forensics={intel.forensics} token={intel.token} />
+                <Section title="Exit liquidity — sell stress test">
+                  <ExitLiquidityPanel token={intel.token} dexPairs={intel.dexPairs} exitLiquidity={intel.exitLiquidity} />
                 </Section>
               </div>
-              <div className="oxc-grid oxc-grid-2">
-                <Section title="Dev wallet age">
-                  <DevWalletAgePanel forensics={intel.forensics} token={intel.token} walletAges={intel.walletAges} walletAgesLoading={intel.walletAgesLoading} />
-                </Section>
-                <Section title="Contract diff">
-                  <ContractDiffPanel forensics={intel.forensics} mint={intel.mint} />
-                </Section>
-              </div>
-              <div className="oxc-grid oxc-grid-2">
-                <Section title="Copycat check">
-                  <CopycatPanel research={intel.research} />
-                </Section>
-                <Section title="Holder conviction">
-                  <HolderConvictionPanel dexPairs={intel.dexPairs} token={intel.token} holderConviction={intel.holderConviction} />
-                </Section>
-              </div>
-              <Section title="Whale labels">
-                <WhaleLabelsPanel token={intel.token} forensics={intel.forensics} whaleLabels={intel.whaleLabels} />
-              </Section>
-              <Section title="Rug radar leaderboard">
-                <RugRadarLeaderboardPanel />
-              </Section>
 
-              {/* B4 — dev sell sim, bundle decay, fresh wallets, migration, metadata, overlap, planner, autopsy */}
               <div className="oxc-grid oxc-grid-2">
-                <Section title="Dev sell simulator">
-                  <DevSellSimulatorPanel token={intel.token} devWallet={intel.devWallet} dexPairs={intel.dexPairs} />
+                <Section title="Pool program & address verification">
+                  <PoolVerificationPanel mint={intel.mint} token={intel.token} forensics={intel.forensics} dexPairs={intel.dexPairs} />
                 </Section>
-                <Section title="Bundle decay">
-                  <BundleDecayPanel bundle={intel.bundle} mint={intel.mint} />
+                <Section title="Token-2022 extensions audit">
+                  <Token2022Panel token={intel.token} token2022Extensions={intel.token2022Extensions} />
                 </Section>
               </div>
-              <div className="oxc-grid oxc-grid-2">
-                <Section title="Fresh wallet radar">
-                  <FreshWalletRadarPanel bundle={intel.bundle} />
-                </Section>
-                <Section title="Liquidity migration">
-                  <LiquidityMigrationPanel forensics={intel.forensics} token={intel.token} />
-                </Section>
-              </div>
+
               <div className="oxc-grid oxc-grid-2">
                 <Section title="Metadata audit">
                   <MetadataAuditPanel token={intel.token} />
@@ -605,17 +709,55 @@ export default function TokenScanner() {
                   <HolderOverlapPanel token={intel.token} holderOverlap={intel.holderOverlap} holderOverlapLoading={intel.holderOverlapLoading} />
                 </Section>
               </div>
-              <Section title="Pool program & address verification">
-                <PoolVerificationPanel mint={intel.mint} token={intel.token} forensics={intel.forensics} dexPairs={intel.dexPairs} />
+
+              <div className="oxc-grid oxc-grid-2">
+                <Section title="Clone signals">
+                  <ClonesPanel research={intel.research} ownMcap={Number.isFinite(mcap) ? mcap : null} mint={intel.mint} />
+                </Section>
+                <Section title="Copycat check">
+                  <CopycatPanel research={intel.research} />
+                </Section>
+              </div>
+
+              <Section title="Bundle decay">
+                <BundleDecayPanel bundle={intel.bundle} mint={intel.mint} />
               </Section>
-              <Section title="Entry / exit planner">
-                <EntryExitPlannerPanel token={intel.token} />
-              </Section>
-              <Section title="Rug autopsy">
-                <RugAutopsyPanel forensics={intel.forensics} token={intel.token} />
+            </div>
+          )}
+
+          {tab === "dev" && (
+            <div className="oxc-grid" style={{ gap: "1rem" }}>
+              <div className="oxc-grid oxc-grid-2">
+                <Section title="Dev wallet lineage — funding chain">
+                  <FundingChainPanel bundle={intel.bundle} forensics={intel.forensics} />
+                </Section>
+                <Section title="Same-dev & dev history">
+                  <SameDevPanel forensics={intel.forensics} sameDev={teamA.sameDev} devHistory={teamA.devHistory} />
+                </Section>
+              </div>
+
+              <Section title="Dev wallet — live position">
+                <DevWalletPanel forensics={intel.forensics} devWallet={intel.devWallet} />
               </Section>
 
-              {/* B5 — dev watch, insiders, unlocks, wash, chart pattern, slippage, compare */}
+              <div className="oxc-grid oxc-grid-2">
+                <Section title="Deployer">
+                  <DevHistoryPanel forensics={intel.forensics} />
+                </Section>
+                <Section title="Dev fingerprint">
+                  <DevFingerprintPanel forensics={intel.forensics} sameDev={teamA.sameDev} devHistory={teamA.devHistory} />
+                </Section>
+              </div>
+
+              <div className="oxc-grid oxc-grid-2">
+                <Section title="Dev wallet age">
+                  <DevWalletAgePanel forensics={intel.forensics} token={intel.token} walletAges={intel.walletAges} walletAgesLoading={intel.walletAgesLoading} />
+                </Section>
+                <Section title="Contract diff">
+                  <ContractDiffPanel forensics={intel.forensics} mint={intel.mint} />
+                </Section>
+              </div>
+
               <div className="oxc-grid oxc-grid-2">
                 <Section title="Live dev wallet watch">
                   <DevWalletWatchPanel forensics={intel.forensics} devWallet={intel.devWallet} />
@@ -624,29 +766,150 @@ export default function TokenScanner() {
                   <InsidersPanel bundle={intel.bundle} forensics={intel.forensics} />
                 </Section>
               </div>
-              {/* W4 — user-added smart wallet watchlist (same wallet route as the dev watch) */}
-              <Section title="Smart wallet watch">
-                <SmartWalletWatch mint={intel.mint} />
+
+              <Section title="Dev sell simulator">
+                <DevSellSimulatorPanel token={intel.token} devWallet={intel.devWallet} dexPairs={intel.dexPairs} />
               </Section>
+            </div>
+          )}
+
+          {tab === "trading" && (
+            <div className="oxc-grid" style={{ gap: "1rem" }}>
               <div className="oxc-grid oxc-grid-2">
-                <Section title="Unlock schedule">
-                  <UnlockSchedulePanel forensics={intel.forensics} />
+                <Section title="Live trade tape">
+                  <TradeTapePanel dexPairs={intel.dexPairs} tradeTape={teamA.tradeTape} />
                 </Section>
-                <Section title="Wash trading">
-                  <WashTradingPanel dexPairs={intel.dexPairs} washTrading={intel.washTrading} tapeLoaded={intel.tradeTape != null} />
+                <Section title="Whale alerts">
+                  <WhaleAlertsPanel forensics={intel.forensics} token={intel.token} whaleAlerts={teamA.whaleAlerts} />
                 </Section>
               </div>
+
               <div className="oxc-grid oxc-grid-2">
+                <Section title="Sniper radar">
+                  <SniperRadarPanel forensics={intel.forensics} token={intel.token} />
+                </Section>
                 <Section title="Chart pattern">
                   <ChartPatternPanel dexPairs={intel.dexPairs} chartPatterns={intel.chartPatterns} deepIntelLoading={intel.deepIntelLoading} />
                 </Section>
+              </div>
+
+              <div className="oxc-grid oxc-grid-2">
                 <Section title="Slippage estimator">
                   <SlippageEstimatorPanel token={intel.token} dexPairs={intel.dexPairs} />
                 </Section>
+                <Section title="Position size calculator">
+                  <PositionSizePanel token={intel.token} />
+                </Section>
               </div>
-              {compareMints.length ? (
-                <CompareView mintA={intel.mint} compareMints={compareMints} />
-              ) : (
+
+              <div className="oxc-grid oxc-grid-2">
+                <Section title="Top-holder cost basis">
+                  <CostBasisPanel token={intel.token} forensics={intel.forensics} />
+                </Section>
+                <Section title="Holder conviction">
+                  <HolderConvictionPanel dexPairs={intel.dexPairs} token={intel.token} holderConviction={intel.holderConviction} />
+                </Section>
+              </div>
+
+              <Section title="Entry / exit planner">
+                <EntryExitPlannerPanel token={intel.token} />
+              </Section>
+
+              <div className="oxc-grid oxc-grid-2">
+                <Section title="Wash trading">
+                  <WashTradingPanel dexPairs={intel.dexPairs} washTrading={intel.washTrading} tapeLoaded={intel.tradeTape != null} />
+                </Section>
+                <Section title="Liquidity migration">
+                  <LiquidityMigrationPanel forensics={intel.forensics} token={intel.token} />
+                </Section>
+              </div>
+            </div>
+          )}
+
+          {tab === "launch" && (
+            <div className="oxc-grid" style={{ gap: "1rem" }}>
+              <Section title="Sandbox launch replay">
+                <SandboxReplayPanel mint={intel.mint} token={intel.token} />
+              </Section>
+
+              <div className="oxc-grid oxc-grid-2">
+                <Section title="Graduation tracker">
+                  <GraduationTrackerPanel forensics={intel.forensics} token={intel.token} />
+                </Section>
+                <Section title="Token DNA">
+                  <TokenDnaPanel token={intel.token} research={intel.research} mint={intel.mint} tokenDna={intel.tokenDna} />
+                </Section>
+              </div>
+
+              <Section title="Fresh wallet radar">
+                <FreshWalletRadarPanel bundle={intel.bundle} />
+              </Section>
+            </div>
+          )}
+
+          {tab === "community" && (
+            <div className="oxc-grid" style={{ gap: "1rem" }}>
+              <Section title="X / Twitter signals">
+                <XPanel x={intel.x} loading={intel.xLoading} onRetry={intel.refresh} />
+              </Section>
+
+              <div className="oxc-grid oxc-grid-2">
+                <Section title="Share scan — card, notes & voting">
+                  <SocialScanPanel
+                    mint={intel.mint}
+                    token={intel.token}
+                    ogScore={intel.ogScore}
+                    riskScore={intel.risk?.score ?? null}
+                    riskLabel={intel.risk?.label ?? null}
+                    flags={shareFlags}
+                  />
+                </Section>
+                <Section title="Fired alerts — this scan">
+                  {firedAlerts.length > 0 ? (
+                    <ScanFeedAlerts
+                      mint={intel.mint}
+                      symbol={intel.token?.symbol ?? null}
+                      ogScore={intel.ogScore?.score ?? null}
+                      devWallet={intel.forensics?.dev?.wallet ?? null}
+                      signals={[]}
+                      firedAlerts={firedAlerts}
+                    />
+                  ) : (
+                    <p className="oxc-empty">
+                      No alert rules fired on this scan. Rules are checked locally in your browser when a scan completes — nothing is
+                      delivered by the backend, and a rule inside its cooldown does not re-fire.
+                    </p>
+                  )}
+                </Section>
+              </div>
+
+              <Section title="Alert builder">
+                <AlertBuilderPanel mint={intel.mint} devWallet={intel.forensics?.dev?.wallet ?? null} />
+              </Section>
+
+              <Section title="Smart wallet watch">
+                <SmartWalletWatch mint={intel.mint} />
+              </Section>
+
+              <div className="oxc-grid oxc-grid-2">
+                <Section title="Whale labels">
+                  <WhaleLabelsPanel token={intel.token} forensics={intel.forensics} whaleLabels={intel.whaleLabels} />
+                </Section>
+                <Section title="Rug radar leaderboard">
+                  <RugRadarLeaderboardPanel />
+                </Section>
+              </div>
+
+              <div className="oxc-grid oxc-grid-2">
+                <Section title="CEX deposit monitoring">
+                  <CexDepositPanel />
+                </Section>
+                <Section title="Unlock schedule">
+                  <UnlockSchedulePanel forensics={intel.forensics} />
+                </Section>
+              </div>
+
+              {isV2 && !compareMints.length && (
                 <Section title="Cross-scan compare">
                   <CrossScanComparePanel
                     summaries={[
@@ -654,59 +917,26 @@ export default function TokenScanner() {
                         mint: intel.mint,
                         name: (intel.token?.name as string) ?? null,
                         symbol: (intel.token?.symbol as string) ?? null,
-                        priceUsd: null, mcap: null, liquidityUsd: null, ogScore: null, riskScore: null,
-                        top10Pct: null, lpLockedPct: null, bundledPct: null, holders: null,
-                        loading: intel.loading, error: intel.error,
+                        priceUsd: null,
+                        mcap: null,
+                        liquidityUsd: null,
+                        ogScore: null,
+                        riskScore: null,
+                        top10Pct: null,
+                        lpLockedPct: null,
+                        bundledPct: null,
+                        holders: null,
+                        loading: intel.loading,
+                        error: intel.error,
                       },
                     ]}
-                    onAddMint={(m) => navigate(`/intel/scanner-v2/${intel.mint}?compare=${m}`)}
+                    onAddMint={(m) => navigate(`${scannerBase}/${intel.mint}?compare=${m}`)}
                   />
                 </Section>
               )}
-
-              {/* B6 — exit liquidity, LP drain, position size, Token-2022, cost basis, RugCheck, CEX */}
-              <div className="oxc-grid oxc-grid-2">
-                <Section title="Exit liquidity — sell stress test">
-                  <ExitLiquidityPanel token={intel.token} dexPairs={intel.dexPairs} exitLiquidity={intel.exitLiquidity} />
-                </Section>
-                <Section title="LP drain alert">
-                  <LpDrainAlertPanel forensics={intel.forensics} token={intel.token} mint={intel.mint} />
-                </Section>
-              </div>
-              <div className="oxc-grid oxc-grid-2">
-                <Section title="Position size calculator">
-                  <PositionSizePanel token={intel.token} />
-                </Section>
-                <Section title="Token-2022 extensions audit">
-                  <Token2022Panel token={intel.token} token2022Extensions={intel.token2022Extensions} />
-                </Section>
-              </div>
-              <div className="oxc-grid oxc-grid-2">
-                <Section title="Top-holder cost basis">
-                  <CostBasisPanel token={intel.token} forensics={intel.forensics} />
-                </Section>
-                <Section title="RugCheck">
-                  <RugCheckPanel rugCheck={rugCheck} safety={intel.safety} mint={intel.mint} />
-                </Section>
-              </div>
-              <Section title="CEX deposit monitoring">
-                <CexDepositPanel />
-              </Section>
-            </>
-          )}
-
-          <div className="oxc-panel" style={termPanel}>
-            <h3 style={termH3}>Tradeability note</h3>
-            <p className="oxc-muted" style={{ margin: 0, fontSize: "0.85rem" }}>
-              {intel.safety?.note || "Run completed — see Jupiter verdict above."}
-            </p>
-            <div style={{ marginTop: "0.75rem" }}>
-              <a className="oxc-btn" href={`/intel/trade`} style={{ textDecoration: "none", display: "inline-block" }}>
-                Trade this token
-              </a>
             </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
     </div>
   );

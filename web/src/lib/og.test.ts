@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FARTCOIN_CANONICAL_MINT, USDC_MINT, forensicOgAttribution, hasPulledOrDeadLiquidity, jupOgCopycats, type JupTokenInfo } from "./og";
+import { FARTCOIN_CANONICAL_MINT, USDC_MINT, dexPaidOrdersForToken, forensicOgAttribution, hasPulledOrDeadLiquidity, jupOgCopycats, type JupTokenInfo } from "./og";
 
 const daysAgoIso = (days: number): string => new Date(Date.now() - days * 86_400_000).toISOString();
 
@@ -644,5 +644,58 @@ describe("jupOgCopycats", () => {
     expect(report.tokenScores["solana:first-ye-mint"]?.classification.primary_label).toBe("LEGACY OG");
     expect(report.tokenScores["solana:later-official-ye"]?.classification.primary_label).toBe("REVIVED OFFICIAL");
     expect(report.familyTree.find((node) => node.token.id === "later-official-ye")?.relationship).toBe("later official");
+  });
+});
+
+describe("dexPaidOrdersForToken", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Regression: DexScreener /orders/v1 returns an OBJECT { orders, boosts },
+  // not an array. Treating it as an array silently reported every token as
+  // unpaid, even boosted ones (verified live 2026-11-08).
+  it("parses the { orders, boosts } object shape and reports paid", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("/orders/v1/")) {
+          return {
+            ok: true,
+            json: async () => ({
+              orders: [
+                { chainId: "solana", tokenAddress: "BoostedMint", type: "tokenProfile", status: "approved", paymentTimestamp: 1794086159182 },
+              ],
+              boosts: [
+                { chainId: "solana", tokenAddress: "BoostedMint", id: "boost-1", amount: 500, paymentTimestamp: 1794086494046 },
+              ],
+            }),
+          };
+        }
+        return { ok: false, json: async () => ({}) };
+      })
+    );
+
+    const summary = await dexPaidOrdersForToken("solana", "BoostedMint");
+
+    expect(summary.totalOrders).toBe(1);
+    expect(summary.approvedOrders).toBe(1);
+    expect(summary.profilePaid).toBe(true);
+    expect(summary.boosts).toHaveLength(1);
+    expect(summary.boostTotalAmount).toBe(500);
+  });
+
+  it("reports unpaid when the object has empty orders and boosts", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => ({ orders: [], boosts: [] }) }))
+    );
+
+    const summary = await dexPaidOrdersForToken("solana", "UnpaidMint");
+
+    expect(summary.totalOrders).toBe(0);
+    expect(summary.approvedOrders).toBe(0);
+    expect(summary.profilePaid).toBe(false);
+    expect(summary.boostTotalAmount).toBe(0);
   });
 });

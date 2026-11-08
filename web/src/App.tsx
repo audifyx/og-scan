@@ -678,7 +678,12 @@ const App = () => (
             <Route path="/snipe-feed" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/dev-wallet-radar" element={<OgdexRedirect to="/ORBITX_DEX/wallet" />} />
             <Route path="/dev-wallet" element={<OgdexRedirect to="/ORBITX_DEX/wallet" />} />
-            <Route path="/scanner" element={<OgdexRedirect to="/ORBITX_DEX/scanner" />} />
+            {/* Scanner v2 is the canonical standalone scanner page — /scanner
+              * is its home (was a redirect into the Terminal's old DEX
+              * scanner). /scanner-v2 stays as an alias; /intel/scanner-v2
+              * stays as the in-Intel entry. */}
+            <Route path="/scanner" element={<Suspense fallback={<RouteFallback label="Scanner" />}><TokenScanner /></Suspense>} />
+            <Route path="/scanner/:mint" element={<Suspense fallback={<RouteFallback label="Scanner" />}><TokenScanner /></Suspense>} />
             <Route path="/scanner-v2" element={<Suspense fallback={<RouteFallback label="Scanner v2" />}><TokenScanner /></Suspense>} />
             <Route path="/scanner-v2/:mint" element={<Suspense fallback={<RouteFallback label="Scanner v2" />}><TokenScanner /></Suspense>} />
             <Route path="/og-finder" element={<OgdexRedirect to="/ORBITX_DEX/scanner" />} />

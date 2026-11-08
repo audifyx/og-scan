@@ -15,6 +15,17 @@
  * scraping, so this hook uses GeckoTerminal's documented keyless OHLCV +
  * trades endpoints instead. Both endpoints were verified live 2026-11-08.
  *
+ * TRADES VIA THE SERVER (2026-11-08 fix): GeckoTerminal's /trades endpoint
+ * returns a FIXED window of the 300 most recent trades and IGNORES `page`
+ * and `before_timestamp` — on a busy pool that's ~1 minute of trading, so
+ * the replay's buys/sells read 0 while candles move. Trades now come from
+ * GET /api/ogdex/replay-trades, which walks Birdeye's time-windowed trade
+ * feed (V3 token txs, legacy seek_by_time fallback) for the full launch
+ * window and falls back to GeckoTerminal's recent window only when Birdeye
+ * is unavailable — reported honestly as `tradeSource`. When the server route
+ * itself is unreachable (local vite dev), the hook falls back to direct
+ * GeckoTerminal recent trades, labelled the same way.
+ *
  * NEVER-FAKE RULE: minutes with no candle are gaps, never interpolated.
  * The chart breaks at gaps and the UI labels them ("no trade data for this
  * window"). Markers come only from fetched trades; when the fetched trade
@@ -59,7 +70,7 @@ export type ReplayGap = {
   minutes: number;
 };
 
-export type ReplayMarkerKind = "first-buy" | "big-buy" | "dev-sell" | "pair-created";
+export type ReplayMarkerKind = "first-buy" | "big-buy" | "big-sell" | "dev-sell" | "pair-created" | "ath" | "peak-volume";
 
 export type ReplayMarker = {
   kind: ReplayMarkerKind;
@@ -96,6 +107,36 @@ export type ReplayPairInfo = {
 
 export type ReplayStatus = "idle" | "loading" | "ready" | "error" | "no-data";
 
+/** Where the replay's trades came from — drives the honest source badge. */
+export type ReplayTradeSource = "birdeye" | "geckoterminal-recent" | "none";
+
+export type ReplayTradesResult = {
+  trades: ReplayTrade[];
+  source: ReplayTradeSource;
+  /** True when the fetched window covers the whole requested [from, to]. */
+  coversWindow: boolean;
+  /** True when the server hit a trade/page/time cap mid-window. */
+  truncated: boolean;
+};
+
+/** Price extremes over the fetched candles — real candles only. */
+export type ReplayExtremes = {
+  athPrice: number | null;
+  athTimeMs: number | null;
+  /** Max % drawdown from the running ATH (0 when the price never fell). */
+  maxDrawdownPct: number | null;
+  troughTimeMs: number | null;
+  peakVolumeMinute: { timeMs: number; volumeUsd: number } | null;
+};
+
+/** Early buyers: distinct makers who bought in the first 10 minutes. */
+export type EarlyBuyerStats = {
+  count: number;
+  /** Of those, how many sold at or before the cursor. */
+  soldCount: number;
+  makers: string[];
+};
+
 export type UseLaunchReplayOptions = {
   mint: string;
   /** Highest-liquidity Solana pair is auto-picked when omitted. */
@@ -126,6 +167,14 @@ export type UseLaunchReplayResult = {
   coversLaunch: boolean;
   /** True when the fetched trade window reaches back to pair creation. */
   tradesCoverLaunch: boolean;
+  /** Where the trades came from (Birdeye full window vs GeckoTerminal recent). */
+  tradeSource: ReplayTradeSource;
+  /** True when the server hit a trade/page/time cap mid-window. */
+  tradesTruncated: boolean;
+  /** ATH / max drawdown / peak-volume minute from real candles. */
+  extremes: ReplayExtremes;
+  /** Early buyers (first 10 min) and how many sold by the cursor. */
+  earlyBuyers: EarlyBuyerStats;
   /** Implied total supply (current mcap / current price). Null when unknown. */
   impliedSupply: number | null;
   /** Estimated market cap at a price, using implied supply. Null when unknown. */
@@ -301,13 +350,89 @@ export function detectGaps(minutes: ReplayMinute[]): ReplayGap[] {
 }
 
 /**
+ * Price extremes over real candles only: window ATH (max close), max
+ * drawdown from the running ATH, and the peak-volume minute (max candle
+ * volumeUsd). Returns nulls when there are no candles. A price that never
+ * falls reports maxDrawdownPct 0 — an honest 0, not "unknown".
+ */
+export function analyzePriceExtremes(candles: ReplayCandle[]): ReplayExtremes {
+  if (candles.length === 0) {
+    return { athPrice: null, athTimeMs: null, maxDrawdownPct: null, troughTimeMs: null, peakVolumeMinute: null };
+  }
+  let athPrice = -Infinity;
+  let athTimeMs: number | null = null;
+  let runningAth = -Infinity;
+  let maxDd = 0;
+  let troughTimeMs: number | null = null;
+  let peak: { timeMs: number; volumeUsd: number } | null = null;
+  for (const c of candles) {
+    if (c.close > athPrice) {
+      athPrice = c.close;
+      athTimeMs = c.timeMs;
+    }
+    if (c.close > runningAth) {
+      runningAth = c.close;
+    } else if (runningAth > 0) {
+      const dd = (runningAth - c.close) / runningAth;
+      if (dd > maxDd) {
+        maxDd = dd;
+        troughTimeMs = c.timeMs;
+      }
+    }
+    if (c.volumeUsd > 0 && (peak == null || c.volumeUsd > peak.volumeUsd)) {
+      peak = { timeMs: c.timeMs, volumeUsd: c.volumeUsd };
+    }
+  }
+  return {
+    athPrice: athPrice === -Infinity ? null : athPrice,
+    athTimeMs,
+    maxDrawdownPct: maxDd * 100,
+    troughTimeMs,
+    peakVolumeMinute: peak,
+  };
+}
+
+/**
+ * Early buyers: distinct makers whose first buy falls in the first 10
+ * minutes after `startMs`, and how many of them sold at or before
+ * `cursorMs`. Makers are exact wallet strings; no wallet is ever guessed.
+ */
+export function analyzeEarlyBuyers(
+  trades: ReplayTrade[],
+  startMs: number | null,
+  cursorMs: number | null,
+): EarlyBuyerStats {
+  if (startMs == null) return { count: 0, soldCount: 0, makers: [] };
+  const early = new Map<string, number>();
+  for (const t of trades) {
+    if (t.kind !== "buy" || !t.maker) continue;
+    if (t.timeMs < startMs || t.timeMs >= startMs + 10 * 60_000) continue;
+    if (!early.has(t.maker)) early.set(t.maker, t.timeMs);
+  }
+  const makers = [...early.keys()];
+  const sold = new Set<string>();
+  if (cursorMs != null) {
+    for (const t of trades) {
+      if (t.kind === "sell" && t.maker && early.has(t.maker) && t.timeMs <= cursorMs) {
+        sold.add(t.maker);
+      }
+    }
+  }
+  return { count: makers.length, soldCount: sold.size, makers };
+}
+
+/**
  * Derive replay markers from real data only.
  * - pair-created: from DexScreener pairCreatedAt (when known).
  * - first-buy: earliest buy trade in the fetched set. `tradesCoverLaunch`
  *   decides whether the label can claim "first buy ever" or only "first buy
  *   in available trade data".
  * - big-buy: the 5 largest buys by USD volume (only when volume is known).
+ * - big-sell: the single largest sell by USD volume — mirror of big-buy.
+ *   Skipped when that trade is already flagged as a dev sell.
  * - dev-sell: every fetched sell whose maker matches devWallet exactly.
+ * - ath / peak-volume: from `candles` when supplied — window ATH (max
+ *   close) and the peak-volume minute (max candle volumeUsd).
  * No marker is ever synthesized from a candle or a price move.
  */
 export function deriveMarkers(input: {
@@ -315,8 +440,9 @@ export function deriveMarkers(input: {
   devWallet?: string | null;
   launchAtMs?: number | null;
   tradesCoverLaunch: boolean;
+  candles?: ReplayCandle[];
 }): ReplayMarker[] {
-  const { trades, devWallet, launchAtMs, tradesCoverLaunch } = input;
+  const { trades, devWallet, launchAtMs, tradesCoverLaunch, candles } = input;
   const markers: ReplayMarker[] = [];
   if (launchAtMs != null) {
     markers.push({
@@ -361,19 +487,60 @@ export function deriveMarkers(input: {
       });
     }
   }
-  if (devWallet) {
-    for (const t of sells) {
-      if (t.maker === devWallet) {
-        markers.push({
-          kind: "dev-sell",
-          timeMs: t.timeMs,
-          label: "Dev sell",
-          detail: `Sell from the dev wallet (${devWallet.slice(0, 4)}…${devWallet.slice(-4)}) for $${(t.volumeUsd ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}.`,
-          volumeUsd: t.volumeUsd,
-          txHash: t.txHash || null,
-          maker: t.maker,
-        });
-      }
+  const devSellTrades = devWallet ? sells.filter((t) => t.maker === devWallet) : [];
+  const devSellHashes = new Set(devSellTrades.map((t) => t.txHash).filter(Boolean));
+  // Largest sell: mirror of big-buy, single marker. Skipped when that trade
+  // is already flagged as a dev sell (dev takes precedence), and only when
+  // its volume is known.
+  const largestSell = [...sells]
+    .filter((t) => t.volumeUsd != null && !devSellHashes.has(t.txHash))
+    .sort((a, b) => (b.volumeUsd ?? 0) - (a.volumeUsd ?? 0))[0];
+  if (largestSell) {
+    markers.push({
+      kind: "big-sell",
+      timeMs: largestSell.timeMs,
+      label: "Largest sell",
+      detail: `Sell of $${(largestSell.volumeUsd ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}.`,
+      volumeUsd: largestSell.volumeUsd,
+      txHash: largestSell.txHash || null,
+      maker: largestSell.maker,
+    });
+  }
+  for (const t of devSellTrades) {
+    markers.push({
+      kind: "dev-sell",
+      timeMs: t.timeMs,
+      label: "Dev sell",
+      detail: `Sell from the dev wallet (${devWallet!.slice(0, 4)}…${devWallet!.slice(-4)}) for $${(t.volumeUsd ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}.`,
+      volumeUsd: t.volumeUsd,
+      txHash: t.txHash || null,
+      maker: t.maker,
+    });
+  }
+  // ATH + peak-volume minute, from real candles only.
+  if (candles && candles.length > 0) {
+    const extremes = analyzePriceExtremes(candles);
+    if (extremes.athPrice != null && extremes.athTimeMs != null) {
+      markers.push({
+        kind: "ath",
+        timeMs: extremes.athTimeMs,
+        label: "Window ATH",
+        detail: `Highest close in the window: $${extremes.athPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })}.`,
+        volumeUsd: null,
+        txHash: null,
+        maker: null,
+      });
+    }
+    if (extremes.peakVolumeMinute) {
+      markers.push({
+        kind: "peak-volume",
+        timeMs: extremes.peakVolumeMinute.timeMs,
+        label: "Peak volume minute",
+        detail: `$${extremes.peakVolumeMinute.volumeUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })} traded in one minute.`,
+        volumeUsd: extremes.peakVolumeMinute.volumeUsd,
+        txHash: null,
+        maker: null,
+      });
     }
   }
   return markers.sort((a, b) => a.timeMs - b.timeMs);
@@ -431,8 +598,93 @@ export async function fetchReplayCandles(
     });
 }
 
-/** Recent trades for a pool, newest pages first (GeckoTerminal `page`). */
-export async function fetchReplayTrades(
+/**
+ * Trades for [fromMs, toMs] from the server route (Birdeye full-window walk
+ * with GeckoTerminal recent-only fallback). The response carries the honest
+ * source + coverage flags — the UI badges them, never fakes them.
+ */
+export async function fetchReplayTradesServer(input: {
+  mint: string;
+  pairAddress: string;
+  fromMs: number;
+  toMs: number;
+}): Promise<ReplayTradesResult> {
+  const qs = new URLSearchParams({
+    mint: input.mint,
+    pair: input.pairAddress,
+    from: String(Math.floor(input.fromMs)),
+    to: String(Math.floor(input.toMs)),
+  });
+  // AbortSignal.timeout exists in browsers + Node, but not in jsdom.
+  const signal =
+    typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+      ? AbortSignal.timeout(30_000)
+      : undefined;
+  const res = await fetch(`/api/ogdex/replay-trades?${qs}`, {
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  if (!res.ok) throw new Error(`replay-trades → ${res.status}`);
+  const raw = (await res.json()) as Record<string, unknown>;
+  const trades = Array.isArray(raw.trades)
+    ? (raw.trades as ReplayTrade[])
+        .filter(
+          (t): t is ReplayTrade =>
+            !!t && typeof t.timeMs === "number" && (t.kind === "buy" || t.kind === "sell"),
+        )
+        .sort((a, b) => a.timeMs - b.timeMs)
+    : [];
+  return {
+    trades,
+    source:
+      raw.source === "birdeye"
+        ? "birdeye"
+        : raw.source === "geckoterminal-recent"
+          ? "geckoterminal-recent"
+          : "none",
+    coversWindow: raw.coversWindow === true,
+    truncated: raw.truncated === true,
+  };
+}
+
+/**
+ * Trade window for a replay: server route first (Birdeye), direct
+ * GeckoTerminal recent trades only when the server route is unreachable
+ * (e.g. local vite dev, where /api/* 404s). The fallback is labelled
+ * honestly as geckoterminal-recent — never as a full window.
+ */
+export async function fetchReplayTradesForWindow(input: {
+  mint: string;
+  pairAddress: string;
+  launchAtMs: number | null;
+  maxTradePages?: number;
+}): Promise<ReplayTradesResult> {
+  const fromMs = input.launchAtMs ?? Date.now() - 24 * 3600_000;
+  try {
+    return await fetchReplayTradesServer({
+      mint: input.mint,
+      pairAddress: input.pairAddress,
+      fromMs,
+      toMs: Date.now(),
+    });
+  } catch {
+    const gt = await fetchReplayTradesGecko(input.pairAddress, input.maxTradePages ?? 3);
+    return {
+      trades: gt,
+      source: gt.length ? "geckoterminal-recent" : "none",
+      coversWindow: false,
+      truncated: false,
+    };
+  }
+}
+
+/**
+ * Recent trades for a pool, newest pages first (GeckoTerminal `page`).
+ * NOTE: the endpoint returns a FIXED window of the 300 most recent trades
+ * and ignores `page`/`before_timestamp` — this is only a recent-only
+ * fallback, never a full-window source.
+ */
+export async function fetchReplayTradesGecko(
   poolAddress: string,
   maxPages = 3,
 ): Promise<ReplayTrade[]> {
@@ -469,6 +721,8 @@ export function useLaunchReplay(options: UseLaunchReplayOptions): UseLaunchRepla
   const [pair, setPair] = useState<ReplayPairInfo | null>(null);
   const [candles, setCandles] = useState<ReplayCandle[]>([]);
   const [trades, setTrades] = useState<ReplayTrade[]>([]);
+  const [tradeSource, setTradeSource] = useState<ReplayTradeSource>("none");
+  const [tradesTruncated, setTradesTruncated] = useState(false);
   const [cursor, setCursorState] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeedState] = useState<number>(4);
@@ -484,6 +738,8 @@ export function useLaunchReplay(options: UseLaunchReplayOptions): UseLaunchRepla
       setPair(null);
       setCandles([]);
       setTrades([]);
+      setTradeSource("none");
+      setTradesTruncated(false);
       setCursorState(0);
       setPlaying(false);
       return;
@@ -521,15 +777,23 @@ export function useLaunchReplay(options: UseLaunchReplayOptions): UseLaunchRepla
         };
         setPair(pairInfo);
 
-        // 2) GeckoTerminal: minute candles back to launch + recent trades.
-        const [c, t] = await Promise.all([
+        // 2) Candles (GeckoTerminal OHLCV) + trades (server route: Birdeye
+        // full window, GeckoTerminal recent-only fallback).
+        const [c, tradeRes] = await Promise.all([
           fetchReplayCandles(picked.pairAddress, launchAtMs, maxCandlePages),
-          fetchReplayTrades(picked.pairAddress, maxTradePages),
+          fetchReplayTradesForWindow({
+            mint,
+            pairAddress: picked.pairAddress,
+            launchAtMs,
+            maxTradePages,
+          }),
         ]);
         if (cancelled) return;
         setCandles(c);
-        setTrades(t);
-        if (c.length === 0 && t.length === 0) {
+        setTrades(tradeRes.trades);
+        setTradeSource(tradeRes.source);
+        setTradesTruncated(tradeRes.truncated);
+        if (c.length === 0 && tradeRes.trades.length === 0) {
           setStatus("no-data");
           setError("No candle or trade history returned for this pair.");
           return;
@@ -559,6 +823,13 @@ export function useLaunchReplay(options: UseLaunchReplayOptions): UseLaunchRepla
         coversLaunch: false,
         tradesCoverLaunch: false,
         impliedSupply: null as number | null,
+        extremes: {
+          athPrice: null,
+          athTimeMs: null,
+          maxDrawdownPct: null,
+          troughTimeMs: null,
+          peakVolumeMinute: null,
+        } as ReplayExtremes,
       };
     }
     const oldestCandle = candles.length ? candles[0].timeMs : null;
@@ -581,7 +852,9 @@ export function useLaunchReplay(options: UseLaunchReplayOptions): UseLaunchRepla
       devWallet,
       launchAtMs: pair.launchAtMs,
       tradesCoverLaunch,
+      candles,
     });
+    const extremes = analyzePriceExtremes(candles);
     const impliedSupply =
       pair.priceUsd != null &&
       pair.priceUsd > 0 &&
@@ -589,7 +862,7 @@ export function useLaunchReplay(options: UseLaunchReplayOptions): UseLaunchRepla
       pair.marketCapUsd > 0
         ? pair.marketCapUsd / pair.priceUsd
         : null;
-    return { startMs, endMs, minutes, gaps, markers, coversLaunch, tradesCoverLaunch, impliedSupply };
+    return { startMs, endMs, minutes, gaps, markers, coversLaunch, tradesCoverLaunch, impliedSupply, extremes };
   }, [pair, candles, trades, devWallet]);
 
   const totalMinutes = derived.minutes.length;
@@ -633,6 +906,12 @@ export function useLaunchReplay(options: UseLaunchReplayOptions): UseLaunchRepla
     return derived.markers.filter((m) => m.timeMs <= current.timeMs + 60_000);
   }, [derived.markers, current]);
 
+  // Early buyers update as the cursor moves (sold-by-cursor counts sells so far).
+  const earlyBuyers = useMemo(
+    () => analyzeEarlyBuyers(trades, derived.startMs, current?.timeMs ?? null),
+    [trades, derived.startMs, current],
+  );
+
   const mcapAt = useCallback(
     (priceUsd: number) =>
       derived.impliedSupply != null && Number.isFinite(priceUsd)
@@ -653,6 +932,10 @@ export function useLaunchReplay(options: UseLaunchReplayOptions): UseLaunchRepla
     markers: derived.markers,
     coversLaunch: derived.coversLaunch,
     tradesCoverLaunch: derived.tradesCoverLaunch,
+    tradeSource,
+    tradesTruncated,
+    extremes: derived.extremes,
+    earlyBuyers,
     impliedSupply: derived.impliedSupply,
     mcapAt,
     totalMinutes,

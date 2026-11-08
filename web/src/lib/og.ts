@@ -312,6 +312,12 @@ export type DexPaidOrder = {
   paymentTimestamp?: number;
 };
 
+export type DexBoost = {
+  id?: string;
+  amount?: number;
+  paymentTimestamp?: number;
+};
+
 export type DexPaidOrderSummary = {
   orders: DexPaidOrder[];
   totalOrders: number;
@@ -321,6 +327,9 @@ export type DexPaidOrderSummary = {
   adsPaid: boolean;
   firstPaidAt?: string;
   lastPaidAt?: string;
+  /** Paid boosts from the same orders response — a boost entry is paid by definition. */
+  boosts: DexBoost[];
+  boostTotalAmount: number;
 };
 
 type BirdeyeOverviewResponse = {
@@ -1028,7 +1037,7 @@ export async function dexBoostsByMint(): Promise<Map<string, DexBoostInfo>> {
   return task;
 }
 
-function summarizeDexPaidOrders(orders: DexPaidOrder[]): DexPaidOrderSummary {
+function summarizeDexPaidOrders(orders: DexPaidOrder[], boosts: DexBoost[] = []): DexPaidOrderSummary {
   const approved = orders.filter((order) => order.status === "approved" || order.status === "processing" || order.status === "on-hold");
   const paidTimes: string[] = approved
     .map((order) => finiteIso(order.paymentTimestamp))
@@ -1044,6 +1053,8 @@ function summarizeDexPaidOrders(orders: DexPaidOrder[]): DexPaidOrderSummary {
     adsPaid: approved.some((order) => order.type === "tokenAd" || order.type === "trendingBarAd"),
     firstPaidAt: paidTimes[0],
     lastPaidAt: paidTimes[paidTimes.length - 1],
+    boosts,
+    boostTotalAmount: boosts.reduce((s, b) => s + (Number(b.amount) || 0), 0),
   };
 }
 
@@ -1056,8 +1067,13 @@ export async function dexPaidOrdersForToken(chainId: string, tokenAddress: strin
   const task = (async (): Promise<DexPaidOrderSummary> => {
     try {
       const url = `https://api.dexscreener.com/orders/v1/${encodeURIComponent(cleanChainId)}/${encodeURIComponent(tokenAddress)}`;
-      const orders = await jget<DexPaidOrder[]>(url);
-      return summarizeDexPaidOrders(Array.isArray(orders) ? orders : []);
+      // DexScreener returns an OBJECT { orders: [...], boosts: [...] } —
+      // NOT an array. Treating it as an array silently yields paid:false
+      // for every token (verified live 2026-11-08 on boosted mints).
+      const body = await jget<{ orders?: DexPaidOrder[]; boosts?: DexBoost[] } | DexPaidOrder[]>(url);
+      const orders = Array.isArray(body) ? body : (body?.orders || []);
+      const boosts = Array.isArray(body) ? [] : (body?.boosts || []);
+      return summarizeDexPaidOrders(orders, boosts);
     } catch {
       return summarizeDexPaidOrders([]);
     }

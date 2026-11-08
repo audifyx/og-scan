@@ -12,17 +12,42 @@ async function rpc(method, params) {
 }
 
 // Was the project's DexScreener listing paid for (profile / ads / boosts)?
+// DexScreener GET /orders/v1/{chain}/{mint} returns an OBJECT
+// { orders: [...], boosts: [...] } — NOT an array. Treating it as an array
+// (Array.isArray ? ... : []) silently yields paid:false for EVERY token,
+// even ones with approved profiles and paid boosts (verified live
+// 2026-11-08: ORBITX itself has an approved tokenProfile order + $50 in
+// boosts, yet read "Unpaid listing"). Parse both lists.
+// Paid-status set is unified with the frontend (og.ts): approved,
+// processing, or on-hold counts as paid; cancelled / rejected does not
+// (USDC has cancelled orders and must still read unpaid).
+// Failure is reported explicitly via ok:false so the UI can say "Unknown"
+// instead of calling a failed check "Unpaid".
 async function dexPaid(mint) {
+  const isPaidStatus = (s) => s === "approved" || s === "processing" || s === "on-hold";
   try {
     const r = await fetch(`https://api.dexscreener.com/orders/v1/solana/${mint}`, { headers: { Accept: "application/json" } });
-    if (!r.ok) return { paid: false, services: [] };
-    const orders = await r.json();
-    const services = (Array.isArray(orders) ? orders : []).map((o) => ({
+    if (!r.ok) return { paid: false, services: [], boosts: [], ok: false, error: `dexscreener ${r.status}` };
+    const body = await r.json();
+    const orders = Array.isArray(body) ? body : (body?.orders || []);
+    const boosts = Array.isArray(body) ? [] : (body?.boosts || []);
+    const services = orders.map((o) => ({
       type: o.type, status: o.status, at: o.paymentTimestamp || null,
     }));
-    const paid = services.some((s) => s.status === "approved");
-    return { paid, services };
-  } catch { return { paid: false, services: [] }; }
+    const approved = services.filter((s) => isPaidStatus(s.status));
+    const boostList = boosts.map((b) => ({ id: b.id || null, amount: b.amount ?? null, at: b.paymentTimestamp || null }));
+    return {
+      paid: approved.length > 0 || boostList.length > 0,
+      services,
+      boosts: boostList,
+      profilePaid: approved.some((s) => s.type === "tokenProfile"),
+      communityTakeoverPaid: approved.some((s) => s.type === "communityTakeover"),
+      adsPaid: approved.some((s) => s.type === "tokenAd" || s.type === "trendingBarAd"),
+      boostsPaid: boostList.length > 0,
+      boostAmount: boostList.reduce((s, b) => s + (Number(b.amount) || 0), 0),
+      ok: true,
+    };
+  } catch (e) { return { paid: false, services: [], boosts: [], ok: false, error: String(e?.message || e) }; }
 }
 
 // pump.fun coin metadata (creator + bonding info) — null for non-pump tokens.

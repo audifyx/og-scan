@@ -37,6 +37,7 @@ import walletTx from "./ogdex/_routes/_wallet-tx.js";
 import llms from "./ogdex/_routes/_llms.js";
 import leaderboard from "./ogdex/_routes/_leaderboard.js";
 import research from "./ogdex/_routes/_research.js";
+import replayTrades from "./ogdex/_routes/_replay.js";
 import platformStats from "./ogdex/_routes/_platform-stats.js";
 import traders from "./ogdex/_routes/_traders.js";
 import waitlist from "./ogdex/_routes/_waitlist.js";
@@ -52,6 +53,7 @@ const ROUTES = {
   config: configRoute, listings, metadata, report, screener, signals, search, token, trade, track, wallet, watchlist, alerts, rpc, forensics, chat, ath, openapi,
   "openapi.json": openapi, health, balance, safety, xray, swaps, "wallet-tx": walletTx, llms, "llms.txt": llms, leaderboard,
   "alerts-run": alertsRun, research,
+  "replay-trades": replayTrades,
   "platform-stats": platformStats,
   traders,
   waitlist,
@@ -63,7 +65,7 @@ const ROUTES = {
 };
 
 const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "llms", "llms.txt", "desk-unlock", "mcp-life-tick"]);
-const LIMITS = { chat: 12, forensics: 20, bundle: 20, report: 10, track: 30, rpc: 40, alerts: 20, watchlist: 20, admin: 30, mcp: 30 };
+const LIMITS = { chat: 12, forensics: 20, bundle: 20, report: 10, track: 30, rpc: 40, alerts: 20, watchlist: 20, admin: 30, mcp: 30, "replay-trades": 10 };
 const DEFAULT_LIMIT = 60;
 const WINDOW_MS = 10_000;
 /** Soft API keys get a higher cap — never unlimited. */

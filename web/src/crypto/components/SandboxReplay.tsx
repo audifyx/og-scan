@@ -129,10 +129,16 @@ function markerStyle(kind: ReplayMarker["kind"]): { fill: string; stroke: string
       return { fill: "#3b82f6", stroke: "#ffffff", r: 5 };
     case "big-buy":
       return { fill: "#f0b429", stroke: "#0a0a0a", r: 4 };
+    case "big-sell":
+      return { fill: "#ffffff", stroke: "#3b82f6", r: 4 };
     case "dev-sell":
       return { fill: "#ffffff", stroke: "#f0b429", r: 5 };
     case "pair-created":
       return { fill: "#0a0a0a", stroke: "#ffffff", r: 4 };
+    case "ath":
+      return { fill: "#f0b429", stroke: "#ffffff", r: 5 };
+    case "peak-volume":
+      return { fill: "#3b82f6", stroke: "#0a0a0a", r: 4 };
     default:
       return { fill: "#ffffff", stroke: "#ffffff", r: 4 };
   }
@@ -255,8 +261,37 @@ export function SandboxReplay({
       buyVol += minutes[i].buyVolumeUsd;
       sellVol += minutes[i].sellVolumeUsd;
     }
-    return { buys, sells, buyVol, sellVol };
+    const buyShare = buyVol + sellVol > 0 ? buyVol / (buyVol + sellVol) : null;
+    return { buys, sells, buyVol, sellVol, buyShare };
   }, [minutes, cursor]);
+
+  // Buy/sell pressure bars: one stacked bar per minute (gold = buys, slate
+  // = sells), height ∝ that minute's total USD volume. Minutes after the
+  // cursor are dimmed, matching the chart's full/played split.
+  const BAR_H = 30;
+  const pressureBars = useMemo(() => {
+    if (totalMinutes === 0) return null;
+    const innerW = CHART_W - PAD_L - PAD_R;
+    const barW = innerW / totalMinutes;
+    let maxVol = 0;
+    for (const m of minutes) maxVol = Math.max(maxVol, m.buyVolumeUsd + m.sellVolumeUsd);
+    if (maxVol <= 0) return null;
+    return minutes.map((m, i) => {
+      const total = m.buyVolumeUsd + m.sellVolumeUsd;
+      if (total <= 0) return null;
+      const h = Math.max(1, (total / maxVol) * (BAR_H - 4));
+      const buyH = (m.buyVolumeUsd / total) * h;
+      const sellH = h - buyH;
+      const x = PAD_L + i * barW;
+      const yTop = BAR_H - 2 - h;
+      return (
+        <g key={i} opacity={i > cursor ? 0.25 : 1}>
+          {sellH > 0 && <rect x={x} y={yTop} width={Math.max(0.5, barW - 0.5)} height={sellH} fill="#64748b" />}
+          {buyH > 0 && <rect x={x} y={yTop + sellH} width={Math.max(0.5, barW - 0.5)} height={buyH} fill="#f0b429" />}
+        </g>
+      );
+    });
+  }, [minutes, totalMinutes, cursor]);
 
   const currentPrice = replay.current?.candle?.close ?? null;
   const currentMcap = currentPrice != null ? replay.mcapAt(currentPrice) : null;
@@ -307,6 +342,15 @@ export function SandboxReplay({
             )}
             {replay.gaps.length > 0 && (
               <span style={chip}>{replay.gaps.length} gap{replay.gaps.length === 1 ? "" : "s"} · {gapMinutes} min with no trade data</span>
+            )}
+            {replay.tradeSource === "birdeye" ? (
+              <span style={goldChip}>
+                Trades: Birdeye (full window){replay.tradesTruncated ? " · capped at 5,000" : ""}
+              </span>
+            ) : replay.tradeSource === "geckoterminal-recent" ? (
+              <span style={chip}>Trades: GeckoTerminal (recent only, ~1 min)</span>
+            ) : (
+              <span style={chip}>Trades: unavailable</span>
             )}
           </div>
 
@@ -389,7 +433,61 @@ export function SandboxReplay({
             <span style={{ color: "#aebfce" }}>
               {tape.buys} buys ({fmtUsd(tape.buyVol, 0)}) · {tape.sells} sells ({fmtUsd(tape.sellVol, 0)}) so far
             </span>
+            {tape.buyShare != null && (
+              <span style={{ color: "#f0b429" }}>Buy pressure {Math.round(tape.buyShare * 100)}%</span>
+            )}
           </div>
+
+          {/* Buy/sell pressure per minute (USD) */}
+          {pressureBars && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ ...muted, marginBottom: 4, display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                <span>Buy / sell pressure per minute (USD)</span>
+                <span>
+                  <span style={{ display: "inline-block", width: 8, height: 8, background: "#f0b429", borderRadius: 2, marginRight: 4 }} />buys
+                  {" · "}
+                  <span style={{ display: "inline-block", width: 8, height: 8, background: "#64748b", borderRadius: 2, marginRight: 4 }} />sells
+                </span>
+              </div>
+              <svg
+                viewBox={`0 0 ${CHART_W} ${BAR_H}`}
+                width="100%"
+                role="img"
+                aria-label="Buy sell pressure per minute"
+                style={{ display: "block", background: "#0a0f15", borderRadius: 6 }}
+              >
+                {pressureBars}
+              </svg>
+            </div>
+          )}
+
+          {/* Advanced stats — all from real candles + real trades */}
+          {(replay.extremes.athPrice != null || replay.earlyBuyers.count > 0) && (
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10, fontSize: 12, color: "#aebfce" }}>
+              {replay.extremes.athPrice != null && (
+                <span>
+                  ATH {fmtUsd(replay.extremes.athPrice)}
+                  {replay.extremes.athTimeMs != null ? ` · ${fmtClock(replay.extremes.athTimeMs)}` : ""}
+                </span>
+              )}
+              {replay.extremes.maxDrawdownPct != null && (
+                <span>
+                  Max drawdown {replay.extremes.maxDrawdownPct.toFixed(1)}%
+                  {replay.extremes.troughTimeMs != null ? ` · trough ${fmtClock(replay.extremes.troughTimeMs)}` : ""}
+                </span>
+              )}
+              {replay.extremes.peakVolumeMinute && (
+                <span>
+                  Peak volume {fmtClock(replay.extremes.peakVolumeMinute.timeMs)} · {fmtUsd(replay.extremes.peakVolumeMinute.volumeUsd, 0)} in 1 min
+                </span>
+              )}
+              {replay.earlyBuyers.count > 0 && (
+                <span>
+                  Early buyers (first 10 min): {replay.earlyBuyers.count} · {replay.earlyBuyers.soldCount} sold by now
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Transport controls */}
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
@@ -519,8 +617,17 @@ export function SandboxReplay({
             {!replay.tradesCoverLaunch && replay.markers.some((m) => m.kind === "first-buy") && (
               <p style={{ margin: "0 0 4px" }}>Trade history does not reach launch, so the first-buy marker is the first buy in available data, not necessarily the first buy ever.</p>
             )}
+            {replay.tradesTruncated && (
+              <p style={{ margin: "0 0 4px" }}>Trade window capped at 5,000 trades — the earliest trades in the window may be missing; coverage is partial, not full.</p>
+            )}
             <p style={{ margin: "4px 0 0" }}>
-              Sources: DexScreener public API (pair, launch time, current price/mcap) + GeckoTerminal public API (minute candles, trades). No key. No interpolated points.
+              Sources: DexScreener public API (pair, launch time, current price/mcap) + GeckoTerminal public API (minute candles)
+              {replay.tradeSource === "birdeye"
+                ? " + Birdeye (trades, full window)"
+                : replay.tradeSource === "geckoterminal-recent"
+                  ? " + GeckoTerminal public API (trades, recent only)"
+                  : " + trades unavailable"}
+              . No key. No interpolated points.
             </p>
           </div>
         </>

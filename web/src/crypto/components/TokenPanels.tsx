@@ -548,10 +548,28 @@ export function LiquidityPanel({
       {forensics?.dexPaid ? (
         <CheckRow
           label="DexScreener listing"
-          value={forensics.dexPaid.paid ? "Paid profile / boost" : "Unpaid listing"}
-          state={forensics.dexPaid.paid ? "pass" : "unknown"}
-          badge={forensics.dexPaid.paid ? "Paid" : "Free"}
-          hint="Whether the project's DexScreener listing was paid for."
+          value={
+            forensics.dexPaid.ok === false
+              ? "Unknown"
+              : forensics.dexPaid.profilePaid
+                ? "Paid profile"
+                : forensics.dexPaid.boostsPaid
+                  ? `Paid boost${forensics.dexPaid.boostAmount ? ` ($${forensics.dexPaid.boostAmount})` : ""}`
+                  : forensics.dexPaid.communityTakeoverPaid
+                    ? "CTO paid"
+                    : forensics.dexPaid.adsPaid
+                      ? "Paid ads"
+                      : forensics.dexPaid.paid
+                        ? "Paid profile / boost"
+                        : "Unpaid listing"
+          }
+          state={forensics.dexPaid.ok === false ? "unknown" : forensics.dexPaid.paid ? "pass" : "unknown"}
+          badge={forensics.dexPaid.ok === false ? "Unknown" : forensics.dexPaid.paid ? "Paid" : "Free"}
+          hint={
+            forensics.dexPaid.ok === false
+              ? "Paid-listing check failed — not assumed unpaid."
+              : "Whether the project's DexScreener listing was paid for."
+          }
         />
       ) : (
         <CheckRow label="DexScreener listing" value="Unknown" state="unknown" badge="Unknown" hint="Paid-listing check did not return." />
@@ -1871,7 +1889,7 @@ export function DevFingerprintPanel({
             const outcome = asStr(o?.outcome) ?? "unknown";
             return mint ? (
               <p key={mint} style={{ margin: "0.15rem 0", fontSize: "0.8rem" }}>
-                <a href={`/intel/scanner-v2/${mint}`} className="oxc-mono">{short(mint)}</a> — {outcome}
+                <a href={`/scanner/${mint}`} className="oxc-mono">{short(mint)}</a> — {outcome}
               </p>
             ) : null;
           })}
@@ -2211,7 +2229,7 @@ export function CopycatPanel({ research }: { research: ResearchPayload | null })
           <CheckRow label="Copycats found" value={`${clones.length}`} state="warn" badge="Copycat" hint="Other mints reusing this name or ticker." />
           {clones.slice(0, 8).map((c) => (
             <p key={c.mint ?? c.name} style={{ margin: "0.2rem 0", fontSize: "0.8rem" }}>
-              <a href={`/intel/scanner-v2/${c.mint ?? ""}`} className="oxc-mono">{short(c.mint ?? "")}</a>
+              <a href={`/scanner/${c.mint ?? ""}`} className="oxc-mono">{short(c.mint ?? "")}</a>
               {" — "}{c.name ?? "?"} ({c.symbol ?? "?"}){c.mcap != null ? ` · ${fmtUsd(c.mcap)}` : ""}
             </p>
           ))}
@@ -2447,7 +2465,7 @@ export function RugRadarLeaderboardPanel() {
               <tr key={t.mint} style={{ borderTop: "1px solid #222" }}>
                 <td style={{ padding: "0.3rem 0", color: "#ffffff", fontWeight: 700 }}>{i + 1}</td>
                 <td>
-                  <a href={`/intel/scanner-v2/${t.mint}`} style={{ color: "#ffffff", fontWeight: 700 }}>
+                  <a href={`/scanner/${t.mint}`} style={{ color: "#ffffff", fontWeight: 700 }}>
                     {t.symbol ? `$${t.symbol}` : `${t.mint.slice(0, 4)}…${t.mint.slice(-4)}`}
                   </a>
                   {t.scanCount > 1 && <span style={{ color: "#9a9a9a", fontSize: "0.75rem" }}> · {t.scanCount} scans</span>}
