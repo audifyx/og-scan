@@ -303,7 +303,25 @@ export function saveOsAlerts(a: OsPriceAlert[]) {
 
 export function loadDeskWidgets(): DeskWidget[] {
   const saved = readJson<DeskWidget[]>(DESK_WIDGETS_KEY);
-  if (!Array.isArray(saved)) return [];
+  if (!Array.isArray(saved)) {
+    // First run (nothing saved yet): seed the three home widgets so /app
+    // shows them out of the box — Fear & Greed, Mini Swap (ORBITX, buy),
+    // Portfolio. Stacked down the left edge, clear of the centered icon
+    // grid. A saved layout (even an empty one the user cleared) wins over
+    // these defaults, so removing them sticks.
+    return [
+      { id: "wdg-default-feargreed", type: "feargreed", x: 3, y: 12 },
+      {
+        id: "wdg-default-miniswap",
+        type: "miniswap",
+        x: 3,
+        y: 40,
+        mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+        swapMode: "buy",
+      },
+      { id: "wdg-default-portfolio", type: "portfolio", x: 3, y: 68 },
+    ];
+  }
   return saved.filter(
     (w) =>
       w &&
