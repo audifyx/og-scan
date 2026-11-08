@@ -195,6 +195,8 @@ function ScanSheet({ mint, intel, teamA }: { mint: string; intel: ReturnType<typ
   const [interval, setInterval] = useState("15");
   const flags = intel.forensics?.safetyFlags;
   const bundled = intel.bundle?.bundledSupplyPct ?? null;
+  const bundleTraced = intel.bundle?.holdersTraced ?? null;
+  const bundleAnalyzed = intel.bundle?.holdersAnalyzed ?? null;
   const lpLocked = flags?.lpLockedPct ?? null;
   const honeypot =
     intel.safety?.canBuy === true && intel.safety?.canSell === false
@@ -335,7 +337,7 @@ function ScanSheet({ mint, intel, teamA }: { mint: string; intel: ReturnType<typ
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.6rem" }}>
           {pill("Risk", intel.risk?.score != null ? `${intel.risk.score}` : "Unknown", intel.risk?.label ?? null, "muted")}
-          {pill("Bundled", bundled != null ? `${bundled.toFixed(1)}%` : "Unknown", "of supply", bundled == null ? "muted" : bundled >= 20 ? "bad" : bundled >= 5 ? "warn" : "good")}
+          {pill("Bundled", bundled != null ? `${bundled.toFixed(1)}%` : "Unknown", bundleTraced != null && bundleAnalyzed != null ? `of supply · ${bundleTraced}/${bundleAnalyzed} traced` : "of supply", bundled == null ? "muted" : bundled >= 20 ? "bad" : bundled >= 5 ? "warn" : "good")}
           {pill("LP locked", lpLocked != null ? `${lpLocked.toFixed(0)}%` : "Unknown", null, lpLocked == null ? "muted" : lpLocked >= 80 ? "good" : lpLocked >= 50 ? "warn" : "bad")}
           {pill("Mint", flags?.mintRenounced === true ? "Renounced" : flags?.mintRenounced === false ? "Live" : "Unknown", null, flags?.mintRenounced === true ? "good" : flags?.mintRenounced === false ? "bad" : "muted")}
           {pill("Freeze", flags?.freezeRenounced === true ? "Renounced" : flags?.freezeRenounced === false ? "Live" : "Unknown", null, flags?.freezeRenounced === true ? "good" : flags?.freezeRenounced === false ? "bad" : "muted")}

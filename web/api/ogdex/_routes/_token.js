@@ -11,6 +11,13 @@ import {
 
 const GT_HDR = { Accept: "application/json;version=20230302" };
 const GT = "https://api.geckoterminal.com/api/v2";
+
+// Last-known-good ATH per mint (warm-function memory). GeckoTerminal
+// rate-limits / times out intermittently — when a live ATH fetch fails we
+// serve the last good value instead of blanking the ATH (a failed fetch
+// used to show ATH price "—" and ATH mcap = current mcap, which is wrong).
+// Entries live 1h; the token route revalidates on every scan anyway.
+const athCache = new Map(); // mint -> { athPrice, athMcap, at }
 const EVM_CHAIN_TO_GT = {
   ethereum: "eth", bsc: "bsc", base: "base", polygon: "polygon_pos",
   arbitrum: "arbitrum", avalanche: "avax", sui: "sui-network",
@@ -32,18 +39,22 @@ function dexLinks(best) {
   return { socials, banner: info.header || info.openGraph || null, imageUrl: info.imageUrl || null };
 }
 
-// Compute ATH price/mcap from the *canonical* (deepest-liquidity) GeckoTerminal
-// pool for this token, then derive ATH mcap from real circulating supply.
+// Daily candles first, then hourly (1000h ≈ 42d), then minute (1000m ≈ 16h)
+// for brand-new tokens / pools with no daily history yet. A daily-only
+// lookup blanks the ATH whenever GT has no daily candle for the pool.
 async function poolHigh(network, pool) {
-  try {
-    const gt = await fetch(
-      `${GT}/networks/${network}/pools/${pool}/ohlcv/day?limit=1000&currency=usd&aggregate=1`,
-      { headers: GT_HDR }
-    ).then((r) => (r.ok ? r.json() : null));
-    const candles = gt?.data?.attributes?.ohlcv_list || [];
-    const highs = candles.map((c) => num(c[2])).filter((h) => h && h > 0);
-    return highs.length ? Math.max(...highs) : null;
-  } catch { return null; }
+  for (const tf of ["day", "hour", "minute"]) {
+    try {
+      const gt = await fetch(
+        `${GT}/networks/${network}/pools/${pool}/ohlcv/${tf}?limit=1000&currency=usd&aggregate=1`,
+        { headers: GT_HDR }
+      ).then((r) => (r.ok ? r.json() : null));
+      const candles = gt?.data?.attributes?.ohlcv_list || [];
+      const highs = candles.map((c) => num(c[2])).filter((h) => h && h > 0);
+      if (highs.length) return Math.max(...highs);
+    } catch { /* try the next timeframe */ }
+  }
+  return null;
 }
 
 // ATH is computed across the token's *top pools*, not just the deepest current
@@ -60,10 +71,15 @@ async function computeAth(network, mint, token, fallbackPool) {
       .sort((a, b) => b.liq - a.liq);
   } catch {}
   const addrs = [...new Set([...pools.slice(0, 4).map((p) => p.addr), fallbackPool].filter(Boolean))].slice(0, 4);
-  if (!addrs.length) return { athPrice: null, athMcap: null };
+  const cached = athCache.get(mint);
+  const freshCached =
+    cached && Date.now() - cached.at < 3600_000 && cached.athPrice
+      ? cached
+      : null;
+  if (!addrs.length) return freshCached ? { athPrice: freshCached.athPrice, athMcap: freshCached.athMcap } : { athPrice: null, athMcap: null };
   try {
     const highs = (await Promise.all(addrs.map((a) => poolHigh(network, a)))).filter((h) => h && h > 0);
-    if (!highs.length) return { athPrice: null, athMcap: null };
+    if (!highs.length) return freshCached ? { athPrice: freshCached.athPrice, athMcap: freshCached.athMcap } : { athPrice: null, athMcap: null };
     let athPrice = Math.max(...highs);
     const price = num(token?.priceUsd);
     // Guard against a single corrupt candle wick.
@@ -73,8 +89,16 @@ async function computeAth(network, mint, token, fallbackPool) {
     if (athPrice && supply) athMcap = athPrice * supply;
     else if (athPrice && price && token?.mcap) athMcap = (athPrice / price) * token.mcap;
     if (athMcap != null && token?.mcap) athMcap = Math.max(athMcap, token.mcap);
+    // Never store a worse ATH over a better cached one (GT can return a
+    // partial candle set on a flaky call).
+    if (freshCached && freshCached.athPrice > athPrice) {
+      return { athPrice: freshCached.athPrice, athMcap: freshCached.athMcap };
+    }
+    athCache.set(mint, { athPrice, athMcap, at: Date.now() });
     return { athPrice, athMcap };
-  } catch { return { athPrice: null, athMcap: null }; }
+  } catch {
+    return freshCached ? { athPrice: freshCached.athPrice, athMcap: freshCached.athMcap } : { athPrice: null, athMcap: null };
+  }
 }
 
 export default async function handler(req, res) {
@@ -299,11 +323,19 @@ export default async function handler(req, res) {
     let intelOut = intel?.ok ? intel : null;
     const athPromise = computeAth(
       "solana", mint, token, best?.pairAddress || token?.firstPool?.id || null
-    ).then(({ athPrice, athMcap }) => ({
-      athPrice,
-      // Fallback to OG Scan's stored ATH mcap if GeckoTerminal had no history.
-      athMcap: athMcap ?? (scanMeta?.athMcap ? num(scanMeta.athMcap) : null),
-    }));
+    ).then(({ athPrice, athMcap }) => {
+      // Stored ATH mcap is only trusted when it actually exceeds the current
+      // mcap — the stored value is the mcap from some past scan, not a
+      // running ATH, so using it blindly showed "ATH mcap = current mcap"
+      // (and ATH price "—") whenever GeckoTerminal flaked. Without a real
+      // ATH the honest value is null, not the current mcap.
+      const curMcap = num(token?.mcap);
+      const stored = scanMeta?.athMcap ? num(scanMeta.athMcap) : null;
+      return {
+        athPrice,
+        athMcap: athMcap ?? (stored != null && curMcap != null && stored > curMcap ? stored : null),
+      };
+    });
     const holdersPromise = !intelOut?.holders?.length
       ? Promise.race([
           // Backfill top holders if the intel function returned none (e.g. its

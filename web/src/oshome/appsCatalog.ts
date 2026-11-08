@@ -88,7 +88,7 @@ const RED = "#ff4d5e";
 
 export const APP_CATALOG: OsHomeApp[] = [
   { id: "dex", name: "OrbitX Terminal", blurb: "OrbitX Terminal · live market data", href: "/intel/trade", icon: ChartCandlestick, accent: GOLD, category: "trade" },
-  { id: "scanner-v2", name: "OG Scanner v2", blurb: "Live risk, bundles, dev lineage", href: "/intel/scanner-v2", icon: Crosshair, accent: GOLD, category: "intel", badge: "new" },
+  { id: "scanner-v2", name: "ORBITX SCANNER", blurb: "Live risk, bundles, dev lineage", href: "/scanner", icon: Crosshair, accent: GOLD, category: "intel", badge: "new" },
   { id: "tradeapp", name: "Trade App", blurb: "Mobile-first trading", href: "/trade", icon: ArrowLeftRight, accent: BLUE, category: "trade" },
   { id: "copy", name: "Copy Trading", blurb: "Mirror elite wallets live", href: "/copy", icon: Copy, accent: VIOLET, category: "trade" },
   { id: "kol", name: "KOL Tracker", blurb: "Key opinion leader flows", href: "/kol-tracker", icon: Telescope, accent: CYAN, category: "trade", badge: "owner" },

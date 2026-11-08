@@ -17,8 +17,10 @@ import {
 // - City is admin-only (owner email); everyone else gets the app 404.
 // - Bagwork is hidden from every menu (menu: false); its route stays live.
 // - HQ was removed outright (it was just a copy of the Social app).
-const PUBLIC_LIVE = ["dex", "trade", "shop", "supercomputer", "social", "nft", "education", "support"];
-const OWNER_ONLY = ["city", "scanner", "vamp", "koltracker", "pnltracker", "gaming"];
+// - ORBITX SCANNER went public 2026-11-08 (was admin-only): it is a live
+//   product on the /app home grid as "ORBITX SCANNER" at /scanner.
+const PUBLIC_LIVE = ["dex", "trade", "shop", "supercomputer", "social", "nft", "education", "support", "scanner"];
+const OWNER_ONLY = ["city", "vamp", "koltracker", "pnltracker", "gaming"];
 
 describe("OrbitX platform catalog", () => {
   it("lists the live platforms on /app", () => {
@@ -29,6 +31,9 @@ describe("OrbitX platform catalog", () => {
     expect(PLATFORM_APPS.find((a) => a.key === "city")?.visibility).toBe("admin");
     expect(PLATFORM_APPS.find((a) => a.key === "education")?.href).toBe("/education");
     expect(PLATFORM_APPS.find((a) => a.key === "support")?.href).toBe("/support");
+    expect(PLATFORM_APPS.find((a) => a.key === "scanner")?.name).toBe("ORBITX SCANNER");
+    expect(PLATFORM_APPS.find((a) => a.key === "scanner")?.href).toBe("/scanner");
+    expect(PLATFORM_APPS.find((a) => a.key === "scanner")?.visibility).toBeUndefined();
   });
 
   it("has no HQ entry (removed — it was a copy of Social)", () => {
