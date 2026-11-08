@@ -493,6 +493,65 @@ export async function fetchWallet(address: string): Promise<Record<string, unkno
   return getJson(`/api/ogdex/wallet?address=${encodeURIComponent(address)}`);
 }
 
+/**
+ * Dev-wallet tracking — the creator / mint-authority wallet's live position,
+ * read from the EXISTING /api/ogdex/wallet route (SOL + SPL holdings, trades,
+ * PnL window). No new endpoint. Unknown stays unknown: the route returns
+ * `sol: null` + `solUnknown: true` when the balance fetch fails — that is
+ * reported as unavailable, never rendered as 0.
+ */
+export type DevWalletIntel = {
+  /** False when the wallet route failed or returned nothing usable. */
+  available: boolean;
+  wallet: string;
+  solBalance: number | null;
+  solUnknown: boolean;
+  totalUsd: number | null;
+  tokenCount: number | null;
+  tradeCount: number | null;
+  /** Share of the scanned token the wallet currently holds, if reported. */
+  holdingPctOfToken: number | null;
+  note?: string | null;
+};
+
+export function normalizeWalletIntel(raw: unknown, wallet: string, mint?: string): DevWalletIntel | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (r.ok === false) return null;
+  const n = (v: unknown): number | null => {
+    const x = Number(v);
+    return Number.isFinite(x) ? x : null;
+  };
+  const holdings = Array.isArray(r.holdings) ? (r.holdings as Array<Record<string, unknown>>) : [];
+  let holdingPct: number | null = null;
+  if (mint) {
+    const h = holdings.find((x) => String(x.mint || "") === mint);
+    holdingPct = h ? n(h.pctSupply) : null;
+  }
+  const trades = Array.isArray(r.trades) ? r.trades.length : n(r.tradeCount);
+  return {
+    available: true,
+    wallet,
+    solBalance: n(r.sol),
+    solUnknown: r.solUnknown === true || r.sol == null,
+    totalUsd: n(r.totalUsd),
+    tokenCount: n(r.tokenCount) ?? (holdings.length ? holdings.length : null),
+    tradeCount: trades,
+    holdingPctOfToken: holdingPct,
+  };
+}
+
+/** Fail-soft: returns null when the wallet route is down — callers render
+ *  the dev-wallet section as unavailable instead of inventing activity. */
+export async function fetchWalletIntel(address: string, mint?: string): Promise<DevWalletIntel | null> {
+  try {
+    const raw = await fetchWallet(address);
+    return normalizeWalletIntel(raw, address, mint);
+  } catch {
+    return null;
+  }
+}
+
 export async function checkAntiVamp(name: string, ticker: string): Promise<AntiVampResult> {
   const res = await fetch("/api/orbitx/anti-vamp-check", {
     method: "POST",

@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import TokenScanner from "../crypto/pages/TokenScanner";
 import { OsShell } from "./layout/OsShell";
 import { OsLandingPage } from "./pages/OsLanding";
 import { OsLoginPage } from "./pages/OsLogin";
@@ -41,6 +42,8 @@ export default function OsApp() {
         <Route path="settings" element={<OsSettingsPage />} />
         <Route path="trading" element={<OsTradingPage />} />
         <Route path="scanner" element={<OsScannerPage />} />
+        <Route path="scanner-v2" element={<TokenScanner />} />
+        <Route path="scanner-v2/:mint" element={<TokenScanner />} />
         <Route path="launchpad" element={<OsLaunchpadPage />} />
         <Route path="games" element={<OsGamesPage />} />
         <Route path="predictions" element={<OsPredictionsPage />} />

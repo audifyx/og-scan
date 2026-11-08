@@ -91,6 +91,10 @@ function RedirectPreserveSearch({ to }: { to: string }) {
 const IntelLayout = lazyWithRetry(() => import("./crypto/pages/IntelLayout"));
 const IntelHome = lazyWithRetry(() => import("./crypto/pages/IntelHome"));
 const TokenScanner = lazyWithRetry(() => import("./crypto/pages/TokenScanner"));
+// ScanVault is a named export — wrap it as a default for lazy loading.
+const ScanVault = lazyWithRetry(() =>
+  import("./crypto/components/ScanVault").then((m) => ({ default: m.ScanVault })),
+);
 const TradeDesk = lazyWithRetry(() => import("./crypto/pages/TradeDesk"));
 const PortfolioDesk = lazyWithRetry(() => import("./crypto/pages/PortfolioDesk"));
 const TrendingIntel = lazyWithRetry(() => import("./crypto/pages/TrendingIntel"));
@@ -511,6 +515,9 @@ const App = () => (
               <Route index element={<Suspense fallback={<RouteFallback label="Intel" />}><IntelHome /></Suspense>} />
               <Route path="scan" element={<Suspense fallback={<RouteFallback label="Scanner" />}><TokenScanner /></Suspense>} />
               <Route path="scan/:mint" element={<Suspense fallback={<RouteFallback label="Scanner" />}><TokenScanner /></Suspense>} />
+              <Route path="scanner-v2" element={<Suspense fallback={<RouteFallback label="Scanner v2" />}><TokenScanner /></Suspense>} />
+              <Route path="scanner-v2/:mint" element={<Suspense fallback={<RouteFallback label="Scanner v2" />}><TokenScanner /></Suspense>} />
+              <Route path="vault" element={<Suspense fallback={<RouteFallback label="Scan vault" />}><ScanVault /></Suspense>} />
               <Route path="trade" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeDesk /></Suspense>} />
               <Route path="portfolio" element={<Suspense fallback={<RouteFallback label="Portfolio" />}><PortfolioDesk /></Suspense>} />
               <Route path="trending" element={<Suspense fallback={<RouteFallback label="Trending" />}><TrendingIntel /></Suspense>} />
@@ -672,6 +679,8 @@ const App = () => (
             <Route path="/dev-wallet-radar" element={<OgdexRedirect to="/ORBITX_DEX/wallet" />} />
             <Route path="/dev-wallet" element={<OgdexRedirect to="/ORBITX_DEX/wallet" />} />
             <Route path="/scanner" element={<OgdexRedirect to="/ORBITX_DEX/scanner" />} />
+            <Route path="/scanner-v2" element={<Suspense fallback={<RouteFallback label="Scanner v2" />}><TokenScanner /></Suspense>} />
+            <Route path="/scanner-v2/:mint" element={<Suspense fallback={<RouteFallback label="Scanner v2" />}><TokenScanner /></Suspense>} />
             <Route path="/og-finder" element={<OgdexRedirect to="/ORBITX_DEX/scanner" />} />
             <Route path="/orbitx-scanner" element={<OgdexRedirect to="/ORBITX_DEX/scanner" />} />
             <Route path="/ogscan-scanner" element={<OgdexRedirect to="/ORBITX_DEX/scanner" />} />

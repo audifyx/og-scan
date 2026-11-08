@@ -29,6 +29,7 @@ const LAZY = {
   "token-feed": () => import("./_token-feed.js"),
   "social": () => import("./_social.js"),
   "stats": () => import("./_stats.js"),
+  "xsocial": () => import("./_xsocial.js"),
   "telegram-mcp": () => import("./_telegram-mcp.js"),
 };
 

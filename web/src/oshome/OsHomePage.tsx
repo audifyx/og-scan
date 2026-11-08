@@ -1,11 +1,109 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { X } from "lucide-react";
+import { Crosshair, X } from "lucide-react";
 import "./oshome.css";
 import { useDeviceTheme } from "../themes/DeviceThemeProvider";
 import { LayoutSwitch, Launcher, useIsMobile, useOrderedApps } from "./layouts";
 import ThemePicker from "./ThemePicker";
 import type { OsHomeApp } from "./appsCatalog";
+import { isValidMint } from "../crypto/api/client";
+
+/**
+ * Scanner v2 quick-scan strip — prominent placement on the OS home:
+ * paste a mint, jump straight into /intel/scanner-v2. Black background,
+ * white text, gold accent — high contrast at any width, 390px included
+ * (input flexes, button never wraps below it).
+ */
+function ScannerQuickStrip() {
+  const navigate = useNavigate();
+  const [draft, setDraft] = useState("");
+  const valid = isValidMint(draft.trim());
+  return (
+    <div
+      style={{
+        flexShrink: 0,
+        display: "flex",
+        justifyContent: "center",
+        padding: "8px 12px 4px",
+        position: "relative",
+        zIndex: 2,
+      }}
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (valid) navigate(`/intel/scanner-v2/${draft.trim()}`);
+        }}
+        style={{
+          width: "100%",
+          maxWidth: 560,
+          background: "#050505",
+          border: "1px solid rgba(232, 184, 74, 0.55)",
+          borderRadius: 14,
+          padding: "8px 10px",
+          boxSizing: "border-box",
+        }}
+      >
+        <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
+          <Crosshair style={{ width: 18, height: 18, color: "#e8b84a", flexShrink: 0 }} aria-hidden />
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Scan a token — paste mint address…"
+            spellCheck={false}
+            aria-label="Token mint address to scan"
+            style={{
+              flex: 1,
+              minWidth: 0,
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              color: "#ffffff",
+              fontSize: 14,
+            }}
+          />
+          <button
+            type="submit"
+            disabled={!valid}
+            style={{
+              flexShrink: 0,
+              background: valid ? "#e8b84a" : "#3a3a3a",
+              color: valid ? "#000000" : "#9a9a9a",
+              border: "none",
+              borderRadius: 9,
+              padding: "7px 14px",
+              fontWeight: 800,
+              fontSize: 13,
+              cursor: valid ? "pointer" : "default",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Scan
+          </button>
+        </div>
+        <div style={{ marginTop: 6, fontSize: 11, color: "#d7d7d7" }}>
+          <button
+            type="button"
+            onClick={() => navigate("/intel/scanner-v2")}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              color: "#e8b84a",
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+          >
+            Open OG Scanner v2
+          </button>
+          {"  "}· live risk, bundle map, dev lineage — free, every check sourced.
+        </div>
+      </form>
+    </div>
+  );
+}
 
 /**
  * OrbitX OS Home — the `/` route.
@@ -54,6 +152,7 @@ export default function OsHomePage() {
       )}
       <div className="osh-wallpaper" aria-hidden />
       <div className="osh-stage">
+        <ScannerQuickStrip />
         <LayoutSwitch
           layout={deviceTheme.layout}
           themeId={deviceTheme.id}
