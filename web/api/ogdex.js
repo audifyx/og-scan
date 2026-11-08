@@ -43,7 +43,7 @@ import waitlist from "./ogdex/_routes/_waitlist.js";
 import mcp from "./ogdex/_routes/_mcp.js";
 import mcpLifeTick from "./ogdex/_routes/_mcp-life-tick.js";
 import mcps from "./ogdex/_routes/_mcps.js";
-import bundle from "../_bundle.js";
+import bundle from "./_bundle.js";
 import vanityMint from "./ogdex/_routes/_vanity-mint.js";
 import { createHmac, timingSafeEqual } from "crypto";
 
