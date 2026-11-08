@@ -21,15 +21,21 @@ import { SUPA_FN, ANON, kvGet, kvPut } from "./_lib.js";
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// AMM program ids — every one verified, none guessed:
-// Raydium CLMM / Orca Whirlpool / PumpSwap from live pool-account owners;
-// pump.fun + Raydium AMM v4 from multi-source docs + on-chain executable check.
+// AMM program ids — every one verified on-chain 2026-11-08 via
+// getAccountInfo (executable check + live pool-account owners). Two entries
+// were WRONG and are fixed here: Raydium AMM v4 was `...Ut1Mb` (does not
+// exist — real is `...Ut1Mp8`) and Meteora DLMM + DAMM v2 were missing
+// entirely, so their pool vaults leaked into holder lists and bundle traces
+// as if they were wallets. The DLMM program is `...BCjp4Yz...` (the often
+// quoted `...BCipNRx...` is WrongSize — it does not exist).
 export const AMM_PROGRAMS = new Set([
   "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P", // pump.fun bonding curve
   "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA", // PumpSwap
-  "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mb", // Raydium AMM v4
+  "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8", // Raydium AMM v4
   "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK", // Raydium CLMM
   "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc", // Orca Whirlpool
+  "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo", // Meteora DLMM
+  "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG", // Meteora DAMM v2
 ]);
 const SYSTEM_PROGRAM = "11111111111111111111111111111111";
 

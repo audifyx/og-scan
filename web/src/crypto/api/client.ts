@@ -71,6 +71,12 @@ export type ForensicsPayload = {
     mintRenounced?: boolean | null;
     freezeRenounced?: boolean | null;
     lpLockedPct?: number | null;
+    /** Share of LP burned (100 for migrated pump.fun tokens — LP tokens
+     *  destroyed at migration). Null when unobserved, never guessed. */
+    lpBurnedPct?: number | null;
+    /** "pumpfun-burn" when the lock/burn figures come from the Pump.fun
+     *  migration rule rather than a measured lock. */
+    lpLockedSource?: string | null;
     rugged?: boolean | null;
     riskScore?: number | null;
   };

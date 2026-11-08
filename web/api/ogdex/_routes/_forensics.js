@@ -172,6 +172,15 @@ export default async function handler(req, res) {
     const top10Pct = realHolders.length ? realHolders.slice(0, 10).reduce((s, h) => s + (h.pct || 0), 0) : null;
     const whales = realHolders.filter((h) => (h.pct || 0) >= 1).length;
 
+    // Pump.fun rule (user-confirmed 2026-11-08): a MIGRATED pump.fun token
+    // has its LP tokens BURNED at migration — nobody can pull the liquidity.
+    // The intel feed's lpLockedPct (e.g. 5.6% on ORBITX) measures the LP
+    // mint, not a lock, and understates it. For migrated pump tokens the
+    // lock is 100% by rule, and the burn is 100% by the same fact.
+    const pumpMigrated = !!pump && !!pump.complete;
+    const lpLockedPct = pumpMigrated ? 100 : (safety.lpLockedPct ?? null);
+    const lpBurnedPct = pumpMigrated ? 100 : null;
+
     return send(res, 200, {
       ok: true,
       mint,
@@ -200,7 +209,9 @@ export default async function handler(req, res) {
       safetyFlags: {
         mintRenounced: safety.mintAuthorityRenounced ?? null,
         freezeRenounced: safety.freezeAuthorityRenounced ?? null,
-        lpLockedPct: safety.lpLockedPct ?? null,
+        lpLockedPct,
+        lpBurnedPct,
+        lpLockedSource: pumpMigrated ? "pumpfun-burn" : null,
         rugged: safety.rugged ?? null,
         riskScore: safety.riskScore ?? null,
       },

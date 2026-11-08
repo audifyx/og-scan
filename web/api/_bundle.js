@@ -1202,12 +1202,85 @@ export async function fetchRugCheck(mint, opts = {}) {
     ? report.risks.slice(0, 20).map((r) => (r?.description ? `${r.name} — ${r.description}` : String(r?.name || "unnamed risk")))
     : [];
   if (report.rugged === true) warnings.unshift("RugCheck flags this token as rugged");
+
+  // ── LP + metadata + lockers (2026-11-08): the report carries the data
+  // the scanner used to show as Unknown — surface it instead of dropping it.
+  const numOrNull = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const markets = Array.isArray(report.markets) ? report.markets : [];
+  // Deepest market by USD depth (base + quote) — the pool that matters.
+  let deepest = null;
+  let deepestUsd = -1;
+  for (const m of markets) {
+    const usd = (numOrNull(m?.lp?.baseUSD) ?? 0) + (numOrNull(m?.lp?.quoteUSD) ?? 0);
+    if (usd > deepestUsd) { deepestUsd = usd; deepest = m; }
+  }
+  const lpRaw = deepest?.lp ?? null;
+  // Burned %: when the LP mint's own supply is 0, every LP token ever
+  // minted has been destroyed (Pump.fun burns at migration) — 100% burned.
+  // Otherwise the split burned-vs-locked is not in this report; null, never guessed.
+  const lpMintSupply = numOrNull(deepest?.mintLPAccount?.supply);
+  const lpTotalSupply = numOrNull(lpRaw?.lpTotalSupply);
+  const burnedPct =
+    lpMintSupply === 0 && lpTotalSupply != null && lpTotalSupply > 0 ? 100 : null;
+  // Lockers: object keyed by locker; each entry may carry an unlock
+  // timestamp under several possible field names, in seconds or ms.
+  // Take the earliest plausible unlock; null when no locker reports one.
+  const lockersRaw =
+    report.lockers && typeof report.lockers === "object" && !Array.isArray(report.lockers)
+      ? report.lockers
+      : {};
+  let earliestUnlockAt = null;
+  const scanTs = (obj, depth = 0) => {
+    if (!obj || typeof obj !== "object" || depth > 2) return;
+    for (const [k, v] of Object.entries(obj)) {
+      if (typeof v === "number" && Number.isFinite(v) && /unlock|expir/i.test(k)) {
+        const ms = v < 1e12 ? v * 1000 : v; // seconds -> ms
+        if (ms > 1e9 && (earliestUnlockAt == null || ms < earliestUnlockAt)) earliestUnlockAt = ms;
+      } else if (v && typeof v === "object") scanTs(v, depth + 1);
+    }
+  };
+  for (const entry of Object.values(lockersRaw)) scanTs(entry);
+  const tokenMetaRaw =
+    report.tokenMeta && typeof report.tokenMeta === "object" ? report.tokenMeta : null;
+
   return {
     score,
     warnings,
     reportUrl: `https://rugcheck.xyz/tokens/${mint}`,
     source: "rugcheck",
     reason: score == null ? "RugCheck returned a report with no score" : null,
+    rugged: report.rugged === true,
+    launchpad:
+      report.launchpad && typeof report.launchpad === "object"
+        ? (typeof report.launchpad.name === "string" ? report.launchpad.name : null)
+        : null,
+    tokenMeta: tokenMetaRaw
+      ? {
+          updateAuthority:
+            typeof tokenMetaRaw.updateAuthority === "string" ? tokenMetaRaw.updateAuthority : null,
+          mutable: typeof tokenMetaRaw.mutable === "boolean" ? tokenMetaRaw.mutable : null,
+          name: typeof tokenMetaRaw.name === "string" ? tokenMetaRaw.name : null,
+          symbol: typeof tokenMetaRaw.symbol === "string" ? tokenMetaRaw.symbol : null,
+        }
+      : null,
+    lp: lpRaw
+      ? {
+          marketType: typeof deepest?.marketType === "string" ? deepest.marketType : null,
+          poolAddress: typeof deepest?.pubkey === "string" ? deepest.pubkey : null,
+          lpMint: typeof lpRaw.lpMint === "string" ? lpRaw.lpMint : null,
+          lpLockedPct: numOrNull(lpRaw.lpLockedPct),
+          lpLockedUsd: numOrNull(lpRaw.lpLockedUSD),
+          lpUnlocked: numOrNull(lpRaw.lpUnlocked),
+          lpTotalSupply,
+          lpCurrentSupply: numOrNull(lpRaw.lpCurrentSupply),
+          burnedPct,
+        }
+      : null,
+    lockers: {
+      count: Object.keys(lockersRaw).length,
+      earliestUnlockAt,
+      scanStatus: typeof report.lockerScanStatus === "string" ? report.lockerScanStatus : null,
+    },
   };
 }
 

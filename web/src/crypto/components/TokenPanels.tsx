@@ -40,6 +40,7 @@ import { ShareToX } from "./ShareToX";
 import {
   bundleDecayFromSnapshots,
   diffAuthorities,
+  getPriorHoneypotSnapshot,
   getPriorSnapshot,
   honeypotFlipFromSnapshots,
   loadVault,
@@ -1783,12 +1784,14 @@ export function LiquidityHealthPanel({
   dexPairs,
   safety,
   liquidityHealth,
+  rugCheck,
 }: {
   token: TokenPayload | null;
   forensics: ForensicsPayload | null;
   dexPairs: DexPair[] | null;
   safety: SafetyPayload | null;
   liquidityHealth?: unknown;
+  rugCheck?: RugCheck | null;
 }) {
   const deepest = (dexPairs ?? []).reduce<DexPair | null>(
     (best, p) => ((p.liquidityUsd ?? 0) > (best?.liquidityUsd ?? 0) ? p : best),
@@ -1797,6 +1800,17 @@ export function LiquidityHealthPanel({
   const depth = deepest?.liquidityUsd ?? Number(token?.liquidityUsd ?? token?.liquidity ?? NaN);
   const locked = forensics?.safetyFlags?.lpLockedPct ?? null;
   const rugged = forensics?.safetyFlags?.rugged ?? null;
+  const lpSource = forensics?.safetyFlags?.lpLockedSource ?? null;
+  // Burned %: forensics (Pump.fun rule) first, then the RugCheck report
+  // (LP mint supply 0 = every LP token destroyed). Never guessed.
+  const burnedPct =
+    forensics?.safetyFlags?.lpBurnedPct ?? rugCheck?.lp?.burnedPct ?? null;
+  // Lock expiry: earliest locker unlock from the RugCheck report.
+  const lockers = rugCheck?.lockers ?? null;
+  const lockExpiryAt =
+    lockers?.earliestUnlockAt != null && Number.isFinite(lockers.earliestUnlockAt)
+      ? lockers.earliestUnlockAt
+      : null;
   // Team A verdict, rendered VERBATIM when present.
   const teamVerdict = asStr(asObj(liquidityHealth)?.verdict ?? asObj(liquidityHealth)?.canDevPullIt);
   const mintRenounced = forensics?.safetyFlags?.mintRenounced ?? null;
@@ -1804,25 +1818,59 @@ export function LiquidityHealthPanel({
   const derivedVerdict =
     rugged === true
       ? "Rugged — LP was removed."
-      : locked != null && locked >= 90
-        ? "LP mostly locked — the dev cannot pull most of the liquidity."
-        : locked != null && locked > 0
-          ? "LP partly locked — the dev can still pull the unlocked share."
-          : locked === 0
-            ? "LP not locked — the dev can pull the liquidity."
-            : "LP lock state unknown — do not assume the liquidity is safe.";
+      : burnedPct === 100
+        ? "No — LP burned. Nobody can pull the liquidity."
+        : locked != null && locked >= 90
+          ? "LP mostly locked — the dev cannot pull most of the liquidity."
+          : locked != null && locked > 0
+            ? "LP partly locked — the dev can still pull the unlocked share."
+            : locked === 0
+              ? "LP not locked — the dev can pull the liquidity."
+              : "LP lock state unknown — do not assume the liquidity is safe.";
   return (
     <div>
       <CheckRow label="Liquidity depth" value={Number.isFinite(depth) ? fmtUsd(depth) : "Unknown"} hint={deepest ? `Deepest pair: ${deepest.dexId ?? "unknown DEX"}.` : "No pair reported liquidity."} />
       {healthBar(locked, "LP locked")}
-      <CheckRow label="LP burned" value="Unknown" state="unknown" badge="Unknown" hint="No burn figure is returned by the intel feed — burn % is not guessed." />
-      <CheckRow label="Lock expiry" value="Unknown" state="unknown" badge="Unknown" hint="No lock expiry timestamp is returned — the lock could be short-lived." />
+      <CheckRow
+        label="LP burned"
+        value={burnedPct != null ? `${Math.round(burnedPct)}%` : "Unknown"}
+        state={burnedPct === 100 ? "pass" : burnedPct != null && burnedPct >= 90 ? "pass" : burnedPct != null ? "warn" : "unknown"}
+        badge={burnedPct === 100 ? "Burned" : burnedPct != null ? "Partly" : "Unknown"}
+        hint={
+          burnedPct === 100
+            ? lpSource === "pumpfun-burn"
+              ? "LP tokens destroyed at Pump.fun migration — nobody can pull the liquidity."
+              : "RugCheck: the LP mint's supply is 0 — every LP token ever minted has been destroyed."
+            : "No burn figure is returned — burn % is not guessed."
+        }
+      />
+      <CheckRow
+        label="Lock expiry"
+        value={
+          burnedPct === 100
+            ? "No lock — LP burned"
+            : lockExpiryAt != null
+              ? new Date(lockExpiryAt).toLocaleString()
+              : "Unknown"
+        }
+        state={burnedPct === 100 ? "pass" : lockExpiryAt != null ? "warn" : "unknown"}
+        badge={burnedPct === 100 ? "Burned" : lockExpiryAt != null ? "Unlocks" : "Unknown"}
+        hint={
+          burnedPct === 100
+            ? "Nothing is locked because the LP was burned — there is no lock to expire."
+            : lockExpiryAt != null
+              ? "Earliest locker unlock from the RugCheck report — after this date that lock can be withdrawn."
+              : lockers != null && lockers.count > 0
+                ? "Lockers were found but none reported an unlock date."
+                : "No locker found in the RugCheck report — lock expiry unknown."
+        }
+      />
       <CheckRow
         label="Can the dev pull it?"
-        value={teamVerdict ?? derivedVerdict}
-        state={rugged === true ? "fail" : locked != null && locked >= 90 ? "pass" : locked != null && locked > 0 ? "warn" : "unknown"}
-        badge={rugged === true ? "Yes — rugged" : locked != null && locked >= 90 ? "Mostly no" : locked != null && locked > 0 ? "Partly" : "Unknown"}
-        hint={teamVerdict ? "Verdict verbatim from the liquidity-health feed (Team A)." : "Derived from LP lock % and authority state — no lock expiry observed."}
+        value={burnedPct === 100 ? "No — LP burned." : teamVerdict ?? derivedVerdict}
+        state={burnedPct === 100 ? "pass" : rugged === true ? "fail" : locked != null && locked >= 90 ? "pass" : locked != null && locked > 0 ? "warn" : "unknown"}
+        badge={burnedPct === 100 ? "Safe" : rugged === true ? "Yes — rugged" : locked != null && locked >= 90 ? "Mostly no" : locked != null && locked > 0 ? "Partly" : "Unknown"}
+        hint={burnedPct === 100 ? "Pump.fun migration burned the LP — nobody can pull it." : teamVerdict ? "Verdict verbatim from the liquidity-health feed (Team A)." : "Derived from LP lock % and authority state — no lock expiry observed."}
       />
       <CheckRow label="Mint authority" value={mintRenounced == null ? "Unknown" : mintRenounced ? "Renounced" : "Live"} hint={mintRenounced === false ? "A live mint authority can inflate supply." : undefined} />
       <CheckRow label="Freeze authority" value={freezeRenounced == null ? "Unknown" : freezeRenounced ? "Renounced" : "Live"} hint={freezeRenounced === false ? "A live freeze authority can freeze holder wallets." : undefined} />
@@ -2669,9 +2717,17 @@ export function metadataUpdateAuthority(token: TokenPayload | null): string | nu
   return null;
 }
 
-export function MetadataAuditPanel({ token }: { token: TokenPayload | null }) {
+export function MetadataAuditPanel({ token, rugCheck }: { token: TokenPayload | null; rugCheck?: RugCheck | null }) {
   if (!token) return <Unavailable what="Metadata audit" reason="No token data returned for this mint." />;
-  const updateAuthority = metadataUpdateAuthority(token);
+  // RugCheck's tokenMeta carries the update authority + mutability directly;
+  // the token payload never had it, which is why this row read Unknown.
+  const rcMeta = rugCheck?.tokenMeta ?? null;
+  const updateAuthority = metadataUpdateAuthority(token) ?? rcMeta?.updateAuthority ?? null;
+  const mutable = rcMeta?.mutable ?? null;
+  const BURN_ADDRESS = "11111111111111111111111111111111";
+  // Immutable when RugCheck says so, or when the authority is the burn
+  // address — nobody holds that key, so the metadata cannot change.
+  const immutable = mutable === false || updateAuthority === BURN_ADDRESS;
   const rows: Array<{ label: string; value: string; ok: boolean | null }> = [
     { label: "Name", value: token.name ?? "Missing", ok: token.name ? true : false },
     { label: "Symbol", value: token.symbol ?? "Missing", ok: token.symbol ? true : false },
@@ -2694,12 +2750,14 @@ export function MetadataAuditPanel({ token }: { token: TokenPayload | null }) {
       <CheckRow
         label="Metadata update authority"
         value={updateAuthority ? <span className="oxc-mono">{short(updateAuthority)}</span> : "Not observed"}
-        state={updateAuthority ? "warn" : "unknown"}
-        badge={updateAuthority ? "Mutable" : "Unknown"}
+        state={immutable ? "pass" : updateAuthority ? "warn" : "unknown"}
+        badge={immutable ? "Immutable" : updateAuthority ? "Mutable" : "Unknown"}
         hint={
-          updateAuthority
-            ? "This address can change the name, symbol and image — metadata is mutable while it holds that power. No feed confirms whether it is the deployer."
-            : "Update authority not observed — no metadata account is read in this stack, so mutability cannot be confirmed."
+          immutable
+            ? "Metadata cannot be changed — the update authority is the burn address, or RugCheck reports the metadata as immutable."
+            : updateAuthority
+              ? "This address can change the name, symbol and image — metadata is mutable while it holds that power. No feed confirms whether it is the deployer."
+              : "Update authority not observed — no metadata account is read in this stack, so mutability cannot be confirmed."
         }
       />
       <p className="oxc-muted" style={{ fontSize: "0.72rem", marginTop: "0.5rem" }}>
@@ -2711,24 +2769,36 @@ export function MetadataAuditPanel({ token }: { token: TokenPayload | null }) {
 }
 
 // ── B4 · Holder overlap (Team C taste graph) ──────────────────────────────
-export function HolderOverlapPanel({ token, holderOverlap, holderOverlapLoading }: { token: TokenPayload | null; holderOverlap?: HolderOverlapEntry[] | null; holderOverlapLoading?: boolean }) {
+export function HolderOverlapPanel({ token, holderOverlap, holderOverlapLoading, walletAges, mcapUsd }: { token: TokenPayload | null; holderOverlap?: HolderOverlapEntry[] | null; holderOverlapLoading?: boolean; walletAges?: WalletAge[] | null; mcapUsd?: number | null }) {
   const holders = token?.holders ?? [];
   const wallets: OverlapWallet[] | null =
     holderOverlap == null
       ? null
-      : holderOverlap.map((e) => ({
-          address: e.wallet,
-          supplyPct: holders.find((h) => h.owner === e.wallet)?.pct ?? null,
-          holdings:
-            e.otherHoldings == null
-              ? null
-              : e.otherHoldings.map((h) => ({
-                  mint: h.mint,
-                  symbol: h.symbol ?? null,
-                  valueUsd: null,
-                  pctOfWallet: h.pctOfWallet ?? null,
-                })),
-        }));
+      : holderOverlap.map((e) => {
+          const supplyPct = holders.find((h) => h.owner === e.wallet)?.pct ?? null;
+          const age = (walletAges ?? []).find((a) => a.wallet === e.wallet)?.ageDays ?? null;
+          return {
+            address: e.wallet,
+            supplyPct,
+            // Value of this wallet's holding of the scanned token:
+            // supply % x market cap. The overlap feed itself returns no
+            // USD values, so this is the honest value the graph can show.
+            usdValue:
+              supplyPct != null && mcapUsd != null && Number.isFinite(mcapUsd)
+                ? (supplyPct / 100) * mcapUsd
+                : null,
+            ageDays: age,
+            holdings:
+              e.otherHoldings == null
+                ? null
+                : e.otherHoldings.map((h) => ({
+                    mint: h.mint,
+                    symbol: h.symbol ?? null,
+                    valueUsd: null,
+                    pctOfWallet: h.pctOfWallet ?? null,
+                  })),
+          };
+        });
   return (
     <div>
       <HolderOverlapGraph
@@ -3383,13 +3453,19 @@ export function CrossScanComparePanel({
 /** ── W5 · Pool program + address verification ────────────────────────── */
 
 /** Known Solana pool programs — canonical program addresses only. Anything
- *  not in this map renders "Unknown", never guessed. */
+ *  not in this map renders "Unknown", never guessed. Every address verified
+ *  on-chain 2026-11-08 (executable check + live pool-account owners).
+ *  Two entries were WRONG and are fixed here: Raydium CLMM was
+ *  `...yl8w...XxZ` (invalid) and pump.fun was `...MJ9Jv` (WrongSize).
+ *  Meteora DLMM + DAMM v2 and PumpSwap were missing entirely. */
 export const KNOWN_POOL_PROGRAMS: Record<string, string> = {
   "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8": "Raydium AMM v4",
-  CPMMoo8L3F4NbTegBCKVNtunBZhdEz3iMR5FfC5x6fM2y: "Raydium CPMM",
-  CAMMCzo5yl8w4VFF8KVHrK22GGUQ3W5Nfqg8QYqjvXxZ: "Raydium CLMM",
-  "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uMJ9Jv": "pump.fun",
+  CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK: "Raydium CLMM",
+  "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P": "pump.fun",
+  pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA: "PumpSwap",
   whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc: "Orca Whirlpool",
+  LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo: "Meteora DLMM",
+  cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG: "Meteora DAMM v2",
 };
 
 export function verifyPoolProgram(poolProgram: string | null | undefined): {
@@ -3469,11 +3545,13 @@ export function PoolVerificationPanel({
     dexId === "raydium" ? "Raydium" : dexId === "pumpfun" ? "pump.fun" : dexId === "orca" ? "Orca" : null;
   const programFamily = verified.programName?.startsWith("Raydium")
     ? "Raydium"
-    : verified.programName === "pump.fun"
+    : verified.programName === "pump.fun" || verified.programName === "PumpSwap"
       ? "pump.fun"
       : verified.programName?.startsWith("Orca")
         ? "Orca"
-        : null;
+        : verified.programName?.startsWith("Meteora")
+          ? "Meteora"
+          : null;
   const disagree = dexFamily != null && programFamily != null && dexFamily !== programFamily;
   return (
     <div>
@@ -3850,7 +3928,12 @@ export function RugCheckPanel({ rugCheck, safety, mint }: { rugCheck?: unknown; 
       : safety?.canSell === true
         ? false
         : null;
-  const prior = mint ? getPriorSnapshot(mint) : null;
+  // Prior honeypot observation: the newest snapshot BEFORE the current one
+  // that actually recorded a honeypot state. Plain getPriorSnapshot often
+  // returns the same scan's early snapshot (recorded before safety
+  // resolved, honeypot null) — that is why flips always read "no prior
+  // honeypot state" even after several scans.
+  const prior = mint ? getPriorHoneypotSnapshot(mint) : null;
   const flip = honeypotFlipFromSnapshots(honeypotNow, prior);
   const flipNode =
     flip == null ? (
@@ -3900,6 +3983,15 @@ export function RugCheckPanel({ rugCheck, safety, mint }: { rugCheck?: unknown; 
       </div>
     );
   }
+  const rcLaunchpad = asStr(rc.launchpad);
+  const rcLp = asObj(rc.lp);
+  const rcLpLockedPct = asNum(rcLp?.lpLockedPct);
+  const rcLpLockedUsd = asNum(rcLp?.lpLockedUsd);
+  const rcLpBurnedPct = asNum(rcLp?.burnedPct);
+  const rcLockers = asObj(rc.lockers);
+  const rcLockersCount = asNum(rcLockers?.count);
+  const rcTokenMeta = asObj(rc.tokenMeta);
+  const rcMutable = typeof rcTokenMeta?.mutable === "boolean" ? rcTokenMeta.mutable : null;
   return (
     <div>
       <CheckRow label="RugCheck score" value={`${score}`} state={score >= 70 ? "fail" : score >= 40 ? "warn" : "pass"} badge={score >= 70 ? "High risk" : score >= 40 ? "Medium" : "Low"} />
@@ -3912,6 +4004,19 @@ export function RugCheckPanel({ rugCheck, safety, mint }: { rugCheck?: unknown; 
       ) : (
         <p className="oxc-muted" style={{ fontSize: "0.8rem" }}>No warnings returned.</p>
       )}
+      {rcLaunchpad ? <CheckRow label="Launchpad" value={rcLaunchpad} /> : null}
+      {rcLp ? (
+        <CheckRow
+          label="Deepest pool (RugCheck)"
+          value={`${asStr(rcLp.marketType) ?? "Unknown market"} — ${rcLpLockedPct != null ? `${Math.round(rcLpLockedPct)}% locked` : "lock % unknown"}${rcLpBurnedPct === 100 ? " · 100% burned" : ""}${rcLpLockedUsd != null ? ` · ${fmtUsd(rcLpLockedUsd)} locked` : ""}`}
+        />
+      ) : null}
+      {rcLockersCount != null && rcLockersCount > 0 ? (
+        <CheckRow label="LP lockers" value={`${rcLockersCount} locker${rcLockersCount === 1 ? "" : "s"} found`} hint="Unlock dates are shown on the Liquidity panel when a locker reports one." />
+      ) : null}
+      {rcMutable != null ? (
+        <CheckRow label="Metadata mutable" value={rcMutable ? "Yes" : "No"} state={rcMutable ? "warn" : "pass"} badge={rcMutable ? "Mutable" : "Immutable"} />
+      ) : null}
       {reportUrl ? (
         <p style={{ marginTop: "0.5rem" }}>
           <a href={reportUrl} target="_blank" rel="noreferrer">Full RugCheck report</a>

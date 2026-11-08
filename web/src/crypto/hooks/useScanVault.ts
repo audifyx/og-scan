@@ -197,6 +197,19 @@ export function getPriorSnapshot(mint: string): ScanSnapshot | null {
   return getSnapshotHistory(mint)[1] ?? null;
 }
 
+/** Newest snapshot BEFORE the newest that actually recorded a honeypot
+ *  state. Scans record twice (once before the safety check resolves, once
+ *  after), so the plain prior is often the same scan's early snapshot with
+ *  honeypot null — flips then always read "no prior honeypot state" even
+ *  after many scans. This skips those empty observations. */
+export function getPriorHoneypotSnapshot(mint: string): ScanSnapshot | null {
+  const history = getSnapshotHistory(mint);
+  for (let i = 1; i < history.length; i++) {
+    if (history[i].honeypot != null) return history[i];
+  }
+  return null;
+}
+
 export type AuthorityDiff = {
   field: "Mint authority" | "Freeze authority";
   from: string;

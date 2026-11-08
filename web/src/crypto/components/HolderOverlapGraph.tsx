@@ -45,6 +45,11 @@ export interface OverlapWallet {
   address: string;
   /** Share of the scanned token's supply held; null = unknown. */
   supplyPct: number | null;
+  /** USD value of this wallet's holding of the scanned token
+   *  (supplyPct x market cap); null = unknown. */
+  usdValue?: number | null;
+  /** Wallet age in days from the wallet-ages feed; null = unknown. */
+  ageDays?: number | null;
   /** Funding source when observed; null = unknown. */
   fundingSource?: string | null;
   /**
@@ -366,7 +371,9 @@ export const HolderOverlapGraph: React.FC<HolderOverlapGraphProps> = ({
                 {unknown
                   ? "holdings unknown"
                   : w.supplyPct != null
-                    ? fmtPct(w.supplyPct)
+                    ? w.usdValue != null
+                      ? `${fmtPct(w.supplyPct)} · ${fmtUsd(w.usdValue)}`
+                      : fmtPct(w.supplyPct)
                     : `holds ${w.holdings!.length} token${w.holdings!.length === 1 ? "" : "s"}`}
               </text>
             </g>
@@ -479,6 +486,15 @@ export const HolderOverlapGraph: React.FC<HolderOverlapGraphProps> = ({
           <p className="text-xs font-bold text-white">
             <span className="font-mono">{shortAddr(selectedWallet.address)}</span> — {fmtPct(selectedWallet.supplyPct)} of supply
           </p>
+          {selectedWallet.usdValue != null || selectedWallet.ageDays != null ? (
+            <p className="mt-0.5 text-[11px] text-white/70">
+              {selectedWallet.usdValue != null ? `Holding ≈ ${fmtUsd(selectedWallet.usdValue)} of this token` : ""}
+              {selectedWallet.usdValue != null && selectedWallet.ageDays != null ? " · " : ""}
+              {selectedWallet.ageDays != null
+                ? `Wallet age ${selectedWallet.ageDays >= 365 ? `${(selectedWallet.ageDays / 365).toFixed(1)}y` : `${Math.round(selectedWallet.ageDays)}d`}`
+                : ""}
+            </p>
+          ) : null}
           <p className="mt-0.5 text-[11px] text-white/70">
             Funding source:{" "}
             {selectedWallet.fundingSource ? (

@@ -209,7 +209,22 @@ function ScanSheet({ mint, intel, teamA }: { mint: string; intel: ReturnType<typ
   const og = intel.ogScore?.score ?? null;
   const ogLabel = intel.ogScore?.label ?? null;
 
-  const holders = (intel.token?.holders ?? []).filter((h) => h.owner);
+  // Top holder EXCLUDES liquidity-pool vaults: the pool is the largest
+  // "holder" by raw largest-accounts (38.3% on ORBITX) but it is not a
+  // holder — counting it here (and in bundles) inflated both numbers.
+  // Pool owners come from the forensics concentration pools; isPool flags
+  // are honoured too when the token payload carries them.
+  const poolOwners = new Set(
+    (intel.forensics?.concentration?.pools ?? [])
+      .map((p) => p.owner)
+      .filter((o): o is string => typeof o === "string" && o.length > 0),
+  );
+  const holders = (intel.token?.holders ?? []).filter(
+    (h) =>
+      h.owner &&
+      !poolOwners.has(h.owner) &&
+      (h as { isPool?: unknown }).isPool !== true,
+  );
   const topPct = holders.length ? Math.max(...holders.map((h) => Number(h.pct ?? 0) || 0)) : null;
   const holderCount =
     intel.token?.holderCount ?? intel.forensics?.concentration?.totalHolders ?? (holders.length > 0 ? holders.length : null);
@@ -793,7 +808,7 @@ export default function TokenScanner() {
 
               <div className="oxc-grid oxc-grid-2">
                 <Section title="Liquidity health">
-                  <LiquidityHealthPanel token={intel.token} forensics={intel.forensics} dexPairs={intel.dexPairs} safety={intel.safety} />
+                  <LiquidityHealthPanel token={intel.token} forensics={intel.forensics} dexPairs={intel.dexPairs} safety={intel.safety} rugCheck={intel.rugCheck} />
                 </Section>
                 <Section title="RugCheck">
                   <RugCheckPanel rugCheck={rugCheck} safety={intel.safety} mint={intel.mint} />
@@ -833,10 +848,10 @@ export default function TokenScanner() {
 
               <div className="oxc-grid oxc-grid-2">
                 <Section title="Metadata audit">
-                  <MetadataAuditPanel token={intel.token} />
+                  <MetadataAuditPanel token={intel.token} rugCheck={intel.rugCheck} />
                 </Section>
                 <Section title="Holder overlap — taste graph">
-                  <HolderOverlapPanel token={intel.token} holderOverlap={intel.holderOverlap} holderOverlapLoading={intel.holderOverlapLoading} />
+                  <HolderOverlapPanel token={intel.token} holderOverlap={intel.holderOverlap} holderOverlapLoading={intel.holderOverlapLoading} walletAges={intel.walletAges} mcapUsd={Number.isFinite(mcap) ? mcap : null} />
                 </Section>
               </div>
 

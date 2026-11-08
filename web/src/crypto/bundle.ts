@@ -352,6 +352,33 @@ export interface RugCheck {
   reportUrl: string;
   source: "rugcheck";
   reason: string | null;
+  rugged?: boolean | null;
+  launchpad?: string | null;
+  tokenMeta?: {
+    updateAuthority: string | null;
+    mutable: boolean | null;
+    name: string | null;
+    symbol: string | null;
+  } | null;
+  lp?: {
+    marketType: string | null;
+    poolAddress: string | null;
+    lpMint: string | null;
+    lpLockedPct: number | null;
+    lpLockedUsd: number | null;
+    lpUnlocked: number | null;
+    lpTotalSupply: number | null;
+    lpCurrentSupply: number | null;
+    /** 100 when the LP mint's own supply is 0 (every LP token destroyed);
+     *  null when the burn split is not observable — never guessed. */
+    burnedPct: number | null;
+  } | null;
+  lockers?: {
+    count: number;
+    /** Earliest locker unlock, ms epoch; null when no locker reports one. */
+    earliestUnlockAt: number | null;
+    scanStatus: string | null;
+  } | null;
 }
 
 export interface Token2022Extension {
