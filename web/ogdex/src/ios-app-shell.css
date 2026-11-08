@@ -399,3 +399,12 @@
     padding: 0 14px;
   }
 }
+/* Phone header: the desktop search trigger is hidden by Tailwind (hidden
+ * md:flex) — do not let the actions row push the bar past the viewport.
+ * Brand tagline + redundant search/star buttons go; logo + name stay. */
+@media (max-width: 767px) {
+  .unified-header__top { gap: 10px; padding: 10px 12px; }
+  .unified-header__tag { display: none; }
+  .unified-header__actions .unified-header__iconbtn[title="Search"] { display: none; }
+  .unified-header__actions .unified-header__iconbtn--star { display: none; }
+}

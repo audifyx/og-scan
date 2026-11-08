@@ -577,7 +577,6 @@ td, .tabular { font-variant-numeric: tabular-nums; }
   color: var(--ox-text-dim);
 }
 .dex-search-trigger {
-  display: inline-flex;
   align-items: center;
   gap: 8px;
   border-radius: 12px;
