@@ -35,6 +35,8 @@ export interface OverlapHolding {
   valueUsd?: number | null;
   /** Share of that token's supply held, when known. */
   supplyPct?: number | null;
+  /** Share of the holding wallet's portfolio, when the feed returns it. */
+  pctOfWallet?: number | null;
 }
 
 /** One top holder of the scanned token, with what else it holds. */
@@ -271,10 +273,15 @@ export const HolderOverlapGraph: React.FC<HolderOverlapGraphProps> = ({
               const wi = shownWallets.indexOf(w);
               const hot = edgeHot(w.address, h.mint);
               const dim = edgeDim(w.address, h.mint);
+              // Edges are the whole point of the graph, and the feed returns
+              // no USD values (and usually no pctOfWallet), so a value-scaled
+              // 1.25px hairline at 0.55 alpha read as "nothing showing" on
+              // phones. Uniform, clearly visible gold lines; pctOfWallet
+              // only thickens them when the feed actually returns it.
               const width =
-                h.valueUsd != null && h.valueUsd > 0
-                  ? Math.max(1, Math.min(4, 1 + Math.log10(h.valueUsd + 1) / 2))
-                  : 1.25;
+                h.pctOfWallet != null && Number.isFinite(h.pctOfWallet)
+                  ? Math.max(2, Math.min(4.5, 2 + h.pctOfWallet / 8))
+                  : 2.5;
               return (
                 <line
                   key={`${w.address}-${h.mint}`}
@@ -282,8 +289,8 @@ export const HolderOverlapGraph: React.FC<HolderOverlapGraphProps> = ({
                   y1={walletY(wi)}
                   x2={TOKEN_X}
                   y2={tokenY(ti)}
-                  stroke={hot ? GOLD : "rgba(232,184,74,0.55)"}
-                  strokeWidth={hot ? width + 1 : width}
+                  stroke={GOLD}
+                  strokeWidth={hot ? width + 1.5 : width}
                   opacity={dim ? 0.15 : 0.9}
                 >
                   <title>
@@ -356,7 +363,11 @@ export const HolderOverlapGraph: React.FC<HolderOverlapGraphProps> = ({
                 fill={unknown ? GOLD : "rgba(255,255,255,0.45)"}
                 style={{ paintOrder: "stroke", stroke: "#0b0b10", strokeWidth: 3 }}
               >
-                {unknown ? "holdings unknown" : fmtPct(w.supplyPct)}
+                {unknown
+                  ? "holdings unknown"
+                  : w.supplyPct != null
+                    ? fmtPct(w.supplyPct)
+                    : `holds ${w.holdings!.length} token${w.holdings!.length === 1 ? "" : "s"}`}
               </text>
             </g>
           );
@@ -494,7 +505,11 @@ export const HolderOverlapGraph: React.FC<HolderOverlapGraphProps> = ({
                     {h.name ? <span className="text-white/50"> · {h.name}</span> : null}
                   </span>
                   <span className="shrink-0 text-white/60">
-                    {fmtUsd(h.valueUsd)}
+                    {h.valueUsd != null
+                      ? fmtUsd(h.valueUsd)
+                      : h.pctOfWallet != null
+                        ? `${h.pctOfWallet.toFixed(1)}% of wallet`
+                        : ""}
                     {h.supplyPct != null ? ` · ${h.supplyPct.toFixed(1)}%` : ""}
                   </span>
                 </li>
@@ -510,17 +525,23 @@ export const HolderOverlapGraph: React.FC<HolderOverlapGraphProps> = ({
           </p>
           <p className="mt-0.5 text-[11px] text-white/70">
             Held by {selectedToken.holderCount} of the shown wallets
-            {selectedToken.totalValueUsd != null ? ` · ${fmtUsd(selectedToken.totalValueUsd)} combined` : " · combined value unknown"}.
+            {selectedToken.totalValueUsd != null ? ` · ${fmtUsd(selectedToken.totalValueUsd)} combined` : ""}.
           </p>
           <ul className="mt-2 space-y-1">
             {selectedToken.holders.map((w) => {
               const h = (w.holdings ?? []).find((x) => x.mint === selectedToken.mint);
+              const value =
+                h?.valueUsd != null
+                  ? fmtUsd(h.valueUsd)
+                  : h?.pctOfWallet != null
+                    ? `${h.pctOfWallet.toFixed(1)}% of wallet`
+                    : "";
               return (
                 <li key={w.address} className="flex justify-between gap-2 text-[11px]">
                   <span className="font-mono text-white/80" title={w.address}>
                     {shortAddr(w.address)}
                   </span>
-                  <span className="text-white/60">{fmtUsd(h?.valueUsd)}</span>
+                  {value ? <span className="text-white/60">{value}</span> : null}
                 </li>
               );
             })}

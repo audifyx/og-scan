@@ -2722,7 +2722,12 @@ export function HolderOverlapPanel({ token, holderOverlap, holderOverlapLoading 
           holdings:
             e.otherHoldings == null
               ? null
-              : e.otherHoldings.map((h) => ({ mint: h.mint, symbol: h.symbol ?? null, valueUsd: null })),
+              : e.otherHoldings.map((h) => ({
+                  mint: h.mint,
+                  symbol: h.symbol ?? null,
+                  valueUsd: null,
+                  pctOfWallet: h.pctOfWallet ?? null,
+                })),
         }));
   return (
     <div>
