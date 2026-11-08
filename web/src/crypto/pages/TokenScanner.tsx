@@ -107,17 +107,17 @@ type TeamAIntel = {
 };
 
 /** Chart-first: DexScreener chart at the top of the scan, same embed as the trade token page. */
-function ScannerChart({ mint }: { mint: string }) {
+function ScannerChart({ mint, interval = "15" }: { mint: string; interval?: string }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     setReady(false);
-  }, [mint]);
+  }, [mint, interval]);
   return (
-    <div className="oxc-panel relative overflow-hidden" style={{ ...termPanel, height: 360, padding: 0 }}>
+    <div className="oxc-panel relative overflow-hidden" style={{ ...termPanel, height: 300, padding: 0 }}>
       {!ready && <p className="oxc-empty oxc-pulse" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>Loading chart…</p>}
       <iframe
         title="DexScreener chart"
-        src={dexChartUrl(mint)}
+        src={dexChartUrl(mint, interval)}
         style={{ width: "100%", height: "100%", border: 0 }}
         allow="clipboard-write"
         onLoad={() => setReady(true)}
@@ -186,10 +186,12 @@ function CompareView({ mintA, compareMints }: { mintA: string; compareMints: str
   );
 }
 
-/** Verdict strip — the answer above the fold: the 7 numbers that decide
- *  "is this a rug" in one row, so a scan never needs a scroll to judge.
- *  Unknowns stay Unknown — never a fake zero. */
-function VerdictStrip({ intel }: { intel: ReturnType<typeof useTokenIntel> }) {
+/** Pro-sheet redesign (2026-11-08, user-picked from the bottom-sheet
+ *  concept): chart-first card with a gold OG badge, then a bottom-sheet
+ *  verdict card — six pills, holders, dev, live tape, Buy/Sell. Every
+ *  number comes from the live intel pass; unknowns stay Unknown. */
+function ScanSheet({ mint, intel, teamA }: { mint: string; intel: ReturnType<typeof useTokenIntel>; teamA: TeamAIntel }) {
+  const [interval, setInterval] = useState("15");
   const flags = intel.forensics?.safetyFlags;
   const bundled = intel.bundle?.bundledSupplyPct ?? null;
   const lpLocked = flags?.lpLockedPct ?? null;
@@ -199,59 +201,181 @@ function VerdictStrip({ intel }: { intel: ReturnType<typeof useTokenIntel> }) {
       : intel.safety?.canSell === true
         ? false
         : null;
+  const symbol = (intel.token?.symbol as string) || (intel.token?.name as string) || "Token";
+  const price = Number(intel.token?.priceUsd ?? intel.token?.price ?? NaN);
+  const mcap = Number(intel.token?.marketCap ?? intel.token?.mcap ?? NaN);
+  const chg = Number((intel.token as unknown as { change24h?: unknown } | null)?.change24h ?? NaN);
+  const og = intel.ogScore?.score ?? null;
+  const ogLabel = intel.ogScore?.label ?? null;
+
+  const holders = (intel.token?.holders ?? []).filter((h) => h.owner);
+  const topPct = holders.length ? Math.max(...holders.map((h) => Number(h.pct ?? 0) || 0)) : null;
+  const holderCount =
+    intel.token?.holderCount ?? intel.forensics?.concentration?.totalHolders ?? (holders.length > 0 ? holders.length : null);
+  const dev =
+    (intel.forensics?.dev?.wallet as string | undefined) ??
+    (intel.devWallet?.wallet as string | undefined) ??
+    null;
+
+  // Live tape, same defensive shape as TradeTapePanel's parser — first 2 rows only.
+  const tape = useMemo(() => {
+    const v: unknown = teamA.tradeTape;
+    let arr: unknown[] = [];
+    if (Array.isArray(v)) arr = v;
+    else if (v && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      for (const k of ["trades", "events", "tape"]) if (Array.isArray(o[k])) { arr = o[k] as unknown[]; break; }
+    }
+    return arr.slice(0, 2).map((item) => {
+      const o = (item && typeof item === "object" ? (item as Record<string, unknown>) : {}) as Record<string, unknown>;
+      const num = (x: unknown) => { const n = Number(x); return Number.isFinite(n) ? n : null; };
+      const str = (x: unknown) => (typeof x === "string" ? x : null);
+      return {
+        side: str(o.side ?? o.type ?? o.direction),
+        price: num(o.price ?? o.priceUsd),
+        amount: num(o.amountUsd ?? o.amount ?? o.valueUsd ?? o.size),
+        time: str(o.time ?? o.timestamp ?? o.at),
+      };
+    });
+  }, [teamA.tradeTape]);
+
   type Tone = "good" | "bad" | "warn" | "muted";
-  const chip = (label: string, value: string, tone: Tone) => {
-    const color =
-      tone === "good" ? "var(--term-gold)" : tone === "bad" ? "var(--oxc-red)" : tone === "warn" ? "#e8c15a" : "#9a9a9a";
+  const pill = (label: string, value: string, sub: string | null, tone: Tone) => {
+    const color = tone === "good" ? "var(--term-gold)" : tone === "bad" ? "var(--oxc-red)" : tone === "warn" ? "#e8c15a" : "#9a9a9a";
+    const border =
+      tone === "good"
+        ? "1px solid rgba(232,184,74,0.55)"
+        : tone === "bad"
+          ? "1px solid rgba(255,92,92,0.55)"
+          : tone === "warn"
+            ? "1px solid rgba(232,193,90,0.45)"
+            : "1px solid #2a2a2a";
     return (
-      <div
-        key={label}
-        style={{ flex: "1 1 0", minWidth: 92, padding: "0.6rem 0.7rem", border: "1px solid #2a2a2a", borderRadius: 8, background: "#0d0d0d" }}
-      >
+      <div key={label} style={{ padding: "0.7rem 0.5rem", border, borderRadius: 14, background: "#0d0d0d", textAlign: "center" }}>
         <div style={{ fontSize: "0.68rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#9a9a9a" }}>{label}</div>
-        <div
-          style={{ fontSize: "1.05rem", fontWeight: 800, color, marginTop: "0.15rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-        >
-          {value}
-        </div>
+        <div style={{ fontSize: "1.05rem", fontWeight: 800, color, marginTop: "0.2rem", lineHeight: 1.15 }}>{value}</div>
+        {sub && <div style={{ fontSize: "0.75rem", color: "#9a9a9a", marginTop: "0.1rem" }}>{sub}</div>}
       </div>
     );
   };
-  const symbol = (intel.token?.symbol as string) || (intel.token?.name as string) || null;
-  const price = Number(intel.token?.priceUsd ?? intel.token?.price ?? NaN);
-  const mcap = Number(intel.token?.marketCap ?? intel.token?.mcap ?? NaN);
+
+  const fmtMcap = (v: number) =>
+    v >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `$${(v / 1e3).toFixed(1)}K` : `$${v.toFixed(0)}`;
+  const fmtPrice = (v: number) => `$${v.toLocaleString(undefined, { maximumSignificantDigits: 6 })}`;
+  const short = (w: string) => (w.length > 10 ? `${w.slice(0, 4)}…${w.slice(-4)}` : w);
+  const tradeHref = `/trade/desk/${mint}`;
+  const tfs = [["15M", "15"], ["1H", "60"], ["1D", "1D"], ["1W", "1W"]] as const;
+
   return (
-    <div className="oxc-panel" style={{ ...termPanel, marginBottom: "1rem" }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem", alignItems: "baseline", marginBottom: "0.7rem" }}>
-        <span style={{ fontSize: "1.25rem", fontWeight: 800, color: "#ffffff" }}>{symbol ?? "Token"}</span>
-        {Number.isFinite(price) && (
-          <span style={{ color: "var(--term-gold)", fontWeight: 700 }}>
-            ${price.toLocaleString(undefined, { maximumSignificantDigits: 6 })}
-          </span>
-        )}
-        {Number.isFinite(mcap) && (
-          <span style={{ color: "#9a9a9a" }}>
-            MCAP ${mcap >= 1e6 ? `${(mcap / 1e6).toFixed(2)}M` : mcap >= 1e3 ? `${(mcap / 1e3).toFixed(1)}K` : mcap.toFixed(0)}
-          </span>
-        )}
-        {intel.ogScore?.label && (
-          <span style={{ marginLeft: "auto", fontWeight: 800, color: "var(--term-gold)" }}>{intel.ogScore.label}</span>
-        )}
+    <>
+      {/* Chart card — token header, timeframe pills, DexScreener chart, gold OG badge. */}
+      <div className="oxc-panel" style={{ ...termPanel, marginBottom: "1rem", padding: 0, overflow: "hidden", borderRadius: 16 }}>
+        <div style={{ padding: "1rem 1rem 0.6rem" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "0.6rem", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "1.3rem", fontWeight: 800, color: "#ffffff" }}>{symbol}</span>
+            <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#000", background: "var(--term-gold)", borderRadius: 6, padding: "0.15rem 0.4rem" }}>SOL</span>
+            {Number.isFinite(price) && <span style={{ fontSize: "1.3rem", fontWeight: 800, color: "#ffffff" }}>{fmtPrice(price)}</span>}
+            {Number.isFinite(chg) && (
+              <span style={{ fontWeight: 700, color: chg >= 0 ? "var(--term-gold)" : "var(--oxc-red)" }}>
+                {chg >= 0 ? "+" : ""}{chg.toFixed(2)}% 24h
+              </span>
+            )}
+            {Number.isFinite(mcap) && <span style={{ marginLeft: "auto", color: "#9a9a9a", fontWeight: 600 }}>MCAP {fmtMcap(mcap)}</span>}
+          </div>
+          <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.7rem", alignItems: "center" }}>
+            {tfs.map(([label, iv]) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setInterval(iv)}
+                style={{
+                  padding: "0.3rem 0.8rem",
+                  borderRadius: 999,
+                  border: interval === iv ? "1px solid var(--term-gold)" : "1px solid #2a2a2a",
+                  background: interval === iv ? "#1a1503" : "transparent",
+                  color: interval === iv ? "var(--term-gold)" : "#9a9a9a",
+                  fontWeight: 700,
+                  fontSize: "0.8rem",
+                  cursor: "pointer",
+                }}
+              >
+                {label}
+              </button>
+            ))}
+            <span style={{ marginLeft: "auto", fontSize: "0.75rem", fontWeight: 800, color: "#000", background: "var(--term-gold)", borderRadius: 999, padding: "0.3rem 0.7rem", whiteSpace: "nowrap" }}>
+              {og != null ? `OG ${og}/100${ogLabel ? ` · ${ogLabel}` : ""}` : "OG Unknown"}
+            </span>
+          </div>
+        </div>
+        <ScannerChart mint={mint} interval={interval} />
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem" }}>
-        {chip(
-          "OG score",
-          intel.ogScore?.score != null ? `${intel.ogScore.score}/100` : "Unknown",
-          intel.ogScore?.score == null ? "muted" : intel.ogScore.score >= 60 ? "good" : intel.ogScore.score >= 40 ? "warn" : "bad",
-        )}
-        {chip("Risk", intel.risk?.score != null ? `${intel.risk.score}${intel.risk.label ? ` · ${intel.risk.label}` : ""}` : "Unknown", "muted")}
-        {chip("Bundled", bundled != null ? `${bundled.toFixed(1)}%` : "Unknown", bundled == null ? "muted" : bundled >= 20 ? "bad" : bundled >= 5 ? "warn" : "good")}
-        {chip("LP locked", lpLocked != null ? `${lpLocked.toFixed(0)}%` : "Unknown", lpLocked == null ? "muted" : lpLocked >= 80 ? "good" : lpLocked >= 50 ? "warn" : "bad")}
-        {chip("Mint", flags?.mintRenounced === true ? "Renounced" : flags?.mintRenounced === false ? "Live" : "Unknown", flags?.mintRenounced === true ? "good" : flags?.mintRenounced === false ? "bad" : "muted")}
-        {chip("Freeze", flags?.freezeRenounced === true ? "Renounced" : flags?.freezeRenounced === false ? "Live" : "Unknown", flags?.freezeRenounced === true ? "good" : flags?.freezeRenounced === false ? "bad" : "muted")}
-        {chip("Honeypot", honeypot === true ? "Honeypot" : honeypot === false ? "Sellable" : "Unknown", honeypot === true ? "bad" : honeypot === false ? "good" : "muted")}
+
+      {/* Bottom sheet — the verdict. */}
+      <div style={{ background: "#101418", border: "1px solid #2a2a2a", borderRadius: 20, padding: "0.9rem 1rem 1rem", marginBottom: "1rem" }}>
+        <div style={{ width: 44, height: 4, borderRadius: 999, background: "#3a3a3a", margin: "0 auto 0.8rem" }} />
+        <div style={{ display: "flex", alignItems: "baseline", marginBottom: "0.8rem" }}>
+          <h2 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 800, color: "#ffffff" }}>Scan Verdict</h2>
+          {ogLabel && <span style={{ marginLeft: "auto", fontWeight: 800, color: "var(--term-gold)" }}>{ogLabel}</span>}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.6rem" }}>
+          {pill("Risk", intel.risk?.score != null ? `${intel.risk.score}` : "Unknown", intel.risk?.label ?? null, "muted")}
+          {pill("Bundled", bundled != null ? `${bundled.toFixed(1)}%` : "Unknown", "of supply", bundled == null ? "muted" : bundled >= 20 ? "bad" : bundled >= 5 ? "warn" : "good")}
+          {pill("LP locked", lpLocked != null ? `${lpLocked.toFixed(0)}%` : "Unknown", null, lpLocked == null ? "muted" : lpLocked >= 80 ? "good" : lpLocked >= 50 ? "warn" : "bad")}
+          {pill("Mint", flags?.mintRenounced === true ? "Renounced" : flags?.mintRenounced === false ? "Live" : "Unknown", null, flags?.mintRenounced === true ? "good" : flags?.mintRenounced === false ? "bad" : "muted")}
+          {pill("Freeze", flags?.freezeRenounced === true ? "Renounced" : flags?.freezeRenounced === false ? "Live" : "Unknown", null, flags?.freezeRenounced === true ? "good" : flags?.freezeRenounced === false ? "bad" : "muted")}
+          {pill("Honeypot", honeypot === true ? "Honeypot" : honeypot === false ? "Safe" : "Unknown", null, honeypot === true ? "bad" : honeypot === false ? "good" : "muted")}
+        </div>
+
+        <div style={{ marginTop: "1rem", paddingTop: "0.9rem", borderTop: "1px solid #2a2a2a" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <span style={{ color: "#9a9a9a", fontSize: "0.85rem" }}>Holders</span>
+            <span style={{ color: "#ffffff", fontWeight: 700 }}>{holderCount != null ? `${holderCount} holders` : "Unknown"}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.4rem", gap: "0.8rem" }}>
+            <span style={{ color: "#ffffff", fontWeight: 700 }}>Top holder {topPct != null ? `${topPct.toFixed(1)}%` : "Unknown"}</span>
+            {topPct != null && (
+              <span style={{ flex: "0 0 120px", height: 6, borderRadius: 999, background: "#2a2a2a", overflow: "hidden" }}>
+                <span style={{ display: "block", height: "100%", width: `${Math.min(100, topPct)}%`, background: "var(--term-gold)" }} />
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div style={{ marginTop: "0.9rem", paddingTop: "0.9rem", borderTop: "1px solid #2a2a2a" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <span style={{ color: "#9a9a9a", fontSize: "0.85rem" }}>Dev</span>
+            <span style={{ color: "#ffffff", fontWeight: 700 }}>{dev ? short(dev) : "Unknown"}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.4rem" }}>
+            <span style={{ color: "#9a9a9a", fontSize: "0.85rem" }}>Dev wallet</span>
+            <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#000", background: flags?.mintRenounced === true ? "var(--term-gold)" : "#9a9a9a", borderRadius: 999, padding: "0.25rem 0.6rem" }}>
+              {flags?.mintRenounced === true ? "Renounced" : flags?.mintRenounced === false ? "Mint live" : "Unknown"}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ marginTop: "0.9rem", paddingTop: "0.9rem", borderTop: "1px solid #2a2a2a" }}>
+          <div style={{ color: "#9a9a9a", fontSize: "0.85rem", marginBottom: "0.45rem" }}>Live trade tape</div>
+          {tape.length === 0 ? (
+            <p style={{ margin: 0, color: "#9a9a9a", fontSize: "0.9rem" }}>No recent trades in the live window.</p>
+          ) : (
+            tape.map((t, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "0.3rem 0" }}>
+                <span style={{ fontWeight: 700, color: t.side?.toLowerCase().includes("buy") ? "var(--term-gold)" : t.side?.toLowerCase().includes("sell") ? "var(--oxc-red)" : "#ffffff" }}>
+                  {t.side ? `${t.side.charAt(0).toUpperCase()}${t.side.slice(1)}` : "Trade"}{t.amount != null ? ` $${t.amount >= 1000 ? `${(t.amount / 1000).toFixed(1)}K` : t.amount.toFixed(0)}` : ""}
+                </span>
+                <span style={{ color: "#9a9a9a", fontSize: "0.85rem" }}>{t.price != null ? fmtPrice(t.price) : ""}{t.time ? ` · ${t.time}` : ""}</span>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: "0.6rem", marginTop: "1rem" }}>
+          <a href={tradeHref} style={{ flex: 1, textAlign: "center", background: "var(--term-gold)", color: "#000", fontWeight: 800, fontSize: "1.05rem", borderRadius: 14, padding: "0.85rem 0", textDecoration: "none" }}>Buy</a>
+          <a href={tradeHref} style={{ flex: 1, textAlign: "center", background: "transparent", color: "var(--term-gold)", fontWeight: 800, fontSize: "1.05rem", border: "1px solid var(--term-gold)", borderRadius: 14, padding: "0.85rem 0", textDecoration: "none" }}>Sell</a>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -566,8 +690,8 @@ export default function TokenScanner() {
 
       {intel.mint && !intel.loading && (
         <>
-          {/* The verdict first — the 7 numbers that decide "is this a rug". */}
-          <VerdictStrip intel={intel} />
+          {/* Pro sheet — chart card + bottom-sheet verdict, above the tabs. */}
+          <ScanSheet mint={intel.mint} intel={intel} teamA={teamA} />
 
           {/* One group at a time. ?tab= deep-links; the tab bar scrolls
             * horizontally on phones. */}
@@ -602,7 +726,6 @@ export default function TokenScanner() {
 
           {tab === "overview" && (
             <div className="oxc-grid" style={{ gap: "1rem" }}>
-              <ScannerChart mint={intel.mint} />
               <TokenOverview mint={intel.mint} token={intel.token} safety={intel.safety} forensics={intel.forensics} />
 
               <div className="oxc-grid oxc-grid-2">
