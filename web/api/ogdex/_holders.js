@@ -54,6 +54,11 @@ function heliusKey() {
 // public RPCs cannot serve getTokenLargestAccounts (mainnet-beta 429s,
 // publicnode blocks the method, solanatracker hangs). Direct Helius is the
 // path that actually gets the data.
+// Last RPC error seen by rpc() — surfaced to the caller so the UI can say
+// WHY holder data is missing (no key vs rejected key vs unreachable),
+// instead of a generic "unreachable".
+export let lastRpcError = null;
+
 async function heliusDirect(method, params, timeout = 9000) {
   const key = heliusKey();
   if (!key) return { result: null, error: "no helius key configured" };
@@ -67,6 +72,7 @@ async function heliusDirect(method, params, timeout = 9000) {
       signal: ctl.signal,
     });
     const j = await res.json().catch(() => null);
+    if (!res.ok) return { result: null, error: `helius HTTP ${res.status}${j?.error?.message ? `: ${j.error.message}` : ""}` };
     if (j?.error) return { result: null, error: j.error?.message || "helius error" };
     return { result: j?.result ?? null, error: null };
   } catch (e) {
@@ -94,7 +100,9 @@ async function rpc(method, params, timeout = 9000) {
   } catch {
     /* proxy unreachable — fall through to direct Helius */
   } finally { clearTimeout(id); }
-  return heliusDirect(method, params, timeout);
+  const direct = await heliusDirect(method, params, timeout);
+  if (direct.error) lastRpcError = direct.error;
+  return direct;
 }
 
 // getTokenLargestAccounts with retry — the index service often recovers on retry.
@@ -194,5 +202,5 @@ export async function getLabeledHolders(mint, price = null, limit = 20) {
     const holders = cached.holders.map((h) => ({ ...h, usdValue: price != null ? (num(h.uiAmount) || 0) * price : h.usdValue, stale: true }));
     return { holders, pools: holders.filter((h) => h.isPool), source: "cache", stale: true };
   }
-  return { holders: [], pools: [], source: "none", stale: false };
+  return { holders: [], pools: [], source: "none", stale: false, lastError: lastRpcError };
 }

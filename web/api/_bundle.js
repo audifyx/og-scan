@@ -381,13 +381,24 @@ export async function analyzeBundles(mint, opts = {}) {
   const allHolders = Array.isArray(holdersRes?.holders) ? holdersRes.holders : [];
   const realHolders = allHolders.filter((h) => !h.isPool).slice(0, MAX_HOLDERS);
   if (!realHolders.length) {
+    // Say WHY the data is missing — the holder fetch records its last RPC
+    // error (no key / rejected key / rate-limited / unreachable). Never
+    // include any credential material in the reason.
+    const lastErr = String(holdersRes?.lastError || "");
+    const reason = /no helius key/i.test(lastErr)
+      ? "Helius API key missing in Vercel env — holder data unavailable."
+      : /401|unauthorized/i.test(lastErr)
+        ? "Helius rejected the API key (401) — holder data unavailable."
+        : /429|rate.?limit/i.test(lastErr)
+          ? "Helius rate-limited (429) — holder data unavailable, try again shortly."
+          : "Top-holder data unavailable (Helius index / RPC unreachable). Try again shortly.";
     const analysis = summarizeBundleAnalysis({
       mint,
       traces: [],
       holdersTotal: allHolders.length,
       topHoldersSupplyPct: null,
       creatorKnown: false,
-      reason: "Top-holder data unavailable (Helius index / RPC unreachable). Try again shortly.",
+      reason,
     });
     cachePut(`bundle:${mint}`, analysis);
     return { analysis, cached: false };
