@@ -177,7 +177,17 @@ export default async function handler(req, res) {
     // The intel feed's lpLockedPct (e.g. 5.6% on ORBITX) measures the LP
     // mint, not a lock, and understates it. For migrated pump tokens the
     // lock is 100% by rule, and the burn is 100% by the same fact.
-    const pumpMigrated = !!pump && !!pump.complete;
+    // pumpCoin (pump.fun's own API) returns null from Vercel, so migration
+    // is NOT read from it: a pump launchpad + an AMM pool in the holders
+    // proves migration (a bonding curve has no pool at all).
+    const launchpadName =
+      (safety.launchpad && typeof safety.launchpad === "object"
+        ? safety.launchpad.name
+        : safety.launchpad) || (pump ? "pump.fun" : null);
+    const isPumpLaunch =
+      typeof launchpadName === "string" && /pump/i.test(launchpadName);
+    const pumpMigrated =
+      (!!pump && !!pump.complete) || (isPumpLaunch && pools.length > 0);
     const lpLockedPct = pumpMigrated ? 100 : (safety.lpLockedPct ?? null);
     const lpBurnedPct = pumpMigrated ? 100 : null;
 
@@ -194,9 +204,9 @@ export default async function handler(req, res) {
       } : null,
       firstBuyer: first,
       dexPaid: paid,
-      launchpad: (safety.launchpad && typeof safety.launchpad === "object" ? safety.launchpad.name : safety.launchpad) || (pump ? "pump.fun" : null),
-      isPumpFun: !!pump || !!safety.isPumpFun,
-      bondingComplete: pump ? !!pump.complete : null,
+      launchpad: launchpadName,
+      isPumpFun: isPumpLaunch || !!pump || !!safety.isPumpFun,
+      bondingComplete: pump ? !!pump.complete : (pumpMigrated ? true : null),
       concentration: {
         top10Pct, whales, pools,
         // Prefer Rugcheck / intel totals — never the top-N sample length.
