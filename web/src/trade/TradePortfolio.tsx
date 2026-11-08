@@ -87,6 +87,7 @@ export default function TradePortfolio() {
 
   const [holderMint, setHolderMint] = useState("");
   const [holderQ, setHolderQ] = useState("");
+  const [holdSort, setHoldSort] = useState<"value" | "pnl" | "name">("value");
   const [mintHits, setMintHits] = useState<MarketCoin[]>([]);
   const [holders, setHolders] = useState<any[]>([]);
   const [holderMeta, setHolderMeta] = useState<{ symbol?: string; holderCount?: number | null }>({});
@@ -263,13 +264,60 @@ export default function TradePortfolio() {
     pickTokenName(h) || (h.isSol ? "Solana" : "Token");
   const tokenImage = (h: any) => pickTokenImage(h);
 
+  /** Unified-portfolio totals, all derived from the existing /wallet payload. */
+  const totalUsd =
+    mine?.totalUsd != null && Number.isFinite(Number(mine.totalUsd))
+      ? Number(mine.totalUsd)
+      : null;
+  const costBasisTotal = useMemo(() => {
+    let sum = 0;
+    let any = false;
+    for (const h of holdings) {
+      if (!h.isSol && h.costUsd != null && Number.isFinite(h.costUsd)) {
+        sum += h.costUsd;
+        any = true;
+      }
+    }
+    return any ? sum : null;
+  }, [holdings]);
+  const totalPnl = useMemo(() => {
+    const r = mine?.pnl?.realizedPnlUsd;
+    const u = mine?.pnl?.unrealizedPnlUsd;
+    if (r == null && u == null) return null;
+    return (Number(r) || 0) + (Number(u) || 0);
+  }, [mine]);
+  /** Tokens no longer held that still carry realized PnL — closed, not open. */
+  const closedPositions = useMemo(() => {
+    const rows: WalletPnlToken[] = [];
+    for (const row of pnlByMint.values()) {
+      if (!row.holding && row.realizedUsd != null && Number.isFinite(row.realizedUsd)) {
+        rows.push(row);
+      }
+    }
+    rows.sort((a, b) => Math.abs(b.realizedUsd ?? 0) - Math.abs(a.realizedUsd ?? 0));
+    return rows.slice(0, 10);
+  }, [pnlByMint]);
+  const sortedHoldings = useMemo(() => {
+    const rows = [...holdings];
+    if (holdSort === "name") {
+      rows.sort((a, b) => String(tokenLabel(a)).localeCompare(String(tokenLabel(b))));
+    } else if (holdSort === "pnl") {
+      rows.sort(
+        (a, b) => (b.unrealizedPct ?? -Infinity) - (a.unrealizedPct ?? -Infinity),
+      );
+    } else {
+      rows.sort((a, b) => (Number(b.usdValue) || 0) - (Number(a.usdValue) || 0));
+    }
+    return rows;
+  }, [holdings, holdSort]);
+
   return (
     <div className="tp">
       <div className="tp__glow" />
       <div className="tp__top">
         <p className="tp__kicker">OrbitX Trade</p>
         <h1 className="tp__title">Portfolio</h1>
-        <p className="tp__sub">Holdings, tracked wallets, and top holders</p>
+        <p className="tp__sub">Your on-chain portfolio — holdings, cost basis, realized vs unrealized PnL. CEX holdings aren&apos;t connected yet.</p>
 
         <Link
           to="/trade/wallets"
@@ -389,6 +437,27 @@ export default function TradePortfolio() {
                     </p>
                   )}
 
+                  <div className="tp__totals" aria-label="Portfolio totals">
+                    <div>
+                      <p className="tp__label">Total value</p>
+                      <p className="tp__metric-val">{totalUsd != null ? fmtUsd(totalUsd) : "—"}</p>
+                    </div>
+                    <div>
+                      <p className="tp__label">Cost basis</p>
+                      <p className="tp__metric-val">
+                        {costBasisTotal != null ? fmtUsd(costBasisTotal) : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="tp__label">Total PnL</p>
+                      <p className={`tp__metric-val ${pnlTone(totalPnl)}`}>{fmtPnl(totalPnl)}</p>
+                      <p className="tp__totals-split">
+                        R <span className={pnlTone(mine?.pnl?.realizedPnlUsd)}>{fmtPnl(mine?.pnl?.realizedPnlUsd)}</span>
+                        {" · "}U <span className={pnlTone(mine?.pnl?.unrealizedPnlUsd)}>{fmtPnl(mine?.pnl?.unrealizedPnlUsd)}</span>
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="mt-5 flex gap-2 pb-2">
                     <button type="button" onClick={() => openWallet(myAddr)} className="tp__btn">
                       Full wallet <ChevronRight className="h-4 w-4" />
@@ -407,13 +476,32 @@ export default function TradePortfolio() {
                 <section className="tp__section">
                   <div className="tp__section-head">
                     <h2 className="tp__section-title">Holdings</h2>
-                    <span className="text-[11px] text-white/65">{holdings.length}</span>
+                    <span className="text-[11px] text-white/65">{sortedHoldings.length}</span>
                   </div>
-                  {!holdings.length ? (
+                  <div className="tp__sort" role="group" aria-label="Sort holdings">
+                    {(
+                      [
+                        ["value", "Value"],
+                        ["pnl", "PnL"],
+                        ["name", "Name"],
+                      ] as ["value" | "pnl" | "name", string][]
+                    ).map(([id, label]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        aria-pressed={holdSort === id}
+                        onClick={() => setHoldSort(id)}
+                        className={`tp__sort-btn${holdSort === id ? " tp__sort-btn--on" : ""}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {!sortedHoldings.length ? (
                     <p className="tp__empty py-8">No token holdings found</p>
                   ) : (
                     <div className="tp__panel tp__holdings">
-                      {holdings.map((h: any) => (
+                      {sortedHoldings.map((h: any) => (
                         <Link
                           key={h.mint}
                           to={h.isSol ? `/trade/wallet/${myAddr}` : `/trade/token/${h.mint}`}
@@ -474,6 +562,71 @@ export default function TradePortfolio() {
                       ))}
                     </div>
                   )}
+                </section>
+
+                {closedPositions.length > 0 && (
+                  <section className="tp__section">
+                    <div className="tp__section-head">
+                      <h2 className="tp__section-title">Closed positions</h2>
+                      <span className="text-[11px] text-white/65">
+                        {closedPositions.length} · realized PnL
+                      </span>
+                    </div>
+                    <div className="tp__panel tp__holdings">
+                      {closedPositions.map((row) => (
+                        <Link
+                          key={row.mint}
+                          to={`/trade/token/${row.mint}`}
+                          className="tp__row"
+                        >
+                          <TokenAvatar
+                            image={row.image ?? null}
+                            symbol={row.symbol || shortAddr(row.mint, 4)}
+                            mint={row.mint}
+                            size={40}
+                            className="tp__avatar"
+                            fallbackClassName="tp__avatar-fb"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[14px] font-bold">
+                              {row.symbol || shortAddr(row.mint, 4)}
+                            </p>
+                            <p className="tp__row-name">{row.name || "Token"}</p>
+                            <p className="mt-0.5 font-mono text-[10px] text-white/60">
+                              {shortAddr(row.mint, 4)}
+                              {row.closedTrades != null ? ` · ${row.closedTrades} closed` : ""}
+                              {row.wins != null || row.losses != null
+                                ? ` · ${row.wins ?? "—"}W / ${row.losses ?? "—"}L`
+                                : ""}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`font-mono text-[13px] font-semibold ${pnlTone(row.realizedUsd)}`}>
+                              {fmtPnl(row.realizedUsd)}
+                            </p>
+                            <p className="font-mono text-[11px] text-white/60">realized</p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                <section className="tp__section">
+                  <div className="tp__section-head">
+                    <h2 className="tp__section-title">CEX holdings</h2>
+                    <span className="text-[11px] text-white/65">Not connected</span>
+                  </div>
+                  <div className="tp__empty">
+                    <Wallet className="mx-auto mb-3 h-9 w-9 opacity-40" />
+                    <p className="font-semibold text-white/85">
+                      Connect an exchange to see CEX holdings here
+                    </p>
+                    <p className="mt-1.5 text-[12px]">
+                      No exchange is connected, so there are no CEX balances to show yet —
+                      nothing here is estimated or filled in.
+                    </p>
+                  </div>
                 </section>
 
                 <Link to="/trade/leaderboard" className="tp__btn tp__btn--ghost mt-6">

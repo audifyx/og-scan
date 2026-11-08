@@ -155,6 +155,12 @@ import {
   playUiBlip,
   wallpaperForSeason,
 } from "./osWave6";
+import {
+  FearGreedWidgetBody,
+  MiniSwapWidgetBody,
+  PhoneWidgetStrip,
+  PortfolioWidgetBody,
+} from "./osHomeWidgets";
 import { AppMark } from "./AppMark";
 import "./os.css";
 
@@ -3306,24 +3312,63 @@ export default function Desktop(props: DesktopProps) {
         if (settings.uiSounds && (e.target as HTMLElement).closest("button")) playUiBlip();
       }}
       onDragOver={(e) => {
-        if (e.dataTransfer.types.includes("text/orbitx-mint")) e.preventDefault();
+        if (
+          e.dataTransfer.types.some((t) =>
+            ["text/orbitx-mint", "application/x-orbitx-token", "text/plain", "text/uri-list"].includes(t),
+          )
+        ) {
+          e.preventDefault();
+        }
       }}
       onDrop={(e) => {
-        const mint = e.dataTransfer.getData("text/orbitx-mint");
+        // Pin a token price widget by dragging a token from the DEX onto
+        // the desktop. Contract (DEX dragstart sets one of these):
+        //  - `text/orbitx-mint`: bare Solana mint (existing contract)
+        //  - `application/x-orbitx-token`: JSON { mint, symbol? }
+        //  - `text/plain` / `text/uri-list`: a bare base58 mint, or a URL
+        //    carrying ?mint=... (e.g. dragged from a token page).
+        // Dropping a mint that is already pinned just moves that widget.
+        const json = e.dataTransfer.getData("application/x-orbitx-token");
+        let mint = e.dataTransfer.getData("text/orbitx-mint");
+        let symbol: string | undefined;
+        if (!mint && json) {
+          try {
+            const parsed = JSON.parse(json) as { mint?: unknown; symbol?: unknown };
+            if (typeof parsed.mint === "string") mint = parsed.mint;
+            if (typeof parsed.symbol === "string") symbol = parsed.symbol;
+          } catch {
+            /* malformed payload — fall through to text sniffing */
+          }
+        }
+        if (!mint) {
+          const text =
+            e.dataTransfer.getData("text/plain") || e.dataTransfer.getData("text/uri-list") || "";
+          const m = text.match(/[?&]mint=([1-9A-HJ-NP-Za-km-z]{32,44})/) ?? text.match(/\b([1-9A-HJ-NP-Za-km-z]{32,44})\b/);
+          if (m) mint = m[1];
+        }
         if (!mint) return;
         e.preventDefault();
         const x = Math.max(2, Math.min(80, (e.clientX / window.innerWidth) * 100));
         const y = Math.max(4, Math.min(70, (e.clientY / window.innerHeight) * 100));
-        setDeskWidgets((prev) => [
-          ...prev,
-          {
-            id: `wdg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
-            type: "token",
-            x,
-            y,
-            mint,
-          },
-        ]);
+        setDeskWidgets((prev) => {
+          const existing = prev.find((w) => w.type === "token" && w.mint === mint);
+          if (existing) {
+            return prev.map((w) =>
+              w.id === existing.id ? { ...w, x, y, ...(symbol ? { label: symbol } : {}) } : w,
+            );
+          }
+          return [
+            ...prev,
+            {
+              id: `wdg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+              type: "token",
+              x,
+              y,
+              mint,
+              ...(symbol ? { label: symbol } : {}),
+            },
+          ];
+        });
       }}
       onContextMenu={(e) => {
         const t = e.target as HTMLElement;
@@ -3397,7 +3442,13 @@ export default function Desktop(props: DesktopProps) {
                                 ? "Note"
                                 : wdg.type === "minichart"
                                   ? "Mini chart"
-                                  : "My alerts"}
+                                  : wdg.type === "feargreed"
+                                    ? "Fear & Greed"
+                                    : wdg.type === "miniswap"
+                                      ? "Mini Swap"
+                                      : wdg.type === "portfolio"
+                                        ? "Portfolio"
+                                        : "My alerts"}
             </span>
             <button
               type="button"
@@ -3517,6 +3568,16 @@ export default function Desktop(props: DesktopProps) {
             )}
             {wdg.type === "market" && <MarketWidgetBody trending={props.trending} />}
             {wdg.type === "minichart" && <MiniChartWidgetBody />}
+            {wdg.type === "feargreed" && <FearGreedWidgetBody />}
+            {wdg.type === "miniswap" && (
+              <MiniSwapWidgetBody
+                mint={wdg.mint}
+                swapMode={wdg.swapMode}
+                solPrice={props.solPrice}
+                onMint={(m) => setDeskWidgets((prev) => prev.map((x) => (x.id === wdg.id ? { ...x, mint: m } : x)))}
+              />
+            )}
+            {wdg.type === "portfolio" && <PortfolioWidgetBody solPrice={props.solPrice} orbitxPrice={props.orbitxPrice} />}
             {wdg.type === "tasks" && (
               <TasksWidgetBody
                 tasks={tasks}
@@ -3652,6 +3713,27 @@ export default function Desktop(props: DesktopProps) {
               </button>
             </span>
           </div>
+          {/* Home widgets on phone: desk widgets are hidden under 768px
+              (os.css), so they render here as a swipeable strip instead. */}
+          <PhoneWidgetStrip
+            widgets={deskWidgets}
+            solPrice={props.solPrice}
+            solChange={props.solChange}
+            orbitxPrice={props.orbitxPrice}
+            orbitxChange={props.orbitxChange}
+            trending={props.trending}
+            alerts={alerts}
+            tasks={tasks}
+            notes={notes}
+            onRemove={(id) => setDeskWidgets((prev) => prev.filter((x) => x.id !== id))}
+            onUpdate={(id, patch) => setDeskWidgets((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)))}
+            onToggleTask={(id) => setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: true } : t)))}
+            onOpenToken={(mint) => {
+              const dex = allApps.find((a) => a.key === "dex");
+              if (dex) openAppWithHref(dex, `/ORBITX_DEX?mint=${mint}`);
+            }}
+            onOpenBuiltin={(kind, title) => openBuiltin(kind, title)}
+          />
           <div className="oxos-phone__grid">
             {[...desktopApps, ...installedAsApps]
               .filter((a) => !foldered.has(a.key))
@@ -4649,6 +4731,9 @@ export default function Desktop(props: DesktopProps) {
                 ["tasks", "Tasks"],
                 ["note", "Note"],
                 ["minichart", "Mini chart"],
+                ["feargreed", "Fear & Greed"],
+                ["miniswap", "Mini Swap"],
+                ["portfolio", "Portfolio"],
               ] as const
             ).map(([t, label]) => (
               <button
@@ -4666,7 +4751,8 @@ export default function Desktop(props: DesktopProps) {
                       ...(t === "countdown"
                         ? { label: "Countdown", targetDate: isoDay(new Date(Date.now() + 7 * 86400000)) }
                         : {}),
-                      ...(t === "token" || t === "chart" ? { mint: ORBITX_MINT } : {}),
+                      ...(t === "token" || t === "chart" || t === "miniswap" ? { mint: ORBITX_MINT } : {}),
+                      ...(t === "miniswap" ? { swapMode: "buy" as const } : {}),
                       ...(t === "note" && notes.length ? { noteId: notes[0].id } : {}),
                     },
                   ])

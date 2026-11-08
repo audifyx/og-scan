@@ -17,16 +17,16 @@ class BootBoundary extends Component<{ children: ReactNode }, { error: Error | n
   render() {
     if (!this.state.error) return this.props.children;
     return (
-      <div style={{ minHeight: "100dvh", display: "grid", placeItems: "center", background: "#060609", color: "#fff", padding: 24, textAlign: "center" }}>
+      <div style={{ minHeight: "100dvh", display: "grid", placeItems: "center", background: "#050505", color: "#f4f4f2", padding: 24, textAlign: "center" }}>
         <div>
-          <AlertTriangle style={{ width: 40, height: 40, color: "#f0c75e", margin: "0 auto 16px" }} />
+          <AlertTriangle style={{ width: 40, height: 40, color: "#e8b84a", margin: "0 auto 16px" }} />
           <h1 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 8px" }}>Terminal failed to load</h1>
-          <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 14, margin: "0 0 20px", maxWidth: 320 }}>
+          <p style={{ color: "rgba(244,244,242,0.55)", fontSize: 14, margin: "0 0 20px", maxWidth: 320 }}>
             {String(this.state.error?.message || "Unexpected error").slice(0, 160)}
           </p>
           <button
             onClick={() => window.location.reload()}
-            style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 12, padding: "12px 24px", fontWeight: 800, fontSize: 15, cursor: "pointer" }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#e8b84a", color: "#050505", border: "none", borderRadius: 12, padding: "12px 24px", fontWeight: 800, fontSize: 15, cursor: "pointer" }}
           >
             <RefreshCw style={{ width: 16, height: 16 }} /> Reload terminal
           </button>

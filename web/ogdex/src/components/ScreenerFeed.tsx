@@ -160,12 +160,20 @@ export function TokenFeedCard({
   r: Row; rank: number; onClick?: () => void; isUnbonded?: boolean; changeVal?: number | null; chainLabel?: string;
 }) {
   const buys = r.numBuys ?? 0, sells = r.numSells ?? 0;
+  const onDragStart = (e: React.DragEvent) => {
+    if (!r.mint) return;
+    e.dataTransfer.setData("text/orbitx-mint", r.mint);
+    e.dataTransfer.setData("application/x-orbitx-token", JSON.stringify({ mint: r.mint, symbol: r.symbol || undefined }));
+    e.dataTransfer.effectAllowed = "copy";
+  };
   return (
     <article
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-panel/90 via-[#0c0c10] to-[#060609] p-4 transition-all hover:border-[var(--ox-blue)]/40 hover:shadow-[0_0_24px_rgba(59,130,246,0.08)] ${onClick ? "cursor-pointer" : "cursor-default"}`}
+      draggable={!!r.mint}
+      onDragStart={onDragStart}
+      className={`group relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-panel/90 via-[#0a0a0a] to-[#050505] p-4 transition-all hover:border-[var(--term-gold)]/40 hover:shadow-[0_0_24px_rgba(232,184,74,0.08)] ${onClick ? "cursor-pointer" : "cursor-default"}`}
     >
-      <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[var(--ox-blue)]/5 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[var(--term-gold)]/5 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
       <TokenIdentity r={r} rank={rank} chainLabel={chainLabel} />
 
       {isUnbonded && (r as any).bondingPct != null && (
@@ -277,6 +285,13 @@ export function TokenFeedList({
                 <tr
                   key={(r.mint || (r as any).poolAddress || i) + i}
                   onClick={() => !isExternal && onRowClick(r)}
+                  draggable={!isExternal && !!r.mint}
+                  onDragStart={(e) => {
+                    if (isExternal || !r.mint) return;
+                    e.dataTransfer.setData("text/orbitx-mint", r.mint);
+                    e.dataTransfer.setData("application/x-orbitx-token", JSON.stringify({ mint: r.mint, symbol: r.symbol || undefined }));
+                    e.dataTransfer.effectAllowed = "copy";
+                  }}
                   className={`dex-token-row ${isExternal ? "cursor-default opacity-80" : ""}`}
                 >
                   <td className="text-muted text-xs">{i + 1}</td>

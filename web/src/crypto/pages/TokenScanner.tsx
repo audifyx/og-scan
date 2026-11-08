@@ -1,5 +1,6 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { dexChartUrl } from "@/trade/tradeFmt";
 import { useTokenIntel } from "../hooks/useTokenIntel";
 import { RiskFactors, RiskGauge } from "../components/RiskGauge";
 import {
@@ -16,6 +17,26 @@ import {
   termPanel,
 } from "../components/TokenPanels";
 import { isValidMint } from "../api/client";
+
+/** Chart-first: DexScreener chart at the top of the scan, same embed as the trade token page. */
+function ScannerChart({ mint }: { mint: string }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    setReady(false);
+  }, [mint]);
+  return (
+    <div className="oxc-panel relative overflow-hidden" style={{ ...termPanel, height: 360, padding: 0 }}>
+      {!ready && <p className="oxc-empty oxc-pulse" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>Loading chart…</p>}
+      <iframe
+        title="DexScreener chart"
+        src={dexChartUrl(mint)}
+        style={{ width: "100%", height: "100%", border: 0 }}
+        allow="clipboard-write"
+        onLoad={() => setReady(true)}
+      />
+    </div>
+  );
+}
 
 export default function TokenScanner() {
   const { mint: routeMint } = useParams<{ mint?: string }>();
@@ -67,6 +88,7 @@ export default function TokenScanner() {
 
       {intel.mint && !intel.loading && (
         <div className="oxc-grid" style={{ gap: "1rem" }}>
+          <ScannerChart mint={intel.mint} />
           <TokenOverview mint={intel.mint} token={intel.token} safety={intel.safety} forensics={intel.forensics} />
 
           <div className="oxc-grid oxc-grid-2">

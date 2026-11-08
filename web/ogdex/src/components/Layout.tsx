@@ -48,11 +48,11 @@ const NAV_LINKS = [
 ];
 
 const MOBILE_TABS = [
-  { to: "/", label: "Trade", ico: "◈", exact: true },
-  { to: "/scanner", label: "Scan", ico: "◎", exact: false },
-  { to: "/pulse", label: "Pulse", ico: "✦", exact: false },
-  { to: "/wallet", label: "Wallet", ico: "▣", exact: false },
-  { to: "/more", label: "More", ico: "☰", exact: false },
+  { to: "/", label: "Trade", Icon: Coins, exact: true },
+  { to: "/scanner", label: "Scan", Icon: Crosshair, exact: false },
+  { to: "/pulse", label: "Pulse", Icon: Flame, exact: false },
+  { to: "/wallet", label: "Wallet", Icon: Wallet2, exact: false },
+  { to: "/more", label: "More", Icon: LayoutGrid, exact: false },
 ];
 
 const ROOT_PATHS = new Set([
@@ -206,11 +206,11 @@ export default function Layout() {
             <div className="hidden md:block dex-status-strip">
               <div className="max-w-[1600px] mx-auto px-5 h-7 flex items-center gap-4 term text-[10px] font-semibold text-white/65">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--ox-blue)]" style={{ boxShadow: "0 0 8px var(--ox-blue)" }} />
-                  <span style={{ color: "var(--ox-blue-hi)", letterSpacing: "0.14em" }}>LIVE</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--term-gold)]" style={{ boxShadow: "0 0 8px var(--term-gold)" }} />
+                  <span style={{ color: "var(--term-gold)", letterSpacing: "0.14em" }}>LIVE</span>
                 </span>
                 <span>SOLANA MAINNET</span>
-                <span className="hidden lg:inline">USERS <span className="text-[var(--ox-blue-hi)]">{pstats.activeUsers}</span></span>
+                <span className="hidden lg:inline">USERS <span className="text-[var(--term-gold)]">{pstats.activeUsers}</span></span>
                 <span className="hidden lg:inline">TOKENS <span className="text-white">{pstats.tokenCount}</span></span>
                 <span className="hidden xl:inline">VOL <span className="text-[var(--ox-gold-hi)]">{pstats.volume}</span></span>
                 <span className="flex-1" />
@@ -228,7 +228,7 @@ export default function Layout() {
             </div>
           </main>
 
-          <footer className="mt-auto border-t" style={{ borderColor: "var(--ox-silver-dim)", background: "linear-gradient(180deg, #0c0c10, #060609)" }}>
+          <footer className="mt-auto border-t" style={{ borderColor: "var(--ox-silver-dim)", background: "linear-gradient(180deg, #0a0a0a, #050505)" }}>
             <div className="brand-hairline" />
             <div className="max-w-[1600px] mx-auto px-5 py-12">
               <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
@@ -262,9 +262,10 @@ export default function Layout() {
           <nav className="dex-ios-tabbar" aria-label="App tabs">
             {MOBILE_TABS.map((t) => {
               const on = t.exact ? loc.pathname === t.to : loc.pathname === t.to || loc.pathname.startsWith(`${t.to}/`);
+              const TabIcon = t.Icon;
               return (
                 <Link key={t.to} to={t.to} className={`dex-ios-tab${on ? " is-on" : ""}`}>
-                  <span className="dex-ios-tab__ico" aria-hidden>{t.ico}</span>
+                  <TabIcon className="w-5 h-5" aria-hidden />
                   <span>{t.label}</span>
                 </Link>
               );

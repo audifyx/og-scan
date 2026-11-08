@@ -5,6 +5,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowRight, Rocket } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 interface ActivityToken {
@@ -84,7 +85,7 @@ export default function LaunchpadActivityFeed() {
     <>
       <style>{`
         @keyframes lp-activity-flash {
-          0% { background-color: rgba(34, 197, 94, 0.18); }
+          0% { background-color: rgba(232, 184, 74, 0.18); }
           100% { background-color: transparent; }
         }
         .lp-activity-new {
@@ -98,24 +99,25 @@ export default function LaunchpadActivityFeed() {
           animation: lp-live-pulse 1.6s ease-in-out infinite;
         }
       `}</style>
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
+      <div className="overflow-hidden rounded-2xl border border-[#e8b84a]/20 bg-white/[0.02]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className="lp-live-dot h-2 w-2 rounded-full bg-green-400" />
+            <span className="lp-live-dot h-2 w-2 rounded-full bg-[#e8b84a]" />
             <h3 className="text-sm font-bold tracking-wide">Live launches</h3>
           </div>
           <Link
             to="/launchpad/live"
-            className="text-xs font-bold text-blue-400 hover:text-blue-300 hover:underline"
+            className="inline-flex items-center gap-1 text-xs font-bold text-[#f6d47c] hover:text-[#e8b84a] hover:underline"
           >
-            View all →
+            View all <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
 
         {/* Items */}
         {tokens.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-white/40">
+            <Rocket className="mx-auto mb-2 h-5 w-5 text-[#e8b84a]/60" />
             No launches yet — be the first via the MCP
           </div>
         ) : (
@@ -129,7 +131,7 @@ export default function LaunchpadActivityFeed() {
                   to={`/launchpad/token/${t.mint}`}
                   className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.04]"
                 >
-                  <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-blue-800 to-purple-800">
+                  <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-[#e8b84a]/30 to-[#b98a1e]/20">
                     {t.image_url ? (
                       <img
                         src={t.image_url}
@@ -138,7 +140,7 @@ export default function LaunchpadActivityFeed() {
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-sm font-black text-white/60">
+                      <div className="flex h-full w-full items-center justify-center text-sm font-black text-[#f6d47c]/70">
                         {t.symbol.charAt(0)}
                       </div>
                     )}
@@ -149,9 +151,9 @@ export default function LaunchpadActivityFeed() {
                         {t.creator_username || "Someone"}
                       </span>{" "}
                       <span className="text-white/50">launched</span>{" "}
-                      <span className="font-bold text-blue-300">${t.symbol}</span>
+                      <span className="font-bold text-[#f6d47c]">${t.symbol}</span>
                       {newMints.has(t.mint) && (
-                        <span className="ml-2 rounded-full bg-green-500/20 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-green-300">
+                        <span className="ml-2 rounded-full bg-[#e8b84a]/20 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-[#f6d47c]">
                           New
                         </span>
                       )}

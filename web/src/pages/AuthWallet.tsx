@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  ArrowRight, Eye, EyeOff, Lock, Rocket, Loader2,
+  ArrowRight, Eye, EyeOff, Lock, Rocket, Loader2, Wallet, ShieldCheck, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { resolveAuthReturn, useAuth } from "@/hooks/useAuth";
@@ -134,10 +134,34 @@ export default function AuthWallet() {
     }
   };
 
+  const guestTo = next === "/app" ? "/orbitx-social" : next;
+
   return (
     <div className="ox-auth">
       <div className="ox-auth-bg" />
       <div className="ox-auth-inner">
+        <aside className="ox-auth-panel" aria-hidden="true">
+          <Link to="/" className="ox-auth-brand" tabIndex={-1}>
+            <div className="ox-auth-brand-mark"><Rocket className="h-4 w-4" /></div>
+            <div>
+              <div className="ox-auth-brand-name">Orbit<span>X</span></div>
+              <div className="ox-auth-brand-sub">sign in</div>
+            </div>
+          </Link>
+          <h2 className="ox-auth-panel-title">One identity.<br />Every <span>OrbitX</span> app.</h2>
+          <p className="ox-auth-panel-sub">
+            Sign in once and your wallet, profile, and social graph follow you across
+            the Terminal, Launchpad, Social, and OrbitX OS.
+          </p>
+          <ul className="ox-auth-panel-list">
+            <li><Wallet className="h-4 w-4" /><span><b>Wallet first</b> — connect a Solana wallet, no password needed.</span></li>
+            <li><ShieldCheck className="h-4 w-4" /><span><b>Self-custody</b> — your keys stay on your device, PIN-locked.</span></li>
+            <li><Zap className="h-4 w-4" /><span><b>Instant return</b> — sign-in drops you back where you came from.</span></li>
+          </ul>
+          <p className="ox-auth-panel-foot">Terminal · Launchpad · Social · OS</p>
+        </aside>
+
+        <div className="ox-auth-main">
         <Link to="/" className="ox-auth-brand">
           <div className="ox-auth-brand-mark"><Rocket className="h-4 w-4" /></div>
           <div>
@@ -150,7 +174,7 @@ export default function AuthWallet() {
           <div className="ox-auth-kicker">Secure access</div>
           <h1 className="ox-auth-title">{signup ? "Create your account" : "Welcome back"}</h1>
           <p className="ox-auth-sub">
-            Continue with X, a Solana wallet, or email.
+            Continue with your wallet, X, or email.
           </p>
 
           {waitingOnUsername ? (
@@ -169,12 +193,16 @@ export default function AuthWallet() {
             </div>
           ) : (
             <>
+              <div className="ox-auth-wallet-block">
+                <div className="ox-auth-wallet-head"><Wallet className="h-3.5 w-3.5" /> Wallet — fastest way in</div>
+                <InjectWalletButtons onSignedIn={(isNew) => { if (isNew) setMerge(true); }} disabled={submitting} />
+                <p className="ox-auth-wallet-note">No password, no email — your Solana wallet is your account.</p>
+              </div>
+
+              <div className="ox-auth-or">or X</div>
               <div className="ox-auth-social">
                 <XSignInButton next={next} disabled={submitting} />
               </div>
-
-              <div className="ox-auth-or">or wallet</div>
-              <InjectWalletButtons onSignedIn={(isNew) => { if (isNew) setMerge(true); }} disabled={submitting} />
 
               <div className="ox-auth-or">or email</div>
               <form onSubmit={onEmailSubmit} className="ox-auth-form">
@@ -235,12 +263,18 @@ export default function AuthWallet() {
           )}
         </div>
 
+        <div className="ox-auth-guest">
+          <p className="ox-auth-guest-label">Just looking around? No account needed to explore.</p>
+          <Link to={guestTo} className="ox-auth-guest-btn">
+            <Eye className="h-4 w-4" /> Continue browsing without signing in
+          </Link>
+          <p className="ox-auth-guest-note">You can sign in any time — we&apos;ll bring you back here.</p>
+        </div>
+
         <Link to="/" className="ox-auth-back">
           Back to home <ArrowRight className="h-3 w-3" />
         </Link>
-        <Link to={next === "/app" ? "/orbitx-social" : next} className="ox-auth-back">
-          Continue browsing without signing in <ArrowRight className="h-3 w-3" />
-        </Link>
+        </div>
       </div>
       <MergeAccountModal open={merge} onClose={() => setMerge(false)} />
     </div>

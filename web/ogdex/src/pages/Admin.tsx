@@ -647,7 +647,7 @@ function BannersTab({ data, act }: any) {
   };
 
   const TYPES = [
-    { id: "info",    label: "Info",    color: "bg-blue-500/15 text-blue-400" },
+    { id: "info",    label: "Info",    color: "bg-[#e8b84a]/15 text-[#e8b84a]" },
     { id: "warning", label: "Warning", color: "bg-yellow-500/15 text-yellow-400" },
     { id: "promo",   label: "Promo",   color: "bg-accent/15 text-accent" },
     { id: "urgent",  label: "Urgent",  color: "bg-down/15 text-down" },
@@ -661,7 +661,7 @@ function BannersTab({ data, act }: any) {
           banner.type === "urgent" ? "bg-down/10 border-down/30" :
           banner.type === "warning" ? "bg-yellow-500/10 border-yellow-500/30" :
           banner.type === "promo" ? "bg-accent/10 border-accent/30" :
-          "bg-blue-500/10 border-blue-500/30"
+          "bg-[#e8b84a]/10 border-[#e8b84a]/30"
         }`}>
           <Megaphone className="w-4 h-4 shrink-0" />
           <div className="flex-1 text-sm">{banner.text}</div>

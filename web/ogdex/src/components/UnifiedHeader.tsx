@@ -33,11 +33,11 @@ export default function UnifiedHeader({ stats }: { stats: Stats }) {
     exact ? loc.pathname === to : loc.pathname.startsWith(to);
 
   const metrics = [
-    { icon: Users, label: "Active Users", value: "154", color: "#5aa2ff" },
-    { icon: Send, label: "Telegram", value: "350", color: "#5aa2ff" },
-    { icon: null, label: "X Followers", value: "660", color: "#f0c75e", isX: true },
-    { icon: Layers, label: "Tokens Listed", value: typeof stats.tokenCount === "number" ? stats.tokenCount.toLocaleString() : stats.tokenCount, color: "#5aa2ff" },
-    { icon: BarChart3, label: "Volume", value: stats.volume, color: "#5aa2ff" },
+    { icon: Users, label: "Active Users", value: "154", color: "#e8b84a" },
+    { icon: Send, label: "Telegram", value: "350", color: "#c9d1d9" },
+    { icon: null, label: "X Followers", value: "660", color: "#e8b84a", isX: true },
+    { icon: Layers, label: "Tokens Listed", value: typeof stats.tokenCount === "number" ? stats.tokenCount.toLocaleString() : stats.tokenCount, color: "#c9d1d9" },
+    { icon: BarChart3, label: "Volume", value: stats.volume, color: "#e8b84a" },
   ];
 
   return (

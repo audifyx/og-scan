@@ -219,7 +219,10 @@ export type DeskWidgetType =
   | "market"
   | "tasks"
   | "note"
-  | "minichart";
+  | "minichart"
+  | "feargreed"
+  | "miniswap"
+  | "portfolio";
 
 export interface DeskWidget {
   id: string;
@@ -235,6 +238,8 @@ export interface DeskWidget {
   /** Countdown widget (idea bank #1009). */
   label?: string;
   targetDate?: string; // YYYY-MM-DD
+  /** Mini swap widget (OS home widgets): persisted buy/sell direction. */
+  swapMode?: "buy" | "sell";
 }
 
 export interface InstalledApp {
@@ -312,7 +317,10 @@ export function loadDeskWidgets(): DeskWidget[] {
         w.type === "market" ||
         w.type === "tasks" ||
         w.type === "note" ||
-        w.type === "minichart"),
+        w.type === "minichart" ||
+        w.type === "feargreed" ||
+        w.type === "miniswap" ||
+        w.type === "portfolio"),
   );
 }
 export function saveDeskWidgets(w: DeskWidget[]) {

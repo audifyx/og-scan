@@ -5,6 +5,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { ArrowLeft, Check, Dices, Eye, Flame, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 interface LaunchToken {
@@ -21,6 +22,34 @@ interface LaunchToken {
 }
 
 const WATCHLIST_KEY = "orbitx-launchpad-watchlist";
+/** Bonding-curve graduation estimate (pump.fun-style curve completes ~$69K mcap). */
+const GRADUATION_MCAP = 69_000;
+
+/**
+ * Launchpad OG score (0–100), estimated from market cap, age, and status.
+ * Not a price prediction — a quick read on how far a launch has come.
+ */
+function ogScore(t: LaunchToken): number {
+  let s = 30;
+  const m = t.market_cap_usd || 0;
+  if (m >= 1e6) s += 35;
+  else if (m >= 200_000) s += 28;
+  else if (m >= GRADUATION_MCAP) s += 20;
+  else if (m >= 10_000) s += 12;
+  else if (m > 0) s += 5;
+  if (t.status === "graduated") s += 15;
+  else if (t.status === "trending") s += 8;
+  const ageH = (Date.now() - new Date(t.created_at).getTime()) / 3600000;
+  if (ageH > 24) s += 5;
+  else if (ageH > 6) s += 3;
+  return Math.min(100, Math.max(0, s));
+}
+
+function bondingProgress(t: LaunchToken): number {
+  const m = t.market_cap_usd || 0;
+  if (t.status === "graduated") return 100;
+  return Math.min(100, Math.round((m / GRADUATION_MCAP) * 100));
+}
 const SWIPE_THRESHOLD = 100; // px to trigger a swipe
 
 function fmtUsd(n: number | null): string {
@@ -137,8 +166,8 @@ export default function LaunchpadSwipe() {
     <div className="flex min-h-screen flex-col bg-black text-white">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-        <Link to="/launchpad/live" className="text-sm font-bold text-blue-400">
-          ← Feed
+        <Link to="/launchpad/live" className="inline-flex items-center gap-1.5 text-sm font-bold text-[#f6d47c]">
+          <ArrowLeft className="h-4 w-4" /> Feed
         </Link>
         <h1 className="text-sm font-black uppercase tracking-widest text-white/70">
           Discover
@@ -147,9 +176,9 @@ export default function LaunchpadSwipe() {
           onClick={() => setShowWatchlist(true)}
           className="relative rounded-full bg-white/5 px-3 py-1.5 text-sm font-bold"
         >
-          👀
+          <Eye className="h-4 w-4" />
           {watchlist.length > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-black">
+            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#e8b84a] px-1 text-[10px] font-black text-black">
               {watchlist.length}
             </span>
           )}
@@ -167,15 +196,15 @@ export default function LaunchpadSwipe() {
           </div>
         ) : done ? (
           <div className="text-center">
-            <p className="text-2xl font-black">That's everything 🔥</p>
+            <p className="text-2xl font-black">That&apos;s everything</p>
             <p className="mt-2 text-sm text-white/40">
               You've seen all {tokens.length} tokens
             </p>
             <button
               onClick={() => setDegen((d) => !d)}
-              className="mt-6 rounded-full bg-blue-600 px-6 py-3 text-sm font-bold"
+              className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#e8b84a] px-6 py-3 text-sm font-bold text-black"
             >
-              {degen ? "🔀 Reshuffle (degen mode)" : "🎲 Degen mode — shuffle"}
+              <Dices className="h-4 w-4" /> {degen ? "Reshuffle (degen mode)" : "Degen mode — shuffle"}
             </button>
           </div>
         ) : current ? (
@@ -203,7 +232,7 @@ export default function LaunchpadSwipe() {
                 >
                   {dragX > 20 && (
                     <span className="rounded-xl border-4 border-green-400 px-3 py-1 text-2xl font-black text-green-400 -rotate-12">
-                      APE 🦍
+                      APE
                     </span>
                   )}
                   {dragX < -20 && (
@@ -214,7 +243,7 @@ export default function LaunchpadSwipe() {
                 </div>
 
                 {/* Token image */}
-                <div className="h-64 w-full bg-gradient-to-br from-blue-900 to-purple-900">
+                <div className="h-64 w-full bg-gradient-to-br from-[#e8b84a]/25 to-[#b98a1e]/15">
                   {current.image_url ? (
                     <img
                       src={current.image_url}
@@ -223,7 +252,7 @@ export default function LaunchpadSwipe() {
                       draggable={false}
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-7xl font-black text-white/30">
+                    <div className="flex h-full w-full items-center justify-center text-7xl font-black text-[#f6d47c]/40">
                       {current.symbol.charAt(0)}
                     </div>
                   )}
@@ -233,8 +262,11 @@ export default function LaunchpadSwipe() {
                 <div className="p-5">
                   <div className="flex items-center gap-2">
                     <h2 className="truncate text-xl font-black">{current.name}</h2>
-                    <span className="shrink-0 rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-bold text-blue-300">
+                    <span className="shrink-0 rounded-full bg-[#e8b84a]/15 px-2 py-0.5 text-xs font-bold text-[#f6d47c]">
                       ${current.symbol}
+                    </span>
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#e8b84a]/40 bg-[#e8b84a]/10 px-2 py-0.5 text-[10px] font-black text-[#f6d47c]" title="OG score — estimated from market cap, age & status">
+                      <Flame className="h-3 w-3" /> OG {ogScore(current)}
                     </span>
                   </div>
                   {current.description && (
@@ -248,6 +280,15 @@ export default function LaunchpadSwipe() {
                     <div className="rounded-xl bg-white/5 p-3">
                       <p className="text-xs text-white/30">Price</p>
                       <p className="font-black">{fmtUsd(current.price_usd)}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-white/30">
+                      <span>Bonding curve</span>
+                      <span className="text-white/50">{bondingProgress(current)}%</span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/5">
+                      <div className="h-full rounded-full bg-gradient-to-r from-[#b98a1e] to-[#f6d47c]" style={{ width: `${bondingProgress(current)}%` }} />
                     </div>
                   </div>
                   {current.creator_username && (
@@ -266,24 +307,24 @@ export default function LaunchpadSwipe() {
             <div className="mt-6 flex items-center justify-center gap-6">
               <button
                 onClick={() => advance("left")}
-                className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-red-500/50 bg-red-500/10 text-2xl transition-transform active:scale-90"
+                className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-red-500/50 bg-red-500/10 text-red-400 transition-transform active:scale-90"
                 aria-label="Skip"
               >
-                ✕
+                <X className="h-7 w-7" />
               </button>
               <button
                 onClick={() => setDegen((d) => !d)}
-                className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wider ${degen ? "bg-purple-600" : "bg-white/10 text-white/50"}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wider ${degen ? "bg-[#e8b84a] text-black" : "bg-white/10 text-white/50"}`}
                 title="Shuffle order"
               >
-                🎲 {degen ? "Degen ON" : "Degen"}
+                <Dices className="h-3.5 w-3.5" /> {degen ? "Degen ON" : "Degen"}
               </button>
               <button
                 onClick={() => advance("right")}
-                className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-green-500/50 bg-green-500/10 text-2xl transition-transform active:scale-90"
+                className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-green-500/50 bg-green-500/10 text-green-400 transition-transform active:scale-90"
                 aria-label="Ape in"
               >
-                ✓
+                <Check className="h-7 w-7" />
               </button>
             </div>
 
@@ -305,17 +346,18 @@ export default function LaunchpadSwipe() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-black">🦍 Aped ({watchlist.length})</h2>
+              <h2 className="text-lg font-black">Aped ({watchlist.length})</h2>
               <button
                 onClick={() => setShowWatchlist(false)}
-                className="rounded-full bg-white/10 px-3 py-1 text-sm font-bold"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/70"
+                aria-label="Close"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
             {watchlistTokens.length === 0 ? (
               <p className="mt-6 text-center text-sm text-white/40">
-                Swipe right or tap ✓ on tokens you like — they'll show up here.
+                Swipe right or tap the check button on tokens you like — they'll show up here.
               </p>
             ) : (
               <div className="mt-4 space-y-3">
@@ -324,7 +366,7 @@ export default function LaunchpadSwipe() {
                     key={t.mint}
                     className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3"
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-blue-800 to-purple-800 font-black">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#e8b84a]/30 to-[#b98a1e]/20 font-black text-[#f6d47c]">
                       {t.image_url ? (
                         <img src={t.image_url} alt={t.symbol} className="h-full w-full object-cover" />
                       ) : (
@@ -337,16 +379,16 @@ export default function LaunchpadSwipe() {
                     </div>
                     <Link
                       to={`/launchpad/token/${t.mint}`}
-                      className="shrink-0 rounded-full bg-blue-600 px-3 py-1.5 text-xs font-bold"
+                      className="shrink-0 rounded-full bg-[#e8b84a] px-3 py-1.5 text-xs font-bold text-black"
                     >
                       View
                     </Link>
                     <button
                       onClick={() => saveWatchlist(watchlist.filter((m) => m !== t.mint))}
-                      className="shrink-0 text-white/30 hover:text-red-400"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center text-white/30 hover:text-red-400"
                       aria-label="Remove"
                     >
-                      ✕
+                      <X className="h-4 w-4" />
                     </button>
                   </div>
                 ))}

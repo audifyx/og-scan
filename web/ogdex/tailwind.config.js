@@ -4,22 +4,25 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg:      "#060609",
-        panel:   "#101016",
-        panel2:  "#14141c",
-        line:    "rgba(255, 255, 255, 0.09)",
-        accent:  "#60A5FA",
-        accent2: "#F0C75E",
-        gold:    "#F0C75E",
-        term:    "#60A5FA",
-        up:      "#34d399",
-        down:    "#fb7185",
-        muted:   "rgba(255, 255, 255, 0.55)",
-        faint:   "rgba(255, 255, 255, 0.32)",
+        /* OrbitX Terminal v2 — black / white / gold / silver.
+         * Single accent: gold #e8b84a. Silver #c9d1d9 is the secondary.
+         * Up = gold, down = silver (Terminal canon, see web/src/index.css --term-*). */
+        bg:      "#050505",
+        panel:   "#0a0a0a",
+        panel2:  "#101010",
+        line:    "rgba(255, 255, 255, 0.08)",
+        accent:  "#e8b84a",
+        accent2: "#c9d1d9",
+        gold:    "#e8b84a",
+        term:    "#e8b84a",
+        up:      "#e8b84a",
+        down:    "#c9d1d9",
+        muted:   "rgba(244, 244, 242, 0.55)",
+        faint:   "rgba(244, 244, 242, 0.32)",
       },
       fontFamily: {
-        sans:    ["Manrope", "system-ui", "sans-serif"],
-        display: ["Syne", "Manrope", "sans-serif"],
+        sans:    ["Instrument Sans", "system-ui", "sans-serif"],
+        display: ["Caveat", "Instrument Sans", "cursive"],
         mono:    ["JetBrains Mono", "ui-monospace", "monospace"],
       },
     },

@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, AtSign, Eye, EyeOff, Loader2, Lock, Mail, Rocket, ShieldCheck } from "lucide-react";
+import { ArrowLeft, AtSign, Eye, EyeOff, Loader2, Lock, Mail, Rocket, ShieldCheck, Wallet, Zap } from "lucide-react";
 import { resolveAuthReturn, useAuth } from "@/hooks/useAuth";
 import { getDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
 import { SliderCaptcha } from "@/components/SliderCaptcha";
@@ -160,10 +160,34 @@ const Auth = () => {
     update: "Set a new password",
   };
 
+  const guestTo = next === "/app" ? "/orbitx-social" : next;
+
   return (
     <div className="ox-auth">
       <div className="ox-auth-bg" />
       <div className="ox-auth-inner">
+        <aside className="ox-auth-panel" aria-hidden="true">
+          <Link to="/auth" className="ox-auth-brand" tabIndex={-1}>
+            <div className="ox-auth-brand-mark"><Rocket className="h-4 w-4" /></div>
+            <div>
+              <div className="ox-auth-brand-name">Orbit<span>X</span></div>
+              <div className="ox-auth-brand-sub">email</div>
+            </div>
+          </Link>
+          <h2 className="ox-auth-panel-title">Email access,<br /><span>OrbitX</span> identity.</h2>
+          <p className="ox-auth-panel-sub">
+            The email route into OrbitX — recovery, full signup, and password
+            updates. Prefer a wallet? The main sign-in is one tap away.
+          </p>
+          <ul className="ox-auth-panel-list">
+            <li><Wallet className="h-4 w-4" /><span><b>Wallet first</b> — the main /auth screen signs you in with Solana.</span></li>
+            <li><ShieldCheck className="h-4 w-4" /><span><b>Protected signup</b> — human check + CAPTCHA keep bots out.</span></li>
+            <li><Zap className="h-4 w-4" /><span><b>Instant return</b> — sign-in drops you back where you came from.</span></li>
+          </ul>
+          <p className="ox-auth-panel-foot">Terminal · Launchpad · Social · OS</p>
+        </aside>
+
+        <div className="ox-auth-main">
         <Link to="/auth" className="ox-auth-brand">
           <div className="ox-auth-brand-mark"><Rocket className="h-4 w-4" /></div>
           <div>
@@ -182,7 +206,7 @@ const Auth = () => {
             {mode === "update" && "Choose a new password for your account."}
             {mode === "signup" && "Create an OrbitX account with email + username."}
             {mode === "signin" && (
-              <>Prefer the new flow? <Link to={`/auth?next=${encodeURIComponent(next)}`} className="text-[#60A5FA] hover:underline">Open /auth</Link></>
+              <>Prefer the new flow? <Link to={`/auth?next=${encodeURIComponent(next)}`} className="text-[#e8b84a] hover:underline">Open /auth</Link></>
             )}
           </p>
 
@@ -283,6 +307,15 @@ const Auth = () => {
               <ArrowLeft className="h-3 w-3" /> Main auth
             </Link>
           </div>
+        </div>
+
+        <div className="ox-auth-guest">
+          <p className="ox-auth-guest-label">Just looking around? No account needed to explore.</p>
+          <Link to={guestTo} className="ox-auth-guest-btn">
+            <Eye className="h-4 w-4" /> Continue browsing without signing in
+          </Link>
+          <p className="ox-auth-guest-note">You can sign in any time — we&apos;ll bring you back here.</p>
+        </div>
         </div>
       </div>
     </div>

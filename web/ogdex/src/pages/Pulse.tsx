@@ -29,7 +29,7 @@ const TYPE_META: Record<string, { label: string; Icon: typeof Zap }> = {
 
 const TONE: Record<string, { text: string; bg: string; ring: string; bar: string }> = {
   lime: { text: "text-accent", bg: "bg-accent/12", ring: "border-accent/30", bar: "bg-accent" },
-  cyan: { text: "text-blue-300", bg: "bg-blue-400/12", ring: "border-blue-400/30", bar: "bg-blue-400" },
+  cyan: { text: "text-[#e8b84a]", bg: "bg-[#e8b84a]/12", ring: "border-[#e8b84a]/30", bar: "bg-[#e8b84a]" },
   violet: { text: "text-accent2", bg: "bg-accent2/12", ring: "border-accent2/30", bar: "bg-accent2" },
   gold: { text: "text-accent2", bg: "bg-accent2/12", ring: "border-accent2/30", bar: "bg-accent2" },
   red: { text: "text-down", bg: "bg-down/12", ring: "border-down/30", bar: "bg-down" },

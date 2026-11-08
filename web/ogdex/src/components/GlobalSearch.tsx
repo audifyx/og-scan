@@ -125,7 +125,7 @@ export default function GlobalSearch() {
 
             {/* Search input */}
             <div className="relative flex items-center rounded-2xl overflow-hidden"
-              style={{ background: "#0b0b10", border: "1.5px solid rgba(96, 165, 250, 0.45)", boxShadow: "0 0 40px rgba(59, 130, 246, 0.15)" }}>
+              style={{ background: "#0a0a0a", border: "1.5px solid rgba(232, 184, 74, 0.45)", boxShadow: "0 0 40px rgba(232, 184, 74, 0.15)" }}>
               <Search className="w-5 h-5 absolute left-4 text-[var(--ox-blue-hi)] pointer-events-none" />
               <input
                 ref={inputRef}
@@ -163,11 +163,11 @@ export default function GlobalSearch() {
                             onClick={() => go(r)}
                             onMouseEnter={() => setCursor(i)}
                             className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all hover:bg-white/5"
-                            style={cursor === i ? { background: "rgba(59, 130, 246, 0.1)" } : {}}
+                            style={cursor === i ? { background: "rgba(232, 184, 74, 0.1)" } : {}}
                           >
                             {/* Icon */}
                             <div className="w-9 h-9 rounded-full shrink-0 overflow-hidden flex items-center justify-center"
-                              style={{ background: "rgba(59, 130, 246, 0.12)" }}>
+                              style={{ background: "rgba(232, 184, 74, 0.12)" }}>
                               {r.icon
                                 ? <img src={r.icon} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                                 : <TrendingUp className="w-4 h-4 text-[var(--ox-blue-hi)]" />}

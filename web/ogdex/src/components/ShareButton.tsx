@@ -20,8 +20,8 @@ export default function ShareButton({ mint, symbol, score, mcap, verdict }: { mi
   return (
     <span className="inline-flex items-center gap-1.5">
       <a href={intent} target="_blank" rel="noreferrer" onClick={(e) => { /* prefer native sheet on mobile */ if (navigator.share && /Mobi|Android/i.test(navigator.userAgent)) { e.preventDefault(); native(); } }}
-        className="btn inline-flex items-center gap-1.5 font-semibold text-white hover:opacity-90"
-        style={{ background: "linear-gradient(135deg, #3b82f6, #5aa2ff)", boxShadow: "0 4px 14px rgba(59,130,246,0.35)" }}>
+        className="btn inline-flex items-center gap-1.5 font-semibold hover:opacity-90"
+        style={{ background: "linear-gradient(135deg, #e8b84a, #c9a227)", color: "#050505", boxShadow: "0 4px 14px rgba(232,184,74,0.35)" }}>
         <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
         Share on X
       </a>

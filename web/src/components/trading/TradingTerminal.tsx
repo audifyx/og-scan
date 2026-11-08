@@ -17,7 +17,7 @@ import { browserWalletRpcUrl } from "@/lib/solanaRpc";
 import { PublicKey } from "@solana/web3.js";
 import {
   Search, Copy, ExternalLink, RefreshCw,
-  ArrowUpRight, ArrowDownLeft, Check,
+  ArrowUpRight, ArrowDownLeft, Check, ChevronUp,
   Wallet, Activity, X, Loader2, Users, Bell, Crosshair,
 } from "lucide-react";
 import type { BubbleHolder, XrayReport } from "./BubbleMap";
@@ -471,6 +471,10 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewQuote, setReviewQuote] = useState<JupQuote | null>(null);
   const [reviewQuoteLoading, setReviewQuoteLoading] = useState(false);
+  /** Mobile bottom-sheet trade panel (item 3) — the full swap UI lives in the sheet. */
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetDragY, setSheetDragY] = useState(0);
+  const sheetDragRef = useRef<{ startY: number; dragging: boolean }>({ startY: 0, dragging: false });
   const [tradeErr, setTradeErr] = useState("");
   const [tradeSig, setTradeSig] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -1163,6 +1167,16 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       .catch(() => null)
       .finally(() => setReviewQuoteLoading(false));
   }, [selectedMint, tradeReady, tradePk, swapMode, buyAmt, getFreshQuote]);
+
+  /* Close the mobile trade sheet on Escape. */
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSheetOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sheetOpen]);
 
   const selectSearchResult = useCallback(
     (token: JupTokenInfo) => {
@@ -1997,10 +2011,43 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         </div>
       </aside>
 
-      {/* ??????????????? CENTER PANEL ??????????????? */}
-      {/* Mobile swap first: on phones the trade panel sits above the chart. */}
-      <div className="lg:hidden border-b border-white/[0.07] bg-[var(--term-bg)]">
-        {renderSwapPanel()}
+      {/* ── Mobile trade bar: big Buy/Sell opens the bottom-sheet trade panel ── */}
+      <div className="border-b border-white/[0.07] bg-[var(--term-bg)] lg:hidden">
+        <div className="flex items-center gap-2 px-3 pt-2.5">
+          <button
+            type="button"
+            disabled={!selectedMint}
+            onClick={() => {
+              setSwapMode("buy");
+              setSheetOpen(true);
+            }}
+            className="h-12 flex-1 rounded-xl bg-green-500 text-sm font-bold text-black disabled:opacity-50"
+          >
+            Buy {t?.symbol || "token"}
+          </button>
+          <button
+            type="button"
+            disabled={!selectedMint}
+            onClick={() => {
+              setSwapMode("sell");
+              setSheetOpen(true);
+            }}
+            className="h-12 flex-1 rounded-xl bg-red-500 text-sm font-bold text-white disabled:opacity-50"
+          >
+            Sell {t?.symbol || "token"}
+          </button>
+          <button
+            type="button"
+            aria-label="Open trade panel"
+            onClick={() => setSheetOpen(true)}
+            className="flex h-12 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-white/70"
+          >
+            <ChevronUp className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="px-3 pb-2 pt-1.5 text-center text-[10px] text-white/40">
+          Presets, slippage and your position live in the trade sheet
+        </p>
       </div>
       <div className={`flex min-w-0 flex-col ${deskMode ? "min-h-[85vh] lg:min-h-0 lg:flex-1 lg:overflow-hidden" : "min-h-0 flex-1 overflow-hidden"}`}>
 
@@ -2549,7 +2596,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           </div>
         )}
 
-        {/* Token Info on mobile (swap panel now renders above the chart) */}
+        {/* Token Info on mobile (trade panel now lives in the bottom sheet) */}
         {security && (
           <div className="p-4">
             <h3 className="text-xs font-semibold text-white/60 mb-3 flex items-center gap-1.5">
@@ -2586,6 +2633,62 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       </div>
     </div>
 
+    {/* ── Mobile trade sheet (item 3): bottom sheet, drag the handle down to close ── */}
+    {sheetOpen && (
+      <div className="fixed inset-0 z-[55] lg:hidden" role="dialog" aria-label="Trade panel">
+        <button
+          type="button"
+          aria-label="Close trade panel"
+          onClick={() => setSheetOpen(false)}
+          className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        />
+        <div
+          className="absolute inset-x-0 bottom-0 max-h-[88vh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-[#e8b84a]/25 bg-[#0d0d0d] pb-[env(safe-area-inset-bottom)] shadow-[0_-12px_40px_rgba(0,0,0,0.6)]"
+          style={{
+            transform: sheetDragY ? `translateY(${sheetDragY}px)` : undefined,
+            transition: sheetDragY ? "none" : "transform 200ms ease-out",
+          }}
+        >
+          <div
+            className="sticky top-0 z-10 touch-none bg-[#0d0d0d] pb-1 pt-2.5"
+            onTouchStart={(e) => {
+              sheetDragRef.current = { startY: e.touches[0].clientY, dragging: true };
+            }}
+            onTouchMove={(e) => {
+              if (!sheetDragRef.current.dragging) return;
+              const dy = e.touches[0].clientY - sheetDragRef.current.startY;
+              setSheetDragY(dy > 0 ? dy : 0);
+            }}
+            onTouchEnd={() => {
+              sheetDragRef.current.dragging = false;
+              if (sheetDragY > 90) setSheetOpen(false);
+              setSheetDragY(0);
+            }}
+          >
+            <div className="mx-auto h-1.5 w-12 rounded-full bg-white/25" />
+            <div className="mt-2 flex items-center justify-between px-4">
+              <p className="text-sm font-bold">
+                Trade {t?.symbol || "token"}
+                {curPrice > 0 && (
+                  <span className="ml-2 font-mono text-xs font-semibold text-white/50">{fmtUsd(curPrice)}</span>
+                )}
+              </p>
+              <button
+                type="button"
+                aria-label="Close trade panel"
+                onClick={() => setSheetOpen(false)}
+                className="rounded-full p-1.5 text-white/50 hover:bg-white/10 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+          {renderSwapPanel()}
+          <div className="h-4" />
+        </div>
+      </div>
+    )}
+
     {/* ── Pre-trade review (confirmation UI only; Confirm runs handleSwap) ── */}
     {reviewOpen && (
       <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center" onClick={() => setReviewOpen(false)}>
@@ -2595,7 +2698,29 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             const recv = swapMode === "buy"
               ? (buyReceiveUi ?? (reviewQuote && typeof dec === "number" ? Number(reviewQuote.outAmount) / 10 ** dec : null))
               : (reviewQuote ? Number(reviewQuote.outAmount) / 1e9 : null);
-            const minRecv = recv != null ? recv * (1 - (Number(slippage) || 0) / 100) : null;
+            // Minimum received straight from the Jupiter quote (otherAmountThreshold),
+            // falling back to the slippage-derived estimate only if the API omits it.
+            const outDec = swapMode === "buy" ? (typeof dec === "number" ? dec : null) : 9;
+            const minRecvApi =
+              reviewQuote?.otherAmountThreshold && outDec != null
+                ? Number(reviewQuote.otherAmountThreshold) / 10 ** outDec
+                : null;
+            const minRecv =
+              minRecvApi != null && Number.isFinite(minRecvApi)
+                ? minRecvApi
+                : recv != null
+                  ? recv * (1 - (Number(slippage) || 0) / 100)
+                  : null;
+            // Route legs as Jupiter reports them — DEX label + route share per leg.
+            // Jupiter does NOT return per-leg price impact, so only the overall
+            // impact (above) is shown; nothing here is invented.
+            const legs = Array.isArray(reviewQuote?.routePlan) ? reviewQuote.routePlan : [];
+            const mintLabel = (m: string) =>
+              m === SOL_MINT
+                ? "SOL"
+                : m === selectedMint
+                  ? selectedToken?.symbol || t?.symbol || shortAddr(m, 4)
+                  : shortAddr(m, 4);
             const impact = reviewQuote?.priceImpactPct != null && Number.isFinite(Number(reviewQuote.priceImpactPct))
               ? Number(reviewQuote.priceImpactPct) * 100
               : null;
@@ -2616,6 +2741,37 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                   <div className={row}><span className="text-white/50">Price impact</span><span className="font-mono font-semibold">{impact != null ? `${impact.toFixed(2)}%` : "—"}</span></div>
                   <div className={row}><span className="text-white/50">Fee</span><span className="font-semibold">{reviewQuote ? "Included in route quote" : "Applied by the route at execution"}</span></div>
                 </div>
+                {legs.length > 0 ? (
+                  <div className="rounded-xl border border-white/10 bg-black/40 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-white/60">Swap route</p>
+                      <span className="text-[10px] text-white/40">via Jupiter</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {legs.map((leg, i) => (
+                        <div key={i} className="flex items-center justify-between gap-2 text-[12px]">
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#e8b84a]/15 font-mono text-[9px] font-bold text-[#e8b84a]">
+                              {i + 1}
+                            </span>
+                            <span className="shrink-0 font-semibold">{leg.swapInfo?.label || "DEX"}</span>
+                            <span className="truncate font-mono text-[11px] text-white/40">
+                              {mintLabel(leg.swapInfo?.inputMint || "")} → {mintLabel(leg.swapInfo?.outputMint || "")}
+                            </span>
+                          </span>
+                          <span className="shrink-0 font-mono text-white/70">{leg.percent}%</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[10px] leading-relaxed text-white/40">
+                      Jupiter reports overall price impact for the whole route, not per leg — see Price impact above.
+                    </p>
+                  </div>
+                ) : reviewQuote ? (
+                  <p className="text-[11px] leading-relaxed text-white/40">
+                    Route detail unavailable for this quote — Jupiter returned no route legs.
+                  </p>
+                ) : null}
                 <p className="text-[11px] leading-relaxed text-white/40">The quote refreshes at execution — final amounts may vary slightly from the estimate above.</p>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setReviewOpen(false)} className="min-h-[44px] flex-1 rounded-xl border border-white/10 bg-white/[0.05] text-sm font-bold">Cancel</button>

@@ -55,7 +55,7 @@ export default function More() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {g.items.map((it) => (
               <Link key={it.to} to={it.to} className="group">
-                <DexPanel className="flex items-center gap-3 transition hover:border-[rgba(96,165,250,0.4)] hover:-translate-y-0.5">
+                <DexPanel className="flex items-center gap-3 transition hover:border-[rgba(232,184,74,0.4)] hover:-translate-y-0.5">
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-[var(--ox-silver-dim)] bg-black/40 text-[var(--ox-gold-hi)]">
                     <it.Icon className="h-5 w-5" />
                   </span>

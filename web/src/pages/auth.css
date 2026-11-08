@@ -1,7 +1,8 @@
-/* OrbitX auth — black / gold / blue / silver */
+/* OrbitX auth — premium black / white / gold / silver. Accent #e8b84a. */
 .ox-auth {
-  --ox-gold: #d4af37;
-  --ox-gold-hi: #f0c75e;
+  --ox-gold: #e8b84a;
+  --ox-gold-hi: #f6d47c;
+  --ox-gold-deep: #b98a1e;
   --ox-blue: #3b82f6;
   --ox-blue-hi: #60a5fa;
   --ox-silver: #a8b0bc;
@@ -16,8 +17,8 @@
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(900px 480px at 12% -8%, rgba(59, 130, 246, 0.16), transparent 55%),
-    radial-gradient(800px 420px at 92% 0%, rgba(212, 175, 55, 0.12), transparent 55%),
+    radial-gradient(900px 480px at 12% -8%, rgba(232, 184, 74, 0.14), transparent 55%),
+    radial-gradient(800px 420px at 92% 0%, rgba(232, 184, 74, 0.08), transparent 55%),
     linear-gradient(rgba(168, 176, 188, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(168, 176, 188, 0.03) 1px, transparent 1px),
     #050505;
@@ -35,6 +36,97 @@
   justify-content: center;
   padding: 24px 16px;
 }
+/* Desktop: brand panel beside the form — premium split auth screen. */
+@media (min-width: 900px) {
+  .ox-auth-inner {
+    max-width: 920px;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+    padding: 32px 24px;
+  }
+  .ox-auth-panel {
+    display: flex;
+  }
+  .ox-auth-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+  }
+}
+.ox-auth-panel {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 28px;
+  padding: 40px 44px;
+  border: 1px solid rgba(232, 184, 74, 0.22);
+  border-right: 0;
+  border-radius: 24px 0 0 24px;
+  background: linear-gradient(160deg, rgba(232, 184, 74, 0.1), rgba(10, 10, 10, 0.98) 55%);
+}
+.ox-auth-panel .ox-auth-brand {
+  margin-bottom: 0;
+}
+.ox-auth-panel-title {
+  margin: 0;
+  font-family: "Syne", sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.ox-auth-panel-title span { color: var(--ox-gold-hi); }
+.ox-auth-panel-sub {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ox-silver);
+}
+.ox-auth-panel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ox-auth-panel-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.85);
+}
+.ox-auth-panel-list li svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--ox-gold-hi);
+}
+.ox-auth-panel-list li b { color: #fff; }
+.ox-auth-panel-foot {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(168, 176, 188, 0.6);
+}
+.ox-auth-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+@media (min-width: 900px) {
+  .ox-auth-main .ox-auth-brand { display: none; }
+  .ox-auth-main .ox-auth-card { border-radius: 0 24px 24px 0; }
+}
 .ox-auth-brand {
   display: flex;
   align-items: center;
@@ -50,8 +142,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  border: 1px solid rgba(212, 175, 55, 0.45);
-  background: linear-gradient(135deg, rgba(240, 199, 94, 0.25), rgba(59, 130, 246, 0.15));
+  border: 1px solid rgba(232, 184, 74, 0.55);
+  background: linear-gradient(135deg, rgba(246, 212, 124, 0.28), rgba(232, 184, 74, 0.08));
   color: var(--ox-gold-hi);
 }
 .ox-auth-brand-name {
@@ -72,7 +164,7 @@
   width: 100%;
   border-radius: 20px;
   border: 1px solid rgba(192, 198, 210, 0.16);
-  background: linear-gradient(180deg, rgba(14, 14, 14, 0.98), rgba(8, 8, 8, 0.99));
+  background: linear-gradient(180deg, rgba(16, 16, 16, 0.98), rgba(8, 8, 8, 0.99));
   padding: 24px 20px 22px;
   box-shadow: 0 24px 80px -32px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
@@ -137,6 +229,8 @@
   text-transform: uppercase;
   color: var(--ox-silver);
   background: transparent;
+  border: 0;
+  cursor: pointer;
 }
 .ox-auth-tab--on {
   color: #0a0a0a;
@@ -171,7 +265,7 @@
   text-transform: none;
   font-weight: 500;
 }
-.ox-auth-input:focus { border-color: rgba(59, 130, 246, 0.55); }
+.ox-auth-input:focus { border-color: rgba(232, 184, 74, 0.65); box-shadow: 0 0 0 3px rgba(232, 184, 74, 0.12); }
 .ox-auth-pw { position: relative; }
 .ox-auth-pw .ox-auth-input { padding-right: 44px; }
 .ox-auth-eye {
@@ -180,6 +274,9 @@
   top: 50%;
   transform: translateY(-50%);
   color: var(--ox-silver);
+  background: none;
+  border: 0;
+  cursor: pointer;
 }
 .ox-auth-btn {
   display: inline-flex;
@@ -188,7 +285,7 @@
   gap: 8px;
   width: 100%;
   border-radius: 12px;
-  border: 1px solid rgba(240, 199, 94, 0.5);
+  border: 1px solid rgba(246, 212, 124, 0.5);
   background: linear-gradient(180deg, var(--ox-gold-hi), var(--ox-gold));
   padding: 13px 16px;
   font-family: "Syne", sans-serif;
@@ -220,7 +317,7 @@
   margin-top: 8px;
 }
 .ox-auth-btn--ghost:hover:not(:disabled) {
-  border-color: rgba(212, 175, 55, 0.45);
+  border-color: rgba(232, 184, 74, 0.55);
   color: var(--ox-gold-hi);
 }
 .ox-auth-links {
@@ -240,7 +337,34 @@
   text-decoration: none;
 }
 .ox-auth-links a:hover,
-.ox-auth-links button:hover { color: var(--ox-blue-hi); }
+.ox-auth-links button:hover { color: var(--ox-gold-hi); }
+/* Wallet-first block: the primary sign-in path, visually elevated. */
+.ox-auth-wallet-block {
+  margin-top: 20px;
+  border: 1px solid rgba(232, 184, 74, 0.35);
+  border-radius: 16px;
+  padding: 14px;
+  background: linear-gradient(180deg, rgba(232, 184, 74, 0.07), rgba(232, 184, 74, 0.02));
+}
+.ox-auth-wallet-block .ox-auth-wallet { margin-top: 0; }
+.ox-auth-wallet-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ox-gold-hi);
+}
+.ox-auth-wallet-head svg { flex-shrink: 0; }
+.ox-auth-wallet-note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ox-silver);
+}
 .ox-auth-wallet { margin-top: 0; }
 .ox-auth-social { margin-top: 20px; }
 .ox-auth-btn--x {
@@ -278,14 +402,14 @@
   margin: 0 0 10px;
   padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(240, 199, 94, 0.45);
-  background: rgba(240, 199, 94, 0.12);
+  border: 1px solid rgba(246, 212, 124, 0.45);
+  background: rgba(246, 212, 124, 0.12);
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--ox-gold-hi, #f0c75e);
+  color: var(--ox-gold-hi, #f6d47c);
 }
 .ox-auth-bullets {
   margin-top: 14px;
@@ -302,7 +426,47 @@
   align-items: center;
   gap: 8px;
 }
-.ox-auth-bullets svg { color: var(--ox-blue-hi); flex-shrink: 0; }
+.ox-auth-bullets svg { color: var(--ox-gold-hi); flex-shrink: 0; }
+/* Guest path — a first-class way in, not a bolted-on link. */
+.ox-auth-guest {
+  margin-top: 18px;
+  border-top: 1px solid rgba(192, 198, 210, 0.12);
+  padding-top: 16px;
+  text-align: center;
+}
+.ox-auth-guest-label {
+  margin: 0 0 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ox-silver);
+}
+.ox-auth-guest-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(192, 198, 210, 0.22);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.ox-auth-guest-btn:hover {
+  border-color: rgba(232, 184, 74, 0.55);
+  background: rgba(232, 184, 74, 0.06);
+  color: var(--ox-gold-hi);
+}
+.ox-auth-guest-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: rgba(168, 176, 188, 0.7);
+}
 .ox-auth-back {
   margin-top: 18px;
   display: inline-flex;
@@ -318,8 +482,8 @@
    Vars live on .ox-auth, which this picker is not inside — copy them here
    so gold/blue buttons don't render as empty black slots. */
 .ox-auth-picker {
-  --ox-gold: #d4af37;
-  --ox-gold-hi: #f0c75e;
+  --ox-gold: #e8b84a;
+  --ox-gold-hi: #f6d47c;
   --ox-blue: #3b82f6;
   --ox-blue-hi: #60a5fa;
   --ox-silver: #a8b0bc;
@@ -359,7 +523,7 @@
   margin-top: 0;
 }
 .ox-auth-picker .ox-auth-btn {
-  background: linear-gradient(180deg, #f0c75e, #d4af37);
+  background: linear-gradient(180deg, #f6d47c, #e8b84a);
   color: #0a0a0a;
 }
 .ox-auth-picker .ox-auth-btn--blue {

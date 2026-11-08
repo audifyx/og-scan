@@ -1,12 +1,12 @@
 /* Mirrored OrbitX iOS shell tokens for ogdex SPA */
 
 .dex-ios {
-  --ios-bg: #0b0d12;
+  --ios-bg: #050505;
   --ios-line: rgba(255, 255, 255, 0.08);
-  --ios-text: #ffffff;
-  --ios-secondary: rgba(255, 255, 255, 0.72);
-  --ios-tertiary: rgba(255, 255, 255, 0.48);
-  --ios-accent: #e8c547;
+  --ios-text: #f4f4f2;
+  --ios-secondary: rgba(244, 244, 242, 0.72);
+  --ios-tertiary: rgba(244, 244, 242, 0.48);
+  --ios-accent: #e8b84a;
   --ios-tab-h: 52px;
   --ios-safe-b: env(safe-area-inset-bottom, 0px);
   --ios-safe-t: env(safe-area-inset-top, 0px);
@@ -45,7 +45,7 @@
   align-items: center;
   min-height: 48px;
   padding: max(0.4rem, var(--ios-safe-t)) 0.65rem 0.4rem;
-  background: rgba(11, 13, 18, 0.82);
+  background: rgba(5, 5, 5, 0.82);
   backdrop-filter: blur(20px) saturate(160%);
   border-bottom: 1px solid var(--ios-line);
 }
@@ -116,7 +116,7 @@
   gap: 0.15rem;
   padding: 0.3rem 0.4rem calc(0.3rem + var(--ios-safe-b));
   min-height: calc(var(--ios-tab-h) + var(--ios-safe-b));
-  background: rgba(16, 20, 28, 0.9);
+  background: rgba(5, 5, 5, 0.9);
   backdrop-filter: blur(22px) saturate(160%);
   border-top: 1px solid var(--ios-line);
 }
@@ -177,7 +177,7 @@
 }
 
 .dex-ios-rail-link.is-on {
-  background: rgba(232, 197, 71, 0.14);
+  background: rgba(232, 184, 74, 0.14);
   color: var(--ios-accent);
 }
 
@@ -202,7 +202,7 @@
     flex-shrink: 0;
     padding: max(0.85rem, var(--ios-safe-t)) 0.75rem 1rem;
     border-right: 1px solid var(--ios-line);
-    background: rgba(11, 13, 18, 0.72);
+    background: rgba(5, 5, 5, 0.72);
     backdrop-filter: blur(20px) saturate(150%);
     position: sticky;
     top: 0;
@@ -245,7 +245,7 @@
 
 /* ── Unified header (matches orbitx.world app header) ── */
 .unified-header {
-  background: #000;
+  background: #050505;
   border-bottom: 1px solid rgba(255,255,255,0.07);
 }
 .unified-header__top {
@@ -280,7 +280,7 @@
   letter-spacing: -0.01em;
 }
 .unified-header__x {
-  color: #5aa2ff;
+  color: #e8b84a;
 }
 .unified-header__tag {
   font-size: 8px;
@@ -312,7 +312,7 @@
   bottom: 4px;
   height: 3px;
   border-radius: 2px;
-  background: #3b82f6;
+  background: #e8b84a;
 }
 .unified-header__search {
   flex: 1;
@@ -334,12 +334,12 @@
   place-items: center;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.09);
-  color: #5aa2ff;
+  color: #e8b84a;
   cursor: pointer;
   transition: background 0.15s;
 }
 .unified-header__iconbtn:hover { background: rgba(255,255,255,0.1); }
-.unified-header__iconbtn--star { color: #f0c75e; }
+.unified-header__iconbtn--star { color: #e8b84a; }
 .unified-header__dot {
   position: absolute;
   top: 8px;
@@ -347,7 +347,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: #e8b84a;
 }
 .unified-header__stats {
   display: flex;
@@ -355,7 +355,7 @@
   gap: 0;
   margin: 0 20px 12px;
   padding: 14px 20px;
-  background: #0a0a0e;
+  background: #0a0a0a;
   border: 1px solid rgba(255,255,255,0.07);
   border-radius: 14px;
   max-width: 1560px;

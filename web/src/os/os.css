@@ -1252,6 +1252,88 @@
 .oxos-deskwd .up { color: #34d399; }
 .oxos-deskwd .down { color: #f87171; }
 
+/* Home widgets (wave 7): Fear & Greed gauge, Mini Swap, Portfolio. */
+.oxos-deskwd__fng { display: flex; flex-direction: column; gap: 4px; }
+.oxos-deskwd__fnghist { display: flex; align-items: flex-end; gap: 3px; height: 28px; margin-top: 2px; }
+.oxos-deskwd__fnghist span { flex: 1; border-radius: 2px 2px 0 0; min-height: 3px; }
+.oxos-deskwd__swap { display: flex; flex-direction: column; gap: 8px; }
+.oxos-deskwd__swapmodes { display: flex; gap: 6px; }
+.oxos-deskwd__swapmodes button,
+.oxos-deskwd__swappcts button {
+  flex: 1;
+  border: 1px solid rgba(var(--os-line-rgb), 0.16);
+  background: rgba(var(--os-line-rgb), 0.06);
+  color: rgb(var(--os-text-rgb));
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.oxos-deskwd__swapmodes button.is-on,
+.oxos-deskwd__swappcts button.is-on {
+  background: #e8b84a;
+  border-color: #e8b84a;
+  color: #111;
+}
+.oxos-deskwd__swapfield { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: rgba(var(--os-text-rgb), 0.65); }
+.oxos-deskwd__swapfield .oxos-input { width: 100%; }
+.oxos-deskwd__swappcts { display: flex; gap: 6px; }
+.oxos-deskwd__swapcta { width: 100%; justify-content: center; }
+.oxos-deskwd__err { margin: 0; color: #f87171; font-size: 12px; }
+.oxos-deskwd__linkbtn { background: none; border: 0; color: #e8b84a; cursor: pointer; font-size: 12px; padding: 0; }
+.oxos-deskwd__portfolio { display: flex; flex-direction: column; gap: 6px; }
+.oxos-deskwd__portfolio .oxos-btn { align-self: flex-start; }
+
+/* Phone widget strip: desk widgets are hidden under 768px, so the phone
+   home renders them here as a swipeable row of cards above the app grid. */
+.oxos-phone__widgets {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 2px 10px;
+  scrollbar-width: none;
+  flex: none;
+}
+.oxos-phone__widgets::-webkit-scrollbar { display: none; }
+.oxos-phone__widget {
+  flex: 0 0 248px;
+  width: 248px;
+  background: rgba(var(--os-panel-rgb), 0.78);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(var(--os-line-rgb), 0.12);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.oxos-phone__widgethead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(var(--os-line-rgb), 0.05);
+}
+.oxos-phone__widgethead button {
+  background: none;
+  border: 0;
+  color: rgb(var(--os-text-rgb));
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0;
+}
+.oxos-phone__widgetbody {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.oxos-phone__widgetbody .up { color: #34d399; }
+.oxos-phone__widgetbody .down { color: #f87171; }
+.oxos-phone__widgetbody .oxos-input { width: 100%; }
+
 /* In-OS Browser. */
 .oxos-browser { display: flex; flex-direction: column; height: 100%; }
 .oxos-browser__tabs { display: flex; gap: 4px; padding: 8px 8px 0; overflow-x: auto; }

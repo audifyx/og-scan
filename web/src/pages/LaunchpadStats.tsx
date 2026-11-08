@@ -3,6 +3,7 @@
  * Read-only aggregates over launchpad_tokens. No wallet, no trading.
  */
 import { useState, useEffect } from "react";
+import { BarChart3 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 interface LaunchToken {
@@ -113,7 +114,7 @@ export default function LaunchpadStats() {
 
   const statusSegments = [
     { label: "Live", count: byStatus.live, color: "bg-green-500" },
-    { label: "Trending", count: byStatus.trending, color: "bg-orange-500" },
+    { label: "Trending", count: byStatus.trending, color: "bg-[#e8b84a]" },
     { label: "Graduated", count: byStatus.graduated, color: "bg-purple-500" },
   ];
   const other = total - byStatus.live - byStatus.trending - byStatus.graduated;
@@ -124,8 +125,8 @@ export default function LaunchpadStats() {
       <div className="border-b border-white/10">
         <div className="mx-auto max-w-6xl px-4 py-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 text-xl font-black">
-              📊
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#e8b84a]/50 bg-gradient-to-br from-[#f6d47c]/25 to-[#e8b84a]/10 text-[#f6d47c]">
+              <BarChart3 className="h-5 w-5" />
             </div>
             <div>
               <h1 className="text-2xl font-black tracking-tight">Launchpad Stats</h1>
@@ -204,11 +205,11 @@ export default function LaunchpadStats() {
                       className="flex items-center gap-3 rounded-xl bg-white/[0.02] p-3 transition-colors hover:bg-white/[0.05]"
                     >
                       <span className="w-6 text-center text-sm font-black text-white/30">#{i + 1}</span>
-                      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-blue-800 to-purple-800">
+                      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-[#e8b84a]/30 to-[#b98a1e]/20">
                         {t.image_url ? (
                           <img src={t.image_url} alt={t.symbol} className="h-full w-full object-cover" loading="lazy" />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-xs font-black text-white/60">
+                          <div className="flex h-full w-full items-center justify-center text-xs font-black text-[#f6d47c]/70">
                             {t.symbol.charAt(0)}
                           </div>
                         )}
@@ -217,7 +218,7 @@ export default function LaunchpadStats() {
                         <p className="truncate text-sm font-bold">{t.name}</p>
                         <p className="text-xs text-white/40">${t.symbol}</p>
                       </div>
-                      <p className="shrink-0 text-sm font-bold text-blue-300">{fmtUsd(t.market_cap_usd)}</p>
+                      <p className="shrink-0 text-sm font-bold text-[#f6d47c]">{fmtUsd(t.market_cap_usd)}</p>
                     </a>
                   ))}
                 </div>
@@ -231,14 +232,14 @@ export default function LaunchpadStats() {
                   {topCreators.map(([name, count], i) => (
                     <div key={name} className="flex items-center gap-3">
                       <span className="w-6 text-center text-sm font-black text-white/30">#{i + 1}</span>
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-800 to-purple-800 text-sm font-black text-white/70">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#e8b84a]/30 to-[#b98a1e]/20 text-sm font-black text-[#f6d47c]">
                         {name.charAt(0).toUpperCase()}
                       </div>
                       <p className="flex-1 truncate text-sm font-bold">{name}</p>
                       <div className="flex w-32 items-center gap-2">
                         <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/5">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-500"
+                            className="h-full rounded-full bg-gradient-to-r from-[#b98a1e] to-[#f6d47c]"
                             style={{ width: `${(count / maxCreator) * 100}%` }}
                           />
                         </div>
@@ -258,7 +259,7 @@ export default function LaunchpadStats() {
                   <div key={i} className="flex flex-1 flex-col items-center justify-end gap-2">
                     <span className="text-xs font-bold text-white/60">{d.count}</span>
                     <div
-                      className="w-full rounded-t-lg bg-gradient-to-t from-blue-700 to-purple-500 transition-all"
+                      className="w-full rounded-t-lg bg-gradient-to-t from-[#b98a1e] to-[#f6d47c] transition-all"
                       style={{ height: `${Math.max(4, (d.count / maxDay) * 120)}px` }}
                       title={`${d.count} launches`}
                     />
@@ -272,7 +273,7 @@ export default function LaunchpadStats() {
             <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-center">
               <p className="text-sm text-white/40">
                 Stats update live as tokens launch via the MCP —{" "}
-                <code className="rounded bg-white/5 px-2 py-0.5 text-xs text-blue-300">orbitx.world/api/mcp-launchpad</code>
+                <code className="rounded bg-white/5 px-2 py-0.5 text-xs text-[#f6d47c]">orbitx.world/api/mcp-launchpad</code>
               </p>
             </div>
           </>

@@ -6,7 +6,7 @@ import {
 
 const APPS = [
   { id: "hub", label: "Hub", href: "/", Icon: Home, gradient: "linear-gradient(145deg, #5eead4 0%, #14b8a6 60%, #0f766e 100%)", glow: "rgba(45,212,191,0.45)" },
-  { id: "dex", label: "OrbitX DEX", href: "/ORBITX_DEX", Icon: TrendingUp, gradient: "linear-gradient(145deg, #60a5fa 0%, #2563eb 60%, #1e40af 100%)", glow: "rgba(59,130,246,0.45)" },
+  { id: "dex", label: "OrbitX DEX", href: "/ORBITX_DEX", Icon: TrendingUp, gradient: "linear-gradient(145deg, #f5d67a 0%, #e8b84a 60%, #9a7414 100%)", glow: "rgba(232,184,74,0.45)" },
   { id: "trade", label: "Trade", href: "/trade", Icon: ArrowRight, gradient: "linear-gradient(145deg, #c4b5fd 0%, #8b5cf6 60%, #6d28d9 100%)", glow: "rgba(139,92,246,0.45)" },
   { id: "shop", label: "Shop", href: "/shop", Icon: Lock, gradient: "linear-gradient(145deg, #5eead4 0%, #0d9488 60%, #115e59 100%)", glow: "rgba(45,212,191,0.45)" },
   { id: "supercomputer", label: "Super Comp...", href: "/supercomputer", Icon: Crosshair, gradient: "linear-gradient(145deg, #5eead4 0%, #14b8a6 60%, #0f766e 100%)", glow: "rgba(45,212,191,0.45)" },
@@ -71,13 +71,13 @@ export default function AppSwitcher() {
           width: 46px;
           height: 46px;
           border-radius: 16px;
-          background: linear-gradient(145deg, rgba(59,130,246,0.3), rgba(37,99,235,0.15));
-          border: 1px solid rgba(96,165,250,0.5);
-          color: #93c5fd;
+          background: linear-gradient(145deg, rgba(232,184,74,0.3), rgba(232,184,74,0.15));
+          border: 1px solid rgba(232,184,74,0.5);
+          color: #e8b84a;
           cursor: pointer;
           transition: all 0.22s cubic-bezier(0.22,1,0.36,1);
           box-shadow:
-            0 6px 20px rgba(59,130,246,0.35),
+            0 6px 20px rgba(232,184,74,0.35),
             inset 0 1px 0 rgba(255,255,255,0.2),
             inset 0 -2px 4px rgba(0,0,0,0.25);
           position: relative;
@@ -95,11 +95,11 @@ export default function AppSwitcher() {
         .app-switcher-btn:hover {
           transform: translateY(-2px) scale(1.05);
           box-shadow:
-            0 10px 32px rgba(59,130,246,0.5),
+            0 10px 32px rgba(232,184,74,0.5),
             inset 0 1px 0 rgba(255,255,255,0.25),
             inset 0 -2px 4px rgba(0,0,0,0.2);
-          border-color: rgba(147,197,253,0.7);
-          color: #dbeafe;
+          border-color: rgba(232,184,74,0.7);
+          color: #f5d67a;
         }
         .app-switcher-btn:active { transform: translateY(0) scale(0.96); }
         .asw-overlay {
@@ -121,13 +121,13 @@ export default function AppSwitcher() {
           max-width: 480px;
           max-height: 78vh;
           overflow-y: auto;
-          background: linear-gradient(160deg, #0c0d14 0%, #060609 50%, #0a0b12 100%);
+          background: linear-gradient(160deg, #0a0a0a 0%, #050505 50%, #0a0a0a 100%);
           border: 1px solid rgba(255,255,255,0.1);
           border-radius: 32px;
           padding: 32px 28px 24px;
           box-shadow:
             0 40px 120px rgba(0,0,0,0.85),
-            0 0 80px rgba(59,130,246,0.08),
+            0 0 80px rgba(232,184,74,0.08),
             inset 0 1px 0 rgba(255,255,255,0.08);
           animation: aswPop 0.38s cubic-bezier(0.22,1,0.36,1);
           scrollbar-width: none;
@@ -229,13 +229,13 @@ export default function AppSwitcher() {
           border-radius: 26px;
           display: grid;
           place-items: center;
-          background: linear-gradient(145deg, rgba(45,212,191,0.28), rgba(13,148,136,0.14));
-          border: 1px solid rgba(94,234,212,0.45);
-          color: #5eead4;
+          background: linear-gradient(145deg, rgba(232,184,74,0.28), rgba(232,184,74,0.14));
+          border: 1px solid rgba(232,184,74,0.45);
+          color: #e8b84a;
           cursor: pointer;
           transition: all 0.24s cubic-bezier(0.22,1,0.36,1);
           box-shadow:
-            0 10px 32px rgba(45,212,191,0.3),
+            0 10px 32px rgba(232,184,74,0.3),
             inset 0 2px 0 rgba(255,255,255,0.2),
             inset 0 -3px 6px rgba(0,0,0,0.25);
           overflow: hidden;
@@ -253,11 +253,11 @@ export default function AppSwitcher() {
         .asw-close:hover {
           transform: translateX(-50%) scale(1.1) rotate(90deg);
           box-shadow:
-            0 14px 44px rgba(45,212,191,0.45),
+            0 14px 44px rgba(232,184,74,0.45),
             inset 0 2px 0 rgba(255,255,255,0.25),
             inset 0 -3px 6px rgba(0,0,0,0.2);
-          border-color: rgba(153,246,228,0.7);
-          color: #99f6e4;
+          border-color: rgba(232,184,74,0.7);
+          color: #f5d67a;
         }
         .asw-close:active { transform: translateX(-50%) scale(0.94); }
         @media (max-width: 420px) {

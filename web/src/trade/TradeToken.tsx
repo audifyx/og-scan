@@ -393,6 +393,16 @@ export default function TradeToken() {
   const buyVol = Number(t.buyVolume) || 0;
   const sellVol = Number(t.sellVolume) || 0;
   const buyPct = buyVol + sellVol > 0 ? Math.round((buyVol / (buyVol + sellVol)) * 100) : null;
+  // Rug-check summary — same sources the Safety / X-ray tabs read, reused up top.
+  const top10Pct =
+    safety?.top10HoldersPercent ?? safety?.top10Pct ?? xray?.concentration?.top10Pct ?? null;
+  const lpLocked =
+    safety?.lpLockedPct ?? safety?.lpBurned ?? xray?.safety?.lpLockedPct ?? null;
+  const mintRenounced =
+    safety?.mintRenounced ?? (safety?.mintable === false ? true : null) ?? xray?.safety?.mintRenounced ?? null;
+  const freezeRenounced =
+    safety?.freezeRenounced ?? (safety?.freezable === false ? true : null) ?? xray?.safety?.freezeRenounced ?? null;
+  const riskScore = safety?.riskScore ?? safetyApi?.riskScore ?? xray?.safety?.riskScore ?? null;
 
   const tabs = useMemo(
     () =>
@@ -560,6 +570,59 @@ export default function TradeToken() {
         </a>
       </div>
 
+      {/* Chart-first: OG score front and center, chart directly below the hero. */}
+      {(score != null || verdict) && (
+        <div className="mx-4 mb-3 rounded-2xl border border-[#e8b84a]/30 bg-gradient-to-br from-[#e8b84a]/10 via-[#050505] to-[#050505] p-4">
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-2xl border border-[#e8b84a]/40 bg-black/60">
+              <span className="font-mono text-2xl font-bold leading-none text-[#e8b84a]">
+                {score != null ? Math.round(Number(score)) : "—"}
+              </span>
+              <span className="mt-1 text-[8px] uppercase tracking-wider text-white/50">/ 100</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#e8b84a]">OG Score</p>
+              {verdict && <p className="mt-0.5 truncate text-sm font-bold">{verdict}</p>}
+              <p className="mt-0.5 text-[11px] text-white/50">
+                {riskScore != null ? `Risk ${riskScore}` : "Risk unknown"}
+                {top10Pct != null ? ` · Top 10 hold ${Number(top10Pct).toFixed(1)}%` : ""}
+                {totalHolders != null ? ` · ${fmtNum(totalHolders)} holders` : ""}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setTab("safety")}
+              className="shrink-0 rounded-full border border-[#e8b84a]/40 px-3 py-1.5 text-[11px] font-bold text-[#e8b84a] hover:bg-[#e8b84a]/10"
+            >
+              Safety
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <span className={`rounded-lg border px-2 py-0.5 text-[10px] font-semibold ${mintRenounced ? "border-green-400/30 bg-green-400/10 text-green-400" : mintRenounced === false ? "border-red-400/30 bg-red-400/10 text-red-400" : "border-white/10 bg-white/5 text-white/50"}`}>
+              Mint {mintRenounced ? "renounced" : mintRenounced === false ? "live" : "unknown"}
+            </span>
+            <span className={`rounded-lg border px-2 py-0.5 text-[10px] font-semibold ${freezeRenounced ? "border-green-400/30 bg-green-400/10 text-green-400" : freezeRenounced === false ? "border-red-400/30 bg-red-400/10 text-red-400" : "border-white/10 bg-white/5 text-white/50"}`}>
+              Freeze {freezeRenounced ? "renounced" : freezeRenounced === false ? "live" : "unknown"}
+            </span>
+            <span className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-white/70">
+              LP locked {lpLocked != null ? `${lpLocked}%` : "unknown"}
+            </span>
+            {safetyApi && (
+              <>
+                <span className={`rounded-lg border px-2 py-0.5 text-[10px] font-semibold ${safetyApi.canBuy ? "border-green-400/30 bg-green-400/10 text-green-400" : "border-red-400/30 bg-red-400/10 text-red-400"}`}>
+                  Buy {safetyApi.canBuy ? "OK" : "BLOCK"}
+                </span>
+                <span className={`rounded-lg border px-2 py-0.5 text-[10px] font-semibold ${safetyApi.canSell ? "border-green-400/30 bg-green-400/10 text-green-400" : "border-red-400/30 bg-red-400/10 text-red-400"}`}>
+                  Sell {safetyApi.canSell ? "OK" : "BLOCK"}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      <DexChart refId={chartRef} />
+
       {/* Stats strip — same fields as DEX */}
       <div className="overflow-x-auto px-4 pb-2 no-scrollbar">
         <div className="flex w-max gap-2">
@@ -611,8 +674,6 @@ export default function TradeToken() {
           )}
         </div>
       )}
-
-      <DexChart refId={chartRef} />
 
       {/* Tabs */}
       <div className="sticky top-0 z-[9] mt-3 border-y border-white/10 bg-[#060606]/95 backdrop-blur">
@@ -707,6 +768,54 @@ export default function TradeToken() {
                 onOpen={() => setTab("bubbles")}
               />
             </Suspense>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-white/10 bg-black/50 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <h4 className="text-[11px] font-semibold text-white/70">Holder distribution</h4>
+                  <button
+                    type="button"
+                    onClick={() => setTab("holders")}
+                    className="text-[11px] font-semibold text-[#e8b84a] hover:underline"
+                  >
+                    All holders
+                  </button>
+                </div>
+                <div className="space-y-1.5 text-[12px]">
+                  <div className="flex justify-between"><span className="text-white/50">Total holders</span><span className="font-mono font-semibold">{totalHolders != null ? fmtNum(totalHolders) : "—"}</span></div>
+                  <div className="flex justify-between"><span className="text-white/50">Whales</span><span className="font-mono font-semibold">{whales}</span></div>
+                  <div className="flex justify-between"><span className="text-white/50">Top 10 hold</span><span className="font-mono font-semibold">{top10Pct != null ? `${Number(top10Pct).toFixed(1)}%` : "—"}</span></div>
+                  {buyPct != null && (
+                    <div>
+                      <div className="flex justify-between"><span className="text-white/50">Buy pressure</span><span className="font-mono font-semibold text-green-400">{buyPct}% buys</span></div>
+                      <div className="mt-1 flex h-1.5 overflow-hidden rounded-full bg-red-500/30">
+                        <div className="h-full bg-green-400" style={{ width: `${buyPct}%` }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-black/50 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <h4 className="text-[11px] font-semibold text-white/70">Rug checks</h4>
+                  <button
+                    type="button"
+                    onClick={() => setTab("safety")}
+                    className="text-[11px] font-semibold text-[#e8b84a] hover:underline"
+                  >
+                    Full safety
+                  </button>
+                </div>
+                <div className="space-y-1.5 text-[12px]">
+                  <div className="flex justify-between"><span className="text-white/50">Mint authority</span><span className={`font-mono font-semibold ${mintRenounced ? "text-green-400" : mintRenounced === false ? "text-red-400" : ""}`}>{mintRenounced ? "Renounced" : mintRenounced === false ? "Live" : "—"}</span></div>
+                  <div className="flex justify-between"><span className="text-white/50">Freeze authority</span><span className={`font-mono font-semibold ${freezeRenounced ? "text-green-400" : freezeRenounced === false ? "text-red-400" : ""}`}>{freezeRenounced ? "Renounced" : freezeRenounced === false ? "Live" : "—"}</span></div>
+                  <div className="flex justify-between"><span className="text-white/50">LP locked</span><span className="font-mono font-semibold">{lpLocked != null ? `${lpLocked}%` : "—"}</span></div>
+                  <div className="flex justify-between"><span className="text-white/50">Risk score</span><span className="font-mono font-semibold">{riskScore != null ? String(riskScore) : "—"}</span></div>
+                  {safetyApi && (
+                    <div className="flex justify-between"><span className="text-white/50">Tradeable</span><span className="font-mono font-semibold">{safetyApi.canBuy && safetyApi.canSell ? "Buy + sell OK" : safetyApi.canBuy ? "Buy only" : safetyApi.canSell ? "Sell only" : "Blocked"}</span></div>
+                  )}
+                </div>
+              </div>
+            </div>
             {research && (
               <>
                 <h4 className="text-[11px] font-semibold text-white/70">Research</h4>

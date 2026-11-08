@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
+import { Palette } from "lucide-react";
 
 const BG_KEY = "hub-bgfx";
 const WALLPAPER_KEY = "hub-wallpaper";
 const EVENT = "ox-atmosphere";
 
+/* Terminal v2 atmosphere — gold / silver glows only, one look across modes. */
 const MODE_TINT: Record<string, string> = {
-  nebula: "radial-gradient(900px 520px at 50% -10%, rgba(94,234,212,.22), transparent 55%), radial-gradient(700px 400px at 100% 10%, rgba(56,189,248,.14), transparent 50%)",
-  starfield: "radial-gradient(800px 500px at 40% 0%, rgba(147,197,253,.18), transparent 55%)",
-  grid3d: "linear-gradient(180deg, rgba(236,72,153,.12), transparent 40%), linear-gradient(0deg, rgba(59,130,246,.18), transparent 50%)",
-  orbs: "radial-gradient(600px 400px at 20% 30%, rgba(168,85,247,.2), transparent 50%), radial-gradient(500px 360px at 80% 70%, rgba(34,211,238,.16), transparent 50%)",
-  matrix: "radial-gradient(900px 600px at 50% 0%, rgba(34,197,94,.16), transparent 60%)",
+  nebula: "radial-gradient(900px 520px at 50% -10%, rgba(232,184,74,.20), transparent 55%), radial-gradient(700px 400px at 100% 10%, rgba(201,209,217,.12), transparent 50%)",
+  starfield: "radial-gradient(800px 500px at 40% 0%, rgba(232,184,74,.16), transparent 55%)",
+  grid3d: "linear-gradient(180deg, rgba(232,184,74,.10), transparent 40%), linear-gradient(0deg, rgba(201,209,217,.14), transparent 50%)",
+  orbs: "radial-gradient(600px 400px at 20% 30%, rgba(232,184,74,.18), transparent 50%), radial-gradient(500px 360px at 80% 70%, rgba(201,209,217,.14), transparent 50%)",
+  matrix: "radial-gradient(900px 600px at 50% 0%, rgba(232,184,74,.14), transparent 60%)",
   custom: "none",
   minimal: "none",
 };
@@ -93,7 +95,7 @@ export function DexThemeButton() {
         title="Platform theme (shared with Hub)"
         aria-label="Platform theme"
       >
-        🎨
+        <Palette className="w-4 h-4" style={{ color: "var(--term-gold)" }} />
       </button>
       {open && (
         <>

@@ -33,11 +33,11 @@ export function getWalletLabel(addr?: string | null): WalletLabel | null {
 
 export function labelKindClass(kind: WalletLabel["kind"]): string {
   switch (kind) {
-    case "exchange": return "bg-blue-500/15 text-blue-300";
+    case "exchange": return "bg-[#e8b84a]/15 text-[#e8b84a]";
     case "amm": return "bg-accent2/15 text-accent2";
     case "launchpad": return "bg-accent/15 text-accent";
     case "burn": return "bg-panel2 text-muted";
-    case "bridge": return "bg-blue-400/15 text-blue-300";
+    case "bridge": return "bg-[#c9d1d9]/15 text-[#c9d1d9]";
     default: return "bg-panel2 text-muted";
   }
 }
