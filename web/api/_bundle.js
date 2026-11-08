@@ -379,7 +379,45 @@ export async function analyzeBundles(mint, opts = {}) {
     holdersRes = { holders: [], pools: [], source: "none" };
   }
   const allHolders = Array.isArray(holdersRes?.holders) ? holdersRes.holders : [];
-  const realHolders = allHolders.filter((h) => !h.isPool).slice(0, MAX_HOLDERS);
+  // Pools are NOT holders — but the isPool flag depends on the owner-program
+  // RPC (classifyHolderOwners), which flakes. When it flakes, pool vaults
+  // leak into realHolders, get traced, and cluster by buy-window (all pools
+  // are created at migration within seconds of each other), inflating the
+  // bundled % to impossible values (42.8% on MAGGIE when the top 20 holders
+  // only hold ~21-34% of supply). Second, deterministic layer: a holder
+  // whose owner IS a DexScreener pair address for this mint is a pool vault
+  // by definition — no RPC classification needed. A real wallet never equals
+  // a pair address, so this cannot false-positive a genuine holder.
+  let pairAddrs = new Set();
+  try {
+    const [dexPairs, gtPools] = await Promise.all([
+      withTimeout(
+        fetchImpl(`https://api.dexscreener.com/tokens/v1/solana/${mint}`, { headers: { Accept: "application/json" } })
+          .then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        8000, null,
+      ).catch(() => null),
+      // GeckoTerminal lists EVERY pool for the token (incl. Meteora DLMM,
+      // which DexScreener does not return as a pair for this mint).
+      withTimeout(
+        fetchImpl(`https://api.geckoterminal.com/api/v2/networks/solana/tokens/${mint}/pools`, { headers: { Accept: "application/json;version=20230302" } })
+          .then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        8000, null,
+      ).catch(() => null),
+    ]);
+    if (Array.isArray(dexPairs)) {
+      for (const p of dexPairs) {
+        if (p?.pairAddress) pairAddrs.add(String(p.pairAddress).toLowerCase());
+      }
+    }
+    for (const p of gtPools?.data || []) {
+      if (p?.attributes?.address) pairAddrs.add(String(p.attributes.address).toLowerCase());
+    }
+  } catch { /* pair lookup is a best-effort second layer; isPool still applies */ }
+  const isPoolVault = (h) =>
+    h.isPool === true ||
+    pairAddrs.has(String(h.owner || "").toLowerCase()) ||
+    pairAddrs.has(String(h.tokenAccount || "").toLowerCase());
+  const realHolders = allHolders.filter((h) => !isPoolVault(h)).slice(0, MAX_HOLDERS);
   if (!realHolders.length) {
     // Say WHY the data is missing — the holder fetch records its last RPC
     // error (no key / rejected key / rate-limited / unreachable). Never
