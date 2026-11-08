@@ -463,8 +463,14 @@ export default function TokenScanner() {
     if (intel.safety?.canBuy === true && intel.safety?.canSell === false) shareFlags.push("Honeypot — sells blocked");
   }
 
+  // The global OrbitAtmosphereLayer is a fixed, opaque, z-0 backdrop that
+  // paints above any static page content — the standalone /scanner mount
+  // rendered fully black because this root was static (only the sticky
+  // z-30 search form escaped). Intel/OS shells already lift their content
+  // with position:relative + z-index:1 (see .oxc-root); do the same here so
+  // every mount of this page sits above the atmosphere.
   return (
-    <div>
+    <div style={{ position: "relative", zIndex: 1 }}>
       {/* Standalone chrome for the canonical /scanner route — the page is
         * a real destination now, not a fragment of the Terminal. Inside
         * /intel or /os the shell already provides nav, so skip it there. */}
