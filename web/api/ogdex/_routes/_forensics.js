@@ -1,12 +1,14 @@
-import { callFn, send, cache, INTEL_FN } from "../_lib.js";
+import { callFn, send, cache, resilientRpc, INTEL_FN } from "../_lib.js";
 import { getLabeledHolders, classifyHolderOwners, poolKindFor } from "../_holders.js";
 
 const SOL = "So11111111111111111111111111111111111111112";
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 
+// RPC via resilientRpc (proxy -> direct Helius -> public). The old direct
+// callFn("rpc-proxy") path is dead — the proxy's Helius provider is
+// unconfigured, so first-buyer tracing always failed.
 async function rpc(method, params) {
-  const r = await callFn("rpc-proxy", { method, params, id: 1, provider: "helius" });
-  return r?.data?.result ?? r?.result ?? null;
+  return resilientRpc(method, params);
 }
 
 // Was the project's DexScreener listing paid for (profile / ads / boosts)?

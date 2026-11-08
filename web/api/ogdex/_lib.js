@@ -54,10 +54,43 @@ export async function callFn(name, body) {
 
 const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Helius key: HELIUS_API_KEY is the server name; REACT_APP_HELIUS_KEY is
+// the same live key already set in Vercel env (verified 2026-11-08).
+function heliusKey() {
+  return process.env.HELIUS_API_KEY || process.env.VITE_HELIUS_API_KEY || process.env.REACT_APP_HELIUS_KEY || "";
+}
+
+// Direct Helius JSON-RPC. The Supabase rpc-proxy's Helius provider is NOT
+// configured (answers every call "RPC provider 'helius' not configured"),
+// and public RPCs can't serve indexed methods (getTokenLargestAccounts
+// 429s / blocked; getTokenAccountsByOwner blocked) and rate-limit the
+// rest. Direct Helius is the path that actually gets the data — verified
+// live 2026-11-08 (ORBITX bundle: 20 holders, 40.01% top, via this key).
+async function heliusDirectRpc(method, params, timeout = 9000) {
+  const key = heliusKey();
+  if (!key) return null;
+  const ctl = new AbortController();
+  const id = setTimeout(() => ctl.abort(), timeout);
+  try {
+    const res = await fetch(`https://mainnet.helius-rpc.com/?api-key=${key}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      signal: ctl.signal,
+    });
+    const j = await res.json().catch(() => null);
+    if (!res.ok || j?.error) return null;
+    return j?.result !== undefined ? j.result : null;
+  } catch {
+    return null;
+  } finally { clearTimeout(id); }
+}
+
 /**
  * Resilient Solana JSON-RPC: Helius via Supabase rpc-proxy first (8s cap),
- * then public RPCs via jsonRpcWithFallback. Returns the unwrapped result,
- * or null when every path fails.
+ * then DIRECT Helius (same live key, no middleman), then public RPCs via
+ * jsonRpcWithFallback. Returns the unwrapped result, or null when every
+ * path fails.
  *
  * Use this for ALL wallet/holder/PnL RPC — direct callFn("rpc-proxy") calls
  * silently return empty wallets (sol 0, holdings [], trades []) when the
@@ -67,6 +100,7 @@ const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * it) — and the rpc-proxy itself rejects that method ("Method not
  * allowed"), so callers must fall back to the tx-derived holdings scan
  * in _txscan.js and flag the list as degraded, never as "0 tokens".
+ * Direct Helius now covers getTokenAccountsByOwner too.
  */
 export async function resilientRpcDetailed(method, params) {
   try {
@@ -81,6 +115,14 @@ export async function resilientRpcDetailed(method, params) {
       if (data && !data.error && data.result !== undefined) {
         return { result: data.result, source: "helius-proxy" };
       }
+    }
+  } catch {
+    /* fall through to direct Helius */
+  }
+  try {
+    const direct = await heliusDirectRpc(method, params);
+    if (direct !== null && direct !== undefined) {
+      return { result: direct, source: "helius-direct" };
     }
   } catch {
     /* fall through to public RPCs */
