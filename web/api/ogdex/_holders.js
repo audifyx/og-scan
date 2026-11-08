@@ -41,7 +41,41 @@ export function poolKindFor(ownerProgram) {
   return null;
 }
 
-// Single JSON-RPC call through the Helius-backed rpc-proxy, with a hard timeout.
+// Helius key: HELIUS_API_KEY is the server name; REACT_APP_HELIUS_KEY is
+// the same live key already set in Vercel env (no HELIUS_API_KEY exists
+// there — verified 2026-11-08 via filter_project_envs, 55 vars).
+function heliusKey() {
+  return process.env.HELIUS_API_KEY || process.env.VITE_HELIUS_API_KEY || process.env.REACT_APP_HELIUS_KEY || "";
+}
+
+// Direct Helius JSON-RPC. The Supabase rpc-proxy's Helius provider is NOT
+// configured — it answers every call with {"success":false,"error":"RPC
+// provider 'helius' not configured"} (verified live 2026-11-08) — and
+// public RPCs cannot serve getTokenLargestAccounts (mainnet-beta 429s,
+// publicnode blocks the method, solanatracker hangs). Direct Helius is the
+// path that actually gets the data.
+async function heliusDirect(method, params, timeout = 9000) {
+  const key = heliusKey();
+  if (!key) return { result: null, error: "no helius key configured" };
+  const ctl = new AbortController();
+  const id = setTimeout(() => ctl.abort(), timeout);
+  try {
+    const res = await fetch(`https://mainnet.helius-rpc.com/?api-key=${key}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      signal: ctl.signal,
+    });
+    const j = await res.json().catch(() => null);
+    if (j?.error) return { result: null, error: j.error?.message || "helius error" };
+    return { result: j?.result ?? null, error: null };
+  } catch (e) {
+    return { result: null, error: String(e?.message || e) };
+  } finally { clearTimeout(id); }
+}
+
+// Single JSON-RPC call: Helius via Supabase rpc-proxy first, direct Helius
+// second (proxy's Helius provider is unconfigured — see above).
 async function rpc(method, params, timeout = 9000) {
   const ctl = new AbortController();
   const id = setTimeout(() => ctl.abort(), timeout);
@@ -53,11 +87,14 @@ async function rpc(method, params, timeout = 9000) {
       signal: ctl.signal,
     });
     const j = await res.json().catch(() => null);
-    if (j?.data?.error || j?.error) return { result: null, error: j?.data?.error?.message || j?.error?.message || "rpc error" };
-    return { result: j?.data?.result ?? j?.result ?? null, error: null };
-  } catch (e) {
-    return { result: null, error: String(e?.message || e) };
+    if (!j?.data?.error && !j?.error && (j?.data?.result !== undefined || j?.result !== undefined)) {
+      return { result: j?.data?.result ?? j?.result ?? null, error: null };
+    }
+    // Proxy failed (incl. "helius not configured") — fall through to direct.
+  } catch {
+    /* proxy unreachable — fall through to direct Helius */
   } finally { clearTimeout(id); }
+  return heliusDirect(method, params, timeout);
 }
 
 // getTokenLargestAccounts with retry — the index service often recovers on retry.

@@ -104,7 +104,10 @@ function withTimeout(promise, ms, fallback) {
 }
 
 function heliusKey() {
-  return process.env.HELIUS_API_KEY || process.env.VITE_HELIUS_API_KEY || "";
+  // REACT_APP_HELIUS_KEY is the live key already set in Vercel env (no
+  // HELIUS_API_KEY exists there — verified 2026-11-08). The rpc-proxy's
+  // Helius provider is unconfigured, so direct Helius is the working path.
+  return process.env.HELIUS_API_KEY || process.env.VITE_HELIUS_API_KEY || process.env.REACT_APP_HELIUS_KEY || "";
 }
 
 /** In-memory per-key cache (warm instances only; Vercel is ephemeral).
