@@ -14,10 +14,17 @@ h2{font-size:14px;margin:0 0 10px;color:var(--mu);font-weight:600}.li{display:fl
 .wide{margin-top:12px}.err{color:#f87171;font-size:13px;margin-top:8px}
 .vi{border-top:1px solid var(--line);padding:12px 0}.vi:first-of-type{border-top:0}.vh{display:flex;justify-content:space-between;gap:10px;font-size:14px}.vh span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vh span:last-child{font-variant-numeric:tabular-nums;color:var(--mu);font-size:12px}.vm{color:var(--mu);font-size:12px;margin-top:2px;overflow-wrap:break-word}.tr{margin:6px 0 0 0;padding:0;list-style:none}.tr li{font-size:12px;color:var(--mu);padding:2px 0;display:flex;justify-content:space-between;gap:10px}.tr li span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tr li span:last-child{font-variant-numeric:tabular-nums}
 .tag{display:inline-block;background:#1c1c22;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:12px;color:var(--ac2);margin-right:4px}
+.botbadge{display:inline-block;background:var(--ac);color:#000;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700;letter-spacing:.05em;margin-left:6px;vertical-align:1px}
+.vi.bot{border-left:3px solid var(--ac);padding-left:10px}
+.tog{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--tx);margin:0 0 4px;cursor:pointer}
+.tog input{accent-color:var(--ac);width:16px;height:16px;cursor:pointer}
+.botnote{color:var(--mu);font-size:12px;margin:0 0 4px}
 </style></head><body><div class="w">
 <h1><span class="dot"></span>OrbitX Live stats</h1><div class="sub" id="as">Loading…</div>
 
 <div class="sec">Overview</div>
+<label class="tog"><input type="checkbox" id="nb" checked> Exclude likely bots from today's counts</label>
+<div class="botnote" id="botnote"></div>
 <div class="g">
 <div class="c live"><div class="k">Viewing now</div><div class="v" id="live">–</div></div>
 <div class="c"><div class="k">Views today</div><div class="v" id="vt">–</div></div>
@@ -85,9 +92,17 @@ function dur(s){s=Math.round(s||0);if(s<60)return s+"s";if(s<3600)return Math.fl
 function loc(v){var c=v.city?esc(v.city)+", ":"";return c+flag(v.country)+" "+esc(v.country)+(v.region?" · "+esc(v.region):"")}
 function load(){fetch(W,{cache:"no-store"}).then(function(r){return r.json()}).then(function(d){
 $("err").textContent="";$("as").textContent="Updated "+new Date(d.asOf).toLocaleTimeString()+" · refreshes every 5s";
-$("live").textContent=f(d.liveNow);$("vt").textContent=f(d.viewsToday);$("ut").textContent=f(d.visitorsToday);$("v24").textContent=f(d.views24h);$("tv").textContent=f(d.totalViews);$("uv").textContent=f(d.uniqueVisitors);
-$("ses").textContent=f(d.sessionsToday);$("asl").textContent=dur(d.avgSessionSeconds);$("pps").textContent=(d.avgPagesPerSession==null?"–":d.avgPagesPerSession);
-var rn=d.returningVsNew||{};$("ret").textContent=f(rn.returning);$("nw").textContent=f(rn.new);
+var H=hideBots;
+$("live").textContent=f(H?(d.liveNowHuman!=null?d.liveNowHuman:d.liveNow):d.liveNow);
+$("vt").textContent=f(H?(d.viewsTodayHuman!=null?d.viewsTodayHuman:d.viewsToday):d.viewsToday);
+$("ut").textContent=f(H?(d.visitorsTodayHuman!=null?d.visitorsTodayHuman:d.visitorsToday):d.visitorsToday);
+$("v24").textContent=f(d.views24h);$("tv").textContent=f(d.totalViews);$("uv").textContent=f(d.uniqueVisitors);
+$("ses").textContent=f(H?(d.sessionsTodayHuman!=null?d.sessionsTodayHuman:d.sessionsToday):d.sessionsToday);
+$("asl").textContent=dur(H?(d.avgSessionSecondsHuman!=null?d.avgSessionSecondsHuman:d.avgSessionSeconds):d.avgSessionSeconds);
+var ppsv=H?(d.avgPagesPerSessionHuman!=null?d.avgPagesPerSessionHuman:d.avgPagesPerSession):d.avgPagesPerSession;
+$("pps").textContent=(ppsv==null?"–":ppsv);
+var rn=H?(d.returningVsNewHuman||d.returningVsNew||{}):(d.returningVsNew||{});$("ret").textContent=f(rn.returning);$("nw").textContent=f(rn.new);
+$("botnote").textContent=(d.liveBots||d.botsToday)?(f(d.liveBots||0)+" likely bot"+((d.liveBots||0)===1?"":"s")+" live · "+f(d.botsToday||0)+" flagged today"+(H?" · all-time totals still include pre-flag traffic":"")):"";
 var days=[],m={};(d.daily||[]).forEach(function(x){m[x.day]=x});var t=new Date(d.asOf+TZ*3600000);for(var i=13;i>=0;i--){var k=new Date(t.getTime()-i*86400000).toISOString().slice(0,10);days.push(m[k]||{day:k,views:0})}
 var mx=Math.max.apply(null,days.map(function(x){return x.views}).concat([1]));$("bars").innerHTML=days.map(function(x){return '<div class="b"><em>'+(x.views||"")+'</em><i style="height:'+(x.views/mx*100)+'%"></i><s>'+x.day.slice(8)+'</s></div>'}).join("");
 var h24=d.hourly24||[],mx24=Math.max.apply(null,h24.map(function(x){return x.views}).concat([1]));$("bars24").innerHTML=h24.map(function(x){return '<div class="b"><em>'+(x.views||"")+'</em><i style="height:'+(x.views/mx24*100)+'%"></i><s>'+x.label.slice(6)+'</s></div>'}).join("");
@@ -100,9 +115,11 @@ list("ep",d.topEntryPages||[],"path","n",nm);list("xp",d.topExitPages||[],"path"
 $("lv").innerHTML=(d.liveVisitors||[]).length?(d.liveVisitors||[]).map(function(v){
 var tr=(v.trail||[]).map(function(s){return '<li><span>'+nm(s.path)+'</span><span>'+tm(s.ts)+'</span></li>'}).join("");
 var tags='<span class="tag">'+unk(v.os)+'</span><span class="tag">'+unk(v.browser)+'</span><span class="tag">'+unk(v.device)+'</span>'+(v.screen?'<span class="tag">'+esc(v.screen)+'</span>':"");
-return '<div class="vi"><div class="vh"><span>'+loc(v)+'</span><span>'+esc(v.vid)+'</span></div><div class="vm" style="margin-top:4px">'+tags+'</div><div class="vm">Now on '+nm(v.path)+'</div><div class="vm">First seen '+tm(v.firstSeen)+' · Last seen '+tm(v.lastSeen)+' · '+f(v.pageCount)+' pages today</div>'+(tr?'<ul class="tr">'+tr+'</ul>':"")+'</div>';
+return '<div class="vi'+(v.likelyBot?" bot":"")+'"><div class="vh"><span>'+loc(v)+'</span><span>'+esc(v.vid)+(v.likelyBot?'<span class="botbadge">LIKELY BOT</span>':"")+'</span></div><div class="vm" style="margin-top:4px">'+tags+'</div><div class="vm">Now on '+nm(v.path)+'</div><div class="vm">First seen '+tm(v.firstSeen)+' · Last seen '+tm(v.lastSeen)+' · '+f(v.pageCount)+' pages today</div>'+(tr?'<ul class="tr">'+tr+'</ul>':"")+'</div>';
 }).join(""):'<div class="li"><span style="color:var(--mu)">Nobody live right now</span><span></span></div>';
-$("rc").innerHTML=(d.recent||[]).length?d.recent.map(function(r){return '<div class="li"><span>'+flag(r.country)+" "+nm(r.path)+" · "+unk(r.os)+" · "+unk(r.browser)+(r.city?" · "+esc(r.city):"")+" · "+esc(r.vid)+'</span><span>'+ago(r.ts)+'</span></div>'}).join(""):'<div class="li"><span style="color:var(--mu)">Nothing yet</span><span></span></div>';
+$("rc").innerHTML=(d.recent||[]).length?d.recent.map(function(r){return '<div class="li"><span>'+flag(r.country)+" "+nm(r.path)+" · "+unk(r.os)+" · "+unk(r.browser)+(r.city?" · "+esc(r.city):"")+" · "+esc(r.vid)+(r.likelyBot?' <span class="botbadge">BOT</span>':"")+'</span><span>'+ago(r.ts)+'</span></div>'}).join(""):'<div class="li"><span style="color:var(--mu)">Nothing yet</span><span></span></div>';
 }).catch(function(){$("err").textContent="Can't reach the stats server. Retrying…"})}
+var hideBots=true;try{var _hb=localStorage.getItem("orbitx_stats_hide_bots");if(_hb!==null)hideBots=_hb==="1"}catch(e){}
+$("nb").checked=hideBots;$("nb").addEventListener("change",function(){hideBots=$("nb").checked;try{localStorage.setItem("orbitx_stats_hide_bots",hideBots?"1":"0")}catch(e){}load()});
 load();setInterval(load,5000);
 </script></body></html>

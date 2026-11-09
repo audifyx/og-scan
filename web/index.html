@@ -138,14 +138,15 @@ var W="https://orbitx.world/stats-api",S="orbitx";
 if(location.pathname.indexOf("/stats")===0)return;
 var k="site_vid",v=localStorage.getItem(k);if(!v){v=crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now();localStorage.setItem(k,v)}
 var dev=(matchMedia("(pointer:coarse)").matches||innerWidth<1024)?"mobile":"desktop";
+var _wd=false;try{_wd=navigator.webdriver===true}catch(e){}
 function pth(){var p=location.pathname||"/";if(location.hash.length>1)p+=location.hash.split("/").slice(0,2).join("/");return p}
 function send(e,b){b.vid=v;b.path=pth();var d=JSON.stringify(b),url=W+"/"+e+"?site="+S;if(e==="hit"&&navigator.sendBeacon){navigator.sendBeacon(url,new Blob([d],{type:"text/plain"}))}else{fetch(url,{method:"POST",body:d,keepalive:true}).catch(function(){})}}
-var last="";function hit(r){var p=pth();if(p===last)return;last=p;send("hit",{ref:r||"",device:dev})}
+var last="";function hit(r){var p=pth();if(p===last)return;last=p;send("hit",{ref:r||"",device:dev,auto:_wd})}
 hit(document.referrer);
 var ps=history.pushState;history.pushState=function(){ps.apply(this,arguments);setTimeout(hit,0)};
 addEventListener("popstate",function(){hit()});addEventListener("hashchange",function(){hit()});
-setInterval(function(){if(!document.hidden)send("ping",{})},20000);
-document.addEventListener("visibilitychange",function(){if(!document.hidden)send("ping",{})});
+setInterval(function(){if(!document.hidden)send("ping",{auto:_wd})},20000);
+document.addEventListener("visibilitychange",function(){if(!document.hidden)send("ping",{auto:_wd})});
 }catch(e){}})();</script>
   </body>
 </html>
