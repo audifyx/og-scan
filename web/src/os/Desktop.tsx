@@ -999,8 +999,14 @@ export default function Desktop(props: DesktopProps) {
   const appByKey = useMemo(() => {
     const m = new Map<string, PlatformApp>();
     for (const a of allApps) m.set(a.key, a);
+    // Desktop-only tiles (e.g. About OrbitX, appended to desktopApps in
+    // HubOS but absent from the catalog) are rendered as icons, so the
+    // click handler (onRootUp) and the app-window renderer both look them
+    // up here. Without this, the tile renders but its click resolves to
+    // undefined and no window ever opens.
+    for (const a of desktopApps) m.set(a.key, a);
     return m;
-  }, [allApps]);
+  }, [allApps, desktopApps]);
 
   const centerRect = () => {
     const el = rootRef.current;
