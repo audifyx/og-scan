@@ -1,4 +1,4 @@
-import { AtSign, Coins, ExternalLink, Globe2, Newspaper } from "lucide-react";
+import { AtSign, Coins, ExternalLink, Globe2, Mail, MapPin, Newspaper } from "lucide-react";
 import {
   OGSCAN_BRAND_IMAGE,
   OGSCAN_DEXSCREENER_URL,
@@ -8,6 +8,15 @@ import {
   OGSCAN_X_URL,
   shortAddr,
 } from "@/lib/og";
+import {
+  ORBITX_CONTACT_EMAIL,
+  ORBITX_CONTACT_GITHUB_URL,
+  ORBITX_CONTACT_LOCATION,
+  ORBITX_CONTACT_TELEGRAM_HANDLE,
+  ORBITX_CONTACT_TELEGRAM_URL,
+  ORBITX_CONTACT_X_HANDLE,
+  ORBITX_RISK_DISCLAIMER,
+} from "@/lib/contact";
 
 export const SiteFooter = () => {
   return (
@@ -65,11 +74,30 @@ export const SiteFooter = () => {
         </div>
         <div className="mt-10 flex flex-col items-center gap-2 border-t border-og-grid pt-5">
           <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <a href="/about" className="hover:text-og-lime">About</a>
+            <a href="/contact" className="hover:text-og-lime">Contact</a>
             <a href="/whitepaper" className="hover:text-og-lime">Whitepaper</a>
             <a href="/roadmap" className="hover:text-og-lime">Roadmap</a>
             <a href="/terms" className="hover:text-og-lime">Terms</a>
             <a href="/privacy" className="hover:text-og-lime">Privacy</a>
           </div>
+          {/* Trust block — who runs OrbitX and how to reach them. */}
+          <div className="mt-4 flex flex-col items-center gap-1.5 text-center font-mono text-[10px] uppercase leading-relaxed tracking-[0.2em] text-muted-foreground">
+            <span className="inline-flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+              <span className="inline-flex items-center gap-1.5"><MapPin className="h-3 w-3" /> {ORBITX_CONTACT_LOCATION}</span>
+              <a href={`mailto:${ORBITX_CONTACT_EMAIL}`} className="inline-flex items-center gap-1.5 hover:text-og-lime"><Mail className="h-3 w-3" /> {ORBITX_CONTACT_EMAIL}</a>
+            </span>
+            <span className="inline-flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+              <a href={OGSCAN_X_URL} target="_blank" rel="noreferrer" className="hover:text-og-lime">X · {ORBITX_CONTACT_X_HANDLE}</a>
+              <a href={ORBITX_CONTACT_TELEGRAM_URL} target="_blank" rel="noreferrer" className="hover:text-og-lime">Telegram · {ORBITX_CONTACT_TELEGRAM_HANDLE}</a>
+              <a href={ORBITX_CONTACT_GITHUB_URL} target="_blank" rel="noreferrer" className="hover:text-og-lime">GitHub · audifyx/og-scan</a>
+              <a href="https://www.orbitx.world" target="_blank" rel="noreferrer" className="hover:text-og-lime">orbitx.world</a>
+            </span>
+            <span className="text-muted-foreground/70">No phone support — reach us on X, Telegram, or email.</span>
+          </div>
+          <p className="mt-3 max-w-xl text-center font-mono text-[10px] uppercase leading-relaxed tracking-[0.2em] text-muted-foreground/80">
+            {ORBITX_RISK_DISCLAIMER}
+          </p>
           <div className="inline-flex items-center gap-3 font-mono text-[9px] uppercase tracking-[0.5em] text-muted-foreground">
             <span className="h-px w-8 bg-og-grid" />
             © {new Date().getFullYear()} · ogscan.fun · Built on Solana

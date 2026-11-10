@@ -5,7 +5,7 @@ const Privacy = () => (
   <PremiumDocPage
     eyebrow="Your data, your rules"
     title={<>Privacy<br />Policy</>}
-    subtitle={`OrbitX · ogscan.fun · Last updated ${new Date().toLocaleDateString(undefined, { month: "long", year: "numeric" })}. How we collect, use, and protect your information across the OrbitX platform.`}
+    subtitle={`OrbitX · orbitx.world · Last updated ${new Date().toLocaleDateString(undefined, { month: "long", year: "numeric" })}. How we collect, use, and protect your information across the OrbitX platform.`}
     rotatingWords={["transparency", "control", "security", "trust"]}
     marqueeItems={["No data selling", "Non-custodial", "Encrypted", "Your keys, your coins", "Opt-out anytime"]}
   >

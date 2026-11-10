@@ -5,7 +5,7 @@ const Terms = () => (
   <PremiumDocPage
     eyebrow="The fine print"
     title={<>Terms of<br />Service</>}
-    subtitle={`OrbitX · ogscan.fun · Last updated ${new Date().toLocaleDateString(undefined, { month: "long", year: "numeric" })}. The rules of the road for using OrbitX — trading, social, launchpad, and everything in between.`}
+    subtitle={`OrbitX · orbitx.world · Last updated ${new Date().toLocaleDateString(undefined, { month: "long", year: "numeric" })}. The rules of the road for using OrbitX — trading, social, launchpad, and everything in between.`}
     rotatingWords={["fairness", "clarity", "accountability", "the community"]}
     marqueeItems={["Non-custodial", "No financial advice", "Use at your own risk", "18+ only", "Be excellent"]}
   >

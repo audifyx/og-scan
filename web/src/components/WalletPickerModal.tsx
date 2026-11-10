@@ -5,6 +5,7 @@ import { X, Loader2, Wallet, Mail } from "lucide-react";
 import type { PickableWallet } from "@/hooks/useWalletSignIn";
 import { XSignInButton } from "@/components/XSignInButton";
 import { useAuth } from "@/hooks/useAuth";
+import { useHumanGate } from "@/components/HumanGate";
 import "@/pages/auth.css";
 
 function currentPath(): string {
@@ -17,8 +18,16 @@ export function WalletPickerModal({ open, onClose, wallets, onPick, busy }: {
   onPick: (name: string) => void; busy: string | null;
 }) {
   const { user } = useAuth();
+  const { requireHuman } = useHumanGate();
   if (!open) return null;
   if (typeof document === "undefined") return null;
+
+  const onPickWallet = async (name: string) => {
+    if (busy) return;
+    const ok = await requireHuman();
+    if (!ok) return;
+    onPick(name);
+  };
 
   const next = currentPath();
   const walletOnly = Boolean(user);
@@ -56,7 +65,7 @@ export function WalletPickerModal({ open, onClose, wallets, onPick, busy }: {
               <button
                 key={w.name}
                 type="button"
-                onClick={() => onPick(w.name)}
+                onClick={() => void onPickWallet(w.name)}
                 disabled={!!busy}
                 className="ox-auth-btn ox-auth-btn--blue"
               >
@@ -65,6 +74,13 @@ export function WalletPickerModal({ open, onClose, wallets, onPick, busy }: {
               </button>
             ))}
           </div>
+
+          <p className="mt-4 text-left text-[11px] leading-relaxed text-white/45">
+            <span className="font-bold text-white/70">How your wallet works: </span>
+            linking connects your OrbitX in-app wallet — no browser extension, no deposit to OrbitX.
+            Your wallet keys are created on your device and never sent to our servers. Trades execute
+            on-chain through the in-app wallet; OrbitX never holds or receives your funds.
+          </p>
 
           {!walletOnly && (
             <>

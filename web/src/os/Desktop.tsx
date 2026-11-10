@@ -4453,6 +4453,8 @@ export default function Desktop(props: DesktopProps) {
               <span className="oxos-start__ava">{props.userInitial}</span>
               {props.userName}
             </span>
+            <a className="oxos-start__footbtn" href="/about" onClick={() => setStartOpen(false)}>About</a>
+            <a className="oxos-start__footbtn" href="/contact" onClick={() => setStartOpen(false)}>Contact</a>
             <button type="button" className="oxos-start__footbtn" onClick={() => openBuiltin("settings", "Settings")}>
               Settings
             </button>

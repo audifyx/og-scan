@@ -14,7 +14,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { OwnerPreviewRoute } from "@/components/OwnerPreviewRoute";
 import { MaintenanceLock } from "@/components/MaintenanceLock";
-import { HumanGate } from "@/components/HumanGate";
+import { HumanGateProvider } from "@/components/HumanGate";
 import { IntercomSync } from "@/components/IntercomSync";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -166,6 +166,8 @@ import VampPortal from "./pages/VampPortal";
 import { SupportNotificationBanner } from "./components/SupportNotificationBanner";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
 import PlatformWhitepaper from "./pages/platform/Whitepaper";
 import PlatformRoadmap from "./pages/platform/Roadmap";
 import { CCCallbackPage } from "./pages/CCCallbackPage";
@@ -338,7 +340,7 @@ function AuthRoute({ children }: { children: ReactNode }) {
 const App = () => (
   <ErrorBoundary>
   <MaintenanceLock>
-        <HumanGate />
+        <HumanGateProvider>
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <SolanaWalletProvider>
@@ -373,6 +375,8 @@ const App = () => (
             <Route path="/setup" element={<Setup />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
             <Route path="/vamp" element={<OwnerPreviewRoute><VampPortal /></OwnerPreviewRoute>} />
             <Route path="/whitepaper" element={<PlatformWhitepaper />} />
             <Route path="/roadmap" element={<Navigate to="/" replace />} />
@@ -917,6 +921,7 @@ const App = () => (
       </SolanaWalletProvider>
     </AuthProvider>
   </QueryClientProvider>
+        </HumanGateProvider>
   </MaintenanceLock>
   </ErrorBoundary>
 );

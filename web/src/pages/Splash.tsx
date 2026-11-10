@@ -769,15 +769,24 @@ export default function Splash() {
             </div>
             <div>
               <h4>Legal</h4>
+              <a href="/about">About</a>
+              <a href="/contact">Contact</a>
               <a href={LINKS.whitepaper}>Whitepaper</a>
               <a href={LINKS.roadmap}>Roadmap</a>
               <a href={LINKS.terms}>Terms</a>
               <a href={LINKS.privacy}>Privacy</a>
             </div>
+            <div>
+              <h4>Contact</h4>
+              <a href="mailto:development@orbitx.world">development@orbitx.world</a>
+              <span className="sp-foot-ca">Los Angeles, California</span>
+              <span className="sp-foot-ca">No phone support</span>
+            </div>
           </div>
         </div>
         <div className="sp-foot-bottom">
           <span>© {new Date().getFullYear()} {BRAND}. Building in public.</span>
+          <span className="sp-foot-risk">Crypto is high-risk — prices can go to zero. Nothing on OrbitX is financial advice.</span>
           <span className="sp-foot-mint" title={OGSCAN_TOKEN_MINT}>
             CA · {OGSCAN_TOKEN_MINT}
           </span>
@@ -1544,6 +1553,9 @@ const css = `
 .sp-foot-mint {
   font-family: var(--font-mono);
   font-size: 10px; word-break: break-all; color: #6b7280;
+}
+.sp-foot-risk {
+  color: #8b95a8;
 }
 
 .reveal {

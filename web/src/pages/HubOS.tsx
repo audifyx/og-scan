@@ -91,6 +91,16 @@ export default function HubOS() {
       const a = byKey.get(k);
       if (a) ordered.push(a);
     }
+    // Trust surface: who runs OrbitX + how to reach them, on the home grid.
+    ordered.push({
+      key: "about-orbitx",
+      name: "About OrbitX",
+      caption: "Who runs OrbitX · contact",
+      href: "/about",
+      tone: "#F0C75E",
+      iconBg: "linear-gradient(135deg, #F0C75E, #B8860B)",
+      glyph: <span style={{ fontSize: 18 }}>◈</span>,
+    });
     return ordered;
   }, [searchableApps, homeGridKeys]);
 

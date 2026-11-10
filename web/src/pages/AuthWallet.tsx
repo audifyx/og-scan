@@ -12,10 +12,12 @@ import { XSignInButton } from "@/components/XSignInButton";
 import { MergeAccountModal } from "@/components/MergeAccountModal";
 import { persistSessionLocally } from "@/lib/authSession";
 import { consumeOAuthHash, consumeOAuthProviderTokens, oauthErrorFromLocation, takeAuthNext } from "@/lib/xOAuth";
+import { useHumanGate } from "@/components/HumanGate";
 import "./auth.css";
 
 export default function AuthWallet() {
   const { user, profile, loading, signIn, signUp, signOut } = useAuth();
+  const { requireHuman } = useHumanGate();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const next = resolveAuthReturn(params);
@@ -96,6 +98,8 @@ export default function AuthWallet() {
       toast.error("Username must be at least 3 characters");
       return;
     }
+    const humanOk = await requireHuman();
+    if (!humanOk) return;
     setSubmitting(true);
     setFormError(null);
     try {

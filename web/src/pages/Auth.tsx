@@ -8,6 +8,7 @@ import { ArrowLeft, AtSign, Eye, EyeOff, Loader2, Lock, Mail, Rocket, ShieldChec
 import { resolveAuthReturn, useAuth } from "@/hooks/useAuth";
 import { getDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
 import { SliderCaptcha } from "@/components/SliderCaptcha";
+import { useHumanGate } from "@/components/HumanGate";
 import { toast } from "sonner";
 import { z } from "zod";
 import {
@@ -31,6 +32,7 @@ const Auth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, loading, signIn, signUp, resetPassword, updatePassword } = useAuth();
+  const { requireHuman } = useHumanGate();
   const next = resolveAuthReturn(searchParams);
 
   const [mode, setMode] = useState<AuthMode>((searchParams.get("mode") as AuthMode) || "signin");
@@ -96,6 +98,11 @@ const Auth = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
+    // Human check gates sign-in / sign-up only — reset + password update skip it.
+    if (mode === "signin" || mode === "signup") {
+      const ok = await requireHuman();
+      if (!ok) return;
+    }
     setIsSubmitting(true);
     const cleanEmail = email.trim().toLowerCase();
     try {
