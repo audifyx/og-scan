@@ -49,22 +49,57 @@ import {
 } from "../bundle";
 import { fetchXIntel, type XIntel as RawXIntel } from "../xintel";
 
+// ── OG scoring engine: single source of truth is web/shared/og-score.js ──────
+// Pure logic (no React/fetch), shared with the Telegram Mini App server route
+// (web/api/ogdex/_routes/_tg-scan.js). This file re-exports it so existing
+// imports keep working; the math lives in exactly one place.
+import {
+  authorityVerdict,
+  bundleRiskVerdict,
+  bundleScoreAdjustment,
+  computeOgScore,
+  honeypotChecks,
+  ogScoreBand,
+  sourceTraceAdjustment,
+  xScoreAdjustment,
+} from "../../../shared/og-score.js";
+import type {
+  BundleAnalysis,
+  BundleRiskLevel,
+  OgScore,
+  SourceWalletTrace,
+  VerdictState,
+  XIntel,
+} from "../../../shared/og-score.js";
+export {
+  authorityVerdict,
+  bundleRiskVerdict,
+  bundleScoreAdjustment,
+  computeOgScore,
+  honeypotChecks,
+  ogScoreBand,
+  sourceTraceAdjustment,
+  xScoreAdjustment,
+};
+export type {
+  BundleAnalysis,
+  BundleRiskLevel,
+  OgScore,
+  OgScoreAdjustment,
+  OgScoreCategory,
+  OgScoreInput,
+  SourceWalletTrace,
+  VerdictState,
+  XAvailability,
+  XIntel,
+} from "../../../shared/og-score.js";
+
 // ── Pure scanner forensics / scoring ─────────────────────────────────────────
-// All functions here are pure (no fetch, no React) so they are unit-testable
-// in src/crypto/scanner-forensics.test.ts. Unknown is always "unknown" — a
-// missing signal scores 0 points for its category and is flagged, never
-// invented.
-
-export type VerdictState = "pass" | "warn" | "fail" | "unknown";
-
-export function authorityVerdict(renounced: boolean | null | undefined): {
-  state: VerdictState;
-  label: string;
-} {
-  if (renounced === true) return { state: "pass", label: "Revoked" };
-  if (renounced === false) return { state: "fail", label: "Live" };
-  return { state: "unknown", label: "Unknown" };
-}
+// The OG score engine itself now lives in web/shared/og-score.js (moved
+// verbatim — see the import + re-export below). Everything below that is
+// pure and unit-testable in src/crypto/scanner-forensics.test.ts stays here.
+// Unknown is always "unknown" — a missing signal scores 0 points for its
+// category and is flagged, never invented.
 
 /** Top-10 holder concentration → band. Pools are already excluded upstream
  *  (forensics strips liquidity-pool vaults before computing top10Pct). */
@@ -94,52 +129,6 @@ export function lpLockState(lpLockedPct: number | null | undefined): {
   if (lpLockedPct >= 50) return { state: "warn", label: `Partially locked (${Math.round(lpLockedPct)}%)` };
   if (lpLockedPct > 0) return { state: "warn", label: `Low lock (${Math.round(lpLockedPct)}%)` };
   return { state: "fail", label: "Unlocked (0%)" };
-}
-
-/** Honeypot-style checks from the Jupiter round-trip safety probe. */
-export function honeypotChecks(safety: SafetyPayload | null | undefined): Array<{
-  id: string;
-  state: VerdictState;
-  label: string;
-  detail: string;
-}> {
-  if (!safety) {
-    return [{ id: "tradeability", state: "unknown", label: "Tradeability unknown", detail: "Safety probe returned nothing." }];
-  }
-  const out: Array<{ id: string; state: VerdictState; label: string; detail: string }> = [];
-  if (safety.canBuy === false) {
-    out.push({ id: "can-buy", state: "fail", label: "Cannot buy", detail: "No Jupiter buy route found." });
-  } else if (safety.canBuy === true) {
-    out.push({ id: "can-buy", state: "pass", label: "Buy route open", detail: "Jupiter quotes a buy." });
-  }
-  if (safety.canSell === false) {
-    out.push({
-      id: "can-sell",
-      state: "fail",
-      label: "Cannot sell — honeypot-style",
-      detail: "A buy route exists but no sell route could be found.",
-    });
-  } else if (safety.canSell === true) {
-    out.push({ id: "can-sell", state: "pass", label: "Sell route open", detail: "Round-trip quote succeeded." });
-  }
-  const rt = safety.roundTripLossPct;
-  if (rt != null && Number.isFinite(rt)) {
-    out.push({
-      id: "round-trip",
-      state: rt >= 35 ? "fail" : rt >= 15 ? "warn" : "pass",
-      label: `Round-trip cost ${rt.toFixed(1)}%`,
-      detail:
-        rt >= 35
-          ? "Loses a third or more to tax, fees and impact — likely high-tax or very thin."
-          : rt >= 15
-            ? "Elevated cost — trade small and mind slippage."
-            : "Low round-trip cost.",
-    });
-  }
-  if (!out.length) {
-    out.push({ id: "tradeability", state: "unknown", label: "Tradeability unknown", detail: "Safety probe returned no route data." });
-  }
-  return out;
 }
 
 /** Clone verdict from the research endpoint's same-symbol/name list. A clone
@@ -177,170 +166,6 @@ export function ageLabel(ageDays: number | null | undefined, createdAt: string |
     }
   }
   return "Unknown";
-}
-
-export type OgScoreInput = {
-  mintRenounced?: boolean | null;
-  freezeRenounced?: boolean | null;
-  lpLockedPct?: number | null;
-  rugged?: boolean | null;
-  liquidityUsd?: number | null;
-  marketCapUsd?: number | null;
-  volume24h?: number | null;
-  top10Pct?: number | null;
-  totalHolders?: number | null;
-  whaleCount?: number | null;
-  canBuy?: boolean | null;
-  canSell?: boolean | null;
-  roundTripLossPct?: number | null;
-  devSold?: boolean | null;
-  devSerial?: boolean | null;
-  creatorTokensCount?: number | null;
-  ageDays?: number | null;
-  cloneCount?: number | null;
-  biggerClone?: boolean | null;
-  /** W1 bundle analysis (see BundleAnalysis). Null/absent = unavailable. */
-  bundle?: BundleAnalysis | null;
-  /** W2 X intel (see XIntel). Null/absent = unavailable. */
-  x?: XIntel | null;
-  /** Source-wallet funding trace (see SourceWalletTrace). Null/absent = unavailable. */
-  sourceTrace?: SourceWalletTrace | null;
-};
-
-// ── W1 contract: bundle analysis ─────────────────────────────────────────────
-// W1 delivers `analyzeBundles(mint)` returning this shape. It is NOT in the
-// tree yet (checked 2026-11-08) — this is the documented interface W3 codes
-// against; the coordinator reconciles field names when W1 lands. Percentages
-// are 0–100 (share of supply), matching RugScore's existing bundlePct
-// convention. `available: false` means the scan did not run / returned
-// nothing — the score treats that as "no information", never as "clean".
-export type BundleRiskLevel = "low" | "moderate" | "high";
-
-export type BundleAnalysis = {
-  available: boolean;
-  /** Share of supply held by detected bundled clusters, 0–100. */
-  bundledSupplyPct: number | null;
-  /** Number of holder clusters funded from a common source. */
-  clusterCount: number | null;
-  /** Largest single cluster's share of supply, 0–100. */
-  largestClusterPct: number | null;
-  bundleRisk: BundleRiskLevel | null;
-  note?: string | null;
-};
-
-/** Bundle risk → human verdict. Unavailable is always "unknown". */
-export function bundleRiskVerdict(bundle: BundleAnalysis | null | undefined): {
-  state: VerdictState;
-  label: string;
-  detail: string;
-} {
-  if (!bundle || bundle.available !== true) {
-    return { state: "unknown", label: "Unknown", detail: "Bundle scan has not run for this mint — no clusters checked, nothing assumed clean." };
-  }
-  const pct = bundle.bundledSupplyPct;
-  if (bundle.bundleRisk === "high" || (pct != null && pct >= 30)) {
-    return { state: "fail", label: `High bundle risk${pct != null ? ` — ${pct.toFixed(1)}% bundled` : ""}`, detail: "A large share of supply sits in wallets funded from a common source — coordinated sell pressure is one decision away." };
-  }
-  if (bundle.bundleRisk === "moderate" || (pct != null && pct >= 15)) {
-    return { state: "warn", label: `Moderate bundle risk${pct != null ? ` — ${pct.toFixed(1)}% bundled` : ""}`, detail: "Some supply is clustered under common funding — watch it, don't trust it." };
-  }
-  return { state: "pass", label: `Low bundle risk${pct != null ? ` — ${pct.toFixed(1)}% bundled` : ""}`, detail: "No material bundled supply detected." };
-}
-
-/**
- * Bundle score adjustment (applied AFTER the 0–100 category sum, BEFORE the
- * hard caps, clamped to 0–100). Weights: high −5, moderate −2, low 0,
- * unavailable 0. Unavailable NEVER penalises — an unrun scan is not evidence
- * of bundling.
- */
-export function bundleScoreAdjustment(bundle: BundleAnalysis | null | undefined): number {
-  if (!bundle || bundle.available !== true) return 0;
-  if (bundle.bundleRisk === "high") return -5;
-  if (bundle.bundleRisk === "moderate") return -2;
-  const pct = bundle.bundledSupplyPct;
-  if (pct != null && Number.isFinite(pct)) {
-    if (pct >= 30) return -5;
-    if (pct >= 15) return -2;
-  }
-  return 0;
-}
-
-// ── W2 contract: X intel ─────────────────────────────────────────────────────
-// W2 delivers `fetchXIntel(mint)` returning this shape. It is NOT in the
-// tree yet (checked 2026-11-08) — this is the documented interface W3 codes
-// against; the coordinator reconciles field names when W2 lands. Every field
-// is nullable: real X data only, never a fabricated count. `availability`
-// carries the honest state — "unavailable" means the X lookup failed or the
-// token has no discoverable X presence, and it must NEVER lower the score.
-export type XAvailability = "available" | "partial" | "unavailable";
-
-export type XIntel = {
-  availability: XAvailability;
-  /** Linked X handle without the @, null when no account is linked/found. */
-  handle: string | null;
-  followers: number | null;
-  /** Real mentions of the token in the last 24h, null when unmeasured. */
-  mentions24h: number | null;
-  /** Distinct KOL accounts mentioning the token, null when unmeasured. */
-  kolMentions: number | null;
-  sentiment: "positive" | "neutral" | "negative" | null;
-  accountAgeDays: number | null;
-  note?: string | null;
-};
-
-/**
- * X score adjustment (applied AFTER the category sum, BEFORE the hard caps,
- * clamped to 0–100). Weights — deliberately small, X is a weak signal:
- * available + positive sentiment +2, available + negative sentiment −2,
- * everything else 0. Unavailable/partial-without-sentiment NEVER moves the
- * score in either direction.
- */
-export function xScoreAdjustment(x: XIntel | null | undefined): number {
-  if (!x || x.availability !== "available") return 0;
-  if (x.sentiment === "positive") return 2;
-  if (x.sentiment === "negative") return -2;
-  return 0;
-}
-
-// ── Source-wallet trace (user spec 2026-11-08, Solscan-style) ───────────────
-// Every fresh wallet was funded from a source wallet (DEX / pump.fun /
-// on-ramp), so a dev launching from a "new" wallet is still on-chain
-// connected to their source. The backend walk (Helius/RPC funding graph) is
-// W1-owned — no new web/api file may be added under the 12-function cap, so
-// this is the documented interface W3 codes against and the coordinator
-// reconciles it with W1's route. Unavailable = no penalty, same rule as X.
-export type SourceWalletTrace = {
-  available: boolean;
-  /** The dev/creator wallet being traced. */
-  devWallet: string | null;
-  /** Wallet that directly funded the dev wallet, null when untraced. */
-  fundedBy: string | null;
-  /** Hops walked from the dev wallet to the root source wallet. */
-  fundingHops: number | null;
-  /** Root funding wallet (funding source behind the dev wallet). */
-  sourceWallet: string | null;
-  /** Tokens launched from wallets funded by this same source. */
-  sourceTokensCreated: number | null;
-  /** Other mints launched from the same source wallet. */
-  sourceOtherLaunches: string[] | null;
-  note?: string | null;
-};
-
-/**
- * Source-trace score adjustment. Weights: source behind ≥5 launches −3,
- * 2–4 launches −1, 0–1 launches 0, unavailable 0. A fresh wallet funded by
- * a serial launcher's source is the same risk as the serial launcher.
- */
-export function sourceTraceAdjustment(trace: SourceWalletTrace | null | undefined): number {
-  if (!trace || trace.available !== true) return 0;
-  const n = trace.sourceTokensCreated;
-  if (n != null && Number.isFinite(n)) {
-    if (n >= 5) return -3;
-    if (n >= 2) return -1;
-  }
-  if (trace.sourceOtherLaunches && trace.sourceOtherLaunches.length >= 5) return -3;
-  if (trace.sourceOtherLaunches && trace.sourceOtherLaunches.length >= 2) return -1;
-  return 0;
 }
 
 // ── Coordinator adapters: W1/W2 raw shapes → scoring inputs ─────────────────
@@ -439,288 +264,6 @@ export function devWalletVerdict(
     return { state: "pass", label: "Dev still holding", detail: "Deployer wallet still holds a position." };
   }
   return { state: "unknown", label: "Unknown", detail: "Deployer wallet is known but its current position could not be confirmed." };
-}
-
-export type OgScoreCategory = {
-  id: string;
-  label: string;
-  points: number;
-  max: number;
-  note: string;
-};
-
-export type OgScoreAdjustment = {
-  id: "bundle" | "x" | "source-trace";
-  label: string;
-  /** Signed points, e.g. −5. Zero adjustments are omitted. */
-  points: number;
-};
-
-export type OgScore = {
-  /** 0–100, higher = safer. Null when there is no evidence at all. */
-  score: number | null;
-  band: string;
-  label: string;
-  categories: OgScoreCategory[];
-  caps: string[];
-  unknowns: string[];
-  /** Post-category adjustments (bundle / X / source-trace). Empty when none apply. */
-  adjustments: OgScoreAdjustment[];
-};
-
-export function ogScoreBand(score: number | null): { band: string; label: string } {
-  if (score == null) return { band: "Unknown", label: "Unverified — not enough signals" };
-  if (score >= 90) return { band: "Excellent", label: "Excellent" };
-  if (score >= 80) return { band: "Strong", label: "Strong" };
-  if (score >= 70) return { band: "Good", label: "Good" };
-  if (score >= 60) return { band: "Fair", label: "Fair" };
-  if (score >= 40) return { band: "Risky", label: "Risky" };
-  if (score >= 20) return { band: "High risk", label: "High risk" };
-  return { band: "Critical", label: "Critical" };
-}
-
-/**
- * OG score — 0–100 (higher = safer), composed from the same evidence the
- * risk engine uses. Missing data scores 0 for its category and is listed in
- * `unknowns`; it never invents a value. Hard caps: rugged ≤15, cannot-sell
- * ≤20, a bigger same-name clone ≤30.
- */
-export function computeOgScore(input: OgScoreInput): OgScore {
-  const cats: OgScoreCategory[] = [];
-  const caps: string[] = [];
-  const unknowns: string[] = [];
-  let evidence = 0;
-
-  // Contract — 25
-  let pts = 0;
-  if (input.mintRenounced === true) { pts += 13; evidence++; }
-  else if (input.mintRenounced === false) { evidence++; }
-  else unknowns.push("Mint authority");
-  if (input.freezeRenounced === true) { pts += 12; evidence++; }
-  else if (input.freezeRenounced === false) { evidence++; }
-  else unknowns.push("Freeze authority");
-  unknowns.push("Mutable metadata", "Token program"); // no source reports these
-  cats.push({
-    id: "contract",
-    label: "Contract",
-    points: pts,
-    max: 25,
-    note:
-      input.mintRenounced === true && input.freezeRenounced === true
-        ? "Both authorities revoked."
-        : input.mintRenounced === false || input.freezeRenounced === false
-          ? "A live authority can change supply or freeze wallets."
-          : "Authority state unknown.",
-  });
-
-  // Liquidity — 20
-  pts = 0;
-  const liq = input.liquidityUsd;
-  if (liq != null && Number.isFinite(liq)) {
-    evidence++;
-    if (liq >= 100_000) pts += 8;
-    else if (liq >= 25_000) pts += 5;
-    else if (liq >= 5_000) pts += 3;
-    else if (liq > 0) pts += 1;
-  } else {
-    unknowns.push("Liquidity");
-  }
-  const lp = input.lpLockedPct;
-  if (lp != null && Number.isFinite(lp)) {
-    evidence++;
-    if (lp >= 90) pts += 12;
-    else if (lp >= 50) pts += 8;
-    else if (lp > 0) pts += 4;
-  } else {
-    unknowns.push("LP lock status");
-  }
-  cats.push({
-    id: "liquidity",
-    label: "Liquidity",
-    points: pts,
-    max: 20,
-    note: liq != null ? `Total liquidity ${liq >= 1000 ? `$${Math.round(liq).toLocaleString()}` : `$${liq.toFixed(2)}`}.` : "Liquidity unknown.",
-  });
-
-  // Holders — 15
-  pts = 0;
-  const top10 = input.top10Pct;
-  if (top10 != null && Number.isFinite(top10)) {
-    evidence++;
-    if (top10 <= 20) pts += 9;
-    else if (top10 <= 35) pts += 6;
-    else if (top10 <= 50) pts += 3;
-  } else {
-    unknowns.push("Top-10 concentration");
-  }
-  const holders = input.totalHolders;
-  if (holders != null && Number.isFinite(holders)) {
-    evidence++;
-    if (holders >= 1000) pts += 4;
-    else if (holders >= 100) pts += 2;
-    else if (holders > 0) pts += 1;
-  } else {
-    unknowns.push("Holder count");
-  }
-  const whales = input.whaleCount;
-  if (whales != null && Number.isFinite(whales)) {
-    evidence++;
-    if (whales === 0) pts += 2;
-    else if (whales <= 3) pts += 1;
-  }
-  cats.push({
-    id: "holders",
-    label: "Holders",
-    points: pts,
-    max: 15,
-    note:
-      top10 != null
-        ? `Top 10 hold ${top10.toFixed(1)}% of supply.`
-        : "Holder concentration unknown.",
-  });
-
-  // Deployer — 15
-  pts = 0;
-  if (input.devSold === true) {
-    evidence++;
-  } else if (input.devSold === false) {
-    pts += 8;
-    evidence++;
-  } else {
-    unknowns.push("Dev position");
-  }
-  if (input.devSerial === true) {
-    evidence++;
-  } else if (input.devSerial === false) {
-    pts += 4;
-    evidence++;
-  } else {
-    unknowns.push("Deployer history");
-  }
-  if (input.creatorTokensCount != null && Number.isFinite(input.creatorTokensCount)) {
-    evidence++;
-    if (input.creatorTokensCount <= 1) pts += 3;
-  }
-  cats.push({
-    id: "deployer",
-    label: "Deployer",
-    points: pts,
-    max: 15,
-    note:
-      input.devSold === true
-        ? "Deployer has exited their position."
-        : input.devSold === false
-          ? "Deployer still holds."
-          : "Deployer position unknown.",
-  });
-
-  // Trading — 10
-  pts = 0;
-  if (input.canBuy === true && input.canSell === true) {
-    pts += 6;
-    evidence++;
-  } else if (input.canBuy === true || input.canSell === true) {
-    evidence++;
-  } else if (input.canBuy === false || input.canSell === false) {
-    evidence++;
-  } else {
-    unknowns.push("Tradeability");
-  }
-  const rt = input.roundTripLossPct;
-  if (rt != null && Number.isFinite(rt)) {
-    evidence++;
-    if (rt < 5) pts += 4;
-    else if (rt < 15) pts += 2;
-  }
-  cats.push({
-    id: "trading",
-    label: "Trading",
-    points: pts,
-    max: 10,
-    note:
-      input.canSell === false
-        ? "No sell route — honeypot-style."
-        : input.canBuy === true && input.canSell === true
-          ? "Buys and sells route cleanly."
-          : "Tradeability unknown.",
-  });
-
-  // Market / maturity — 15
-  pts = 0;
-  const age = input.ageDays;
-  if (age != null && Number.isFinite(age)) {
-    evidence++;
-    if (age >= 30) pts += 5;
-    else if (age >= 7) pts += 3;
-    else if (age >= 1) pts += 1;
-  } else {
-    unknowns.push("Token age");
-  }
-  const vol = input.volume24h;
-  if (vol != null && Number.isFinite(vol) && liq != null && Number.isFinite(liq) && liq > 0) {
-    evidence++;
-    const ratio = vol / liq;
-    if (ratio >= 0.15 && ratio <= 8) pts += 5;
-    else if (ratio > 8) pts += 1; // wash-trading territory
-    else pts += 2; // quiet
-  } else if (vol != null && Number.isFinite(vol)) {
-    evidence++;
-    pts += 2;
-  }
-  if (input.marketCapUsd != null && Number.isFinite(input.marketCapUsd) && input.marketCapUsd > 0) {
-    pts += 2;
-    evidence++;
-  }
-  if (input.cloneCount != null && Number.isFinite(input.cloneCount)) {
-    evidence++;
-    if (input.cloneCount > 0) pts += 0; // clones add no points; they cap below
-    else pts += 3;
-  }
-  cats.push({
-    id: "market",
-    label: "Market",
-    points: pts,
-    max: 15,
-    note:
-      age != null
-        ? `Pair is ${age < 1 ? "less than a day" : `${Math.round(age)} days`} old.`
-        : "Token age unknown.",
-  });
-
-  let score = cats.reduce((s, c) => s + c.points, 0);
-  if (input.rugged === true) {
-    score = Math.min(score, 15);
-    caps.push("Flagged rugged — score capped at 15.");
-    evidence++;
-  }
-  if (input.canSell === false) {
-    score = Math.min(score, 20);
-    caps.push("No sell route — score capped at 20.");
-  }
-  if (input.biggerClone === true) {
-    score = Math.min(score, 30);
-    caps.push("A bigger same-name token exists — score capped at 30.");
-  }
-
-  // Post-category adjustments (bundle / X / source-trace): applied AFTER the
-  // category sum and caps, clamped to 0–100. Unavailable signals adjust 0 —
-  // an unrun scan is never evidence of anything.
-  const adjustments: OgScoreAdjustment[] = [];
-  const bundleAdj = bundleScoreAdjustment(input.bundle);
-  if (bundleAdj !== 0) adjustments.push({ id: "bundle", label: `Bundle risk ${bundleAdj}`, points: bundleAdj });
-  const xAdj = xScoreAdjustment(input.x);
-  if (xAdj !== 0) adjustments.push({ id: "x", label: `X sentiment ${xAdj > 0 ? `+${xAdj}` : xAdj}`, points: xAdj });
-  const traceAdj = sourceTraceAdjustment(input.sourceTrace);
-  if (traceAdj !== 0) adjustments.push({ id: "source-trace", label: `Serial-launcher source ${traceAdj}`, points: traceAdj });
-  if (adjustments.length > 0) {
-    score = Math.max(0, Math.min(100, score + adjustments.reduce((s, a) => s + a.points, 0)));
-  }
-
-  if (evidence === 0) {
-    return { score: null, band: "Unknown", label: "Unverified — not enough signals", categories: cats, caps, unknowns, adjustments: [] };
-  }
-  const { band, label } = ogScoreBand(score);
-  return { score, band, label, categories: cats, caps, unknowns, adjustments };
 }
 
 // ── Team A (scanner v2): funding chain / dev history / same-dev / tape ─────
