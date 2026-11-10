@@ -3378,7 +3378,10 @@ export default function Desktop(props: DesktopProps) {
       }}
       onDoubleClick={(e) => {
         const t = e.target as HTMLElement;
-        if (t.closest(".oxos-window, .oxos-panel, .oxos-taskbar, .oxos-start, .oxos-deskwd, .oxos-folderpanel, .oxos-phone, .oxos-lock")) return;
+        // Desktop icons live in .oxos-icons and open on single click — a
+        // double-click on one must not also fire the background "new note"
+        // action (it used to open a stray Notes window over the app).
+        if (t.closest(".oxos-window, .oxos-panel, .oxos-taskbar, .oxos-start, .oxos-deskwd, .oxos-folderpanel, .oxos-phone, .oxos-lock, .oxos-icons")) return;
         newDesktopNote();
       }}
     >
