@@ -206,6 +206,7 @@ export const PlatformGlyph = {
 
 export const PLATFORM_APPS: PlatformApp[] = [
   { key: "dex", name: "OrbitX Terminal", caption: "Live market data", href: "/intel/trade", tone: "#e8b84a", iconBg: "linear-gradient(145deg, #f5d47a 0%, #e8b84a 48%, #8a6d1f 100%)", glyph: PlatformGlyph.dex, iconSrc: "/icons/dex.png", dock: true },
+  { key: "orbitxdex", name: "OrbitX DEX", caption: "Swap & trade", href: "/ORBITX_DEX", tone: "#e8b84a", iconBg: "linear-gradient(145deg, #f5d47a 0%, #e8b84a 48%, #8a6d1f 100%)", glyph: PlatformGlyph.dex },
   { key: "trade", name: "Trade", caption: "Phantom buy & sell", href: "/trade", tone: "#AB9FF2", iconBg: "linear-gradient(145deg, #C9BFFF 0%, #AB9FF2 46%, #6B5FD4 100%)", glyph: PlatformGlyph.trade, iconSrc: "/icons/trade.png" },
   { key: "shop", name: "Shop", caption: "Credits + burn access", href: "/shop", tone: "#2DD4BF", iconBg: "linear-gradient(145deg, #5EEAD4 0%, #14B8A6 48%, #115E59 100%)", glyph: PlatformGlyph.shop, iconSrc: "/icons/shop.png", dock: true },
   { key: "supercomputer", name: "Super Computer", caption: "One MCP · every channel", href: "/supercomputer", tone: "#5EEAD4", iconBg: "linear-gradient(145deg, #99F6E4 0%, #2DD4BF 48%, #0F766E 100%)", glyph: PlatformGlyph.ai, iconSrc: "/icons/supercomputer.png", dock: true },
@@ -228,7 +229,7 @@ export type PlatformSection = { id: string; title: string; subtitle: string; key
 
 export const PLATFORM_SECTIONS: PlatformSection[] = [
   { id: "world", title: "World", subtitle: "City, agents, play, and education", keys: ["city", "gaming", "education"] },
-  { id: "trade", title: "Trade & Launch", subtitle: "DEX, scanner, launch", keys: ["dex", "trade", "scanner", "vamp"] },
+  { id: "trade", title: "Trade & Launch", subtitle: "DEX, scanner, launch", keys: ["orbitxdex", "dex", "trade", "scanner", "vamp"] },
   { id: "intel", title: "Intelligence", subtitle: "Trackers and alerts", keys: ["koltracker", "pnltracker"] },
   { id: "mcp", title: "AI Connectors", subtitle: "Super Computer, Telegram, and shop", keys: ["supercomputer", "shop"] },
   { id: "social", title: "Social", subtitle: "Feed and support", keys: ["social", "support"] },

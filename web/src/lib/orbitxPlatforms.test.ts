@@ -19,7 +19,10 @@ import {
 // - HQ was removed outright (it was just a copy of the Social app).
 // - ORBITX SCANNER went public 2026-11-08 (was admin-only): it is a live
 //   product on the /app home grid as "ORBITX SCANNER" at /scanner.
-const PUBLIC_LIVE = ["dex", "trade", "shop", "supercomputer", "social", "nft", "education", "support", "scanner"];
+// - OrbitX DEX went on the /app home grid 2026-11-10 (was missing from
+//   the desktop entirely): it is a live product as "OrbitX DEX" at
+//   /ORBITX_DEX, first in the Trade & Launch section.
+const PUBLIC_LIVE = ["dex", "orbitxdex", "trade", "shop", "supercomputer", "social", "nft", "education", "support", "scanner"];
 const OWNER_ONLY = ["city", "vamp", "koltracker", "pnltracker", "gaming"];
 
 describe("OrbitX platform catalog", () => {
@@ -34,6 +37,9 @@ describe("OrbitX platform catalog", () => {
     expect(PLATFORM_APPS.find((a) => a.key === "scanner")?.name).toBe("ORBITX SCANNER");
     expect(PLATFORM_APPS.find((a) => a.key === "scanner")?.href).toBe("/scanner");
     expect(PLATFORM_APPS.find((a) => a.key === "scanner")?.visibility).toBeUndefined();
+    expect(PLATFORM_APPS.find((a) => a.key === "orbitxdex")?.name).toBe("OrbitX DEX");
+    expect(PLATFORM_APPS.find((a) => a.key === "orbitxdex")?.href).toBe("/ORBITX_DEX");
+    expect(PLATFORM_APPS.find((a) => a.key === "orbitxdex")?.visibility).toBeUndefined();
   });
 
   it("has no HQ entry (removed — it was a copy of Social)", () => {
