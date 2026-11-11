@@ -1,22 +1,29 @@
 <!DOCTYPE html>
 <!--
-  OrbitX OG Scanner — Telegram Mini App (v1)
+  OrbitX OG Scanner — Telegram Mini App (v2)
   =================================================
-  Standalone static page (NOT part of the React SPA). Served from
-  web/public/ at https://orbitx.world/tg-scanner.html — Vercel serves
-  files from public/ (copied to dist/) before the catch-all SPA rewrite
-  in web/vercel.json, so the /(.*) -> /app.html rewrite does not swallow
-  this path (same precedent as hunter.html / landing.html).
+  Thin full-screen shell: it embeds the ACTUAL scanner — the same
+  <TokenScanner /> the web app serves at /scanner/:mint — in a
+  same-origin iframe. Nothing about the scanner is replicated here:
+  same UI, same data, same routes, nothing to drift. The shell only
+  adds:
+    - a minimal mint input (paste a contract -> load /scanner/<mint>)
+    - Telegram.WebApp expand() + theme handling for the shell chrome
+    - mint from ?mint= or Telegram start_param (t.me/orbitxapirbot?startapp=<mint>)
 
-  v1 scope: read-only risk scan + Telegram-native share. NO wallet
-  connect, NO trading, NO buy/sell, NO trade links, NO links out to
-  the DEX / orbitx.world trading pages / Solscan / DexScreener, NO
-  payments, NO Stars, NO widget version. The only outbound action is
-  a Telegram-native share (see shareResult()).
+  This page is a static file in web/public/, served at
+  https://orbitx.world/tg-scanner.html before the SPA catch-all
+  rewrite (same precedent as hunter.html / landing.html).
 
-  Auth: the user's first name from initDataUnsafe is display-only.
-  The backend validates the raw initData string (tg.initData) — this
-  page never uses initDataUnsafe for auth.
+  Framing is allowed: web/vercel.json sets X-Frame-Options SAMEORIGIN
+  on the catch-all, and the shell + iframe are the same origin
+  (orbitx.world). The scanner inside is the public /scanner route —
+  no Telegram session is needed to view it, and it works in a plain
+  browser too. The bot's /scan command still uses POST /api/ogdex/tg-scan
+  (tg-scan endpoint, OG-score engine) — this page does not call it.
+
+  Read-only display. NO wallet connect, NO trading, NO buy/sell,
+  NO payments, NO Stars. The scanner inside has its own share.
 -->
 <html lang="en">
 <head>
@@ -27,13 +34,11 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     /*
-      Theme: Telegram themeParams drive --bg/--text/--hint/--btn/--btn-text
-      via JS (applyTheme). Defaults below are the OrbitX dark theme, used
-      outside Telegram and whenever a param is missing. High-contrast
-      rule (user-set, all OrbitX platforms, forever): never light-on-light
-      or dark-on-dark — light bg always gets dark text, dark bg always
-      gets light text. We never invent a colour pair: we take Telegram's
-      own bg/text pair, and only the accent (gold) is ours.
+      Shell chrome only — the scanner itself is the React app inside
+      the iframe and brings its own theme. Contrast rule (user-set,
+      all OrbitX platforms, forever): never light-on-light or
+      dark-on-dark. The shell takes Telegram's own bg/text pair when
+      run inside Telegram, and defaults to the OrbitX dark theme.
     */
     :root {
       --bg: #000000;
@@ -44,259 +49,148 @@
       --btn: #c9a227;          /* OrbitX gold */
       --btn-text: #000000;
       --gold: #d4af37;
-      --silver: #c0c0c0;
-      --blue: #4a90d9;
-      --green: #22c55e;
-      --amber: #f59e0b;
-      --red: #ef4444;
-      --radius: 16px;
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
+    html, body { margin: 0; padding: 0; height: 100%; }
     body {
       background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-size: 16px;
       line-height: 1.45;
-      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      overflow: hidden;
       -webkit-tap-highlight-color: transparent;
     }
-    .wrap { max-width: 560px; margin: 0 auto; padding: 18px 16px calc(28px + env(safe-area-inset-bottom)); }
-    header { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
-    header img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; flex: none; }
-    header .title { font-size: 19px; font-weight: 800; letter-spacing: .02em; line-height: 1.2; }
-    header .title span { color: var(--gold); }
-    header .sub { font-size: 13px; color: var(--hint); }
-    .greeting { font-size: 14px; color: var(--hint); margin: 2px 0 16px; }
-    .greeting b { color: var(--text); }
 
-    .card {
-      background: var(--card);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius);
-      padding: 16px;
-      margin-bottom: 14px;
+    /* ---- Shell top bar: logo + mint input + Scan ---- */
+    .bar {
+      flex: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 10px 12px calc(10px + env(safe-area-inset-top, 0px));
+      padding-top: calc(10px + env(safe-area-inset-top));
+      background: var(--bg);
+      border-bottom: 1px solid var(--card-border);
     }
-    .card h2 { margin: 0 0 4px; font-size: 16px; }
-    .card p.hint { margin: 0 0 12px; font-size: 13px; color: var(--hint); }
-
-    label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+    .brand { display: flex; align-items: center; gap: 8px; flex: none; }
+    .brand img { width: 30px; height: 30px; border-radius: 7px; object-fit: cover; }
+    .brand .title { font-size: 15px; font-weight: 800; letter-spacing: .02em; line-height: 1.1; white-space: nowrap; }
+    .brand .title span { color: var(--gold); }
+    .greeting { font-size: 12px; color: var(--hint); line-height: 1.1; }
+    .mint-row { display: flex; gap: 8px; flex: 1 1 220px; min-width: 0; }
     input[type="text"] {
-      width: 100%;
-      padding: 13px 12px;
-      font-size: 15px;
+      flex: 1;
+      min-width: 0;
+      padding: 10px 12px;
+      font-size: 14px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       color: var(--text);
-      background: var(--bg);
+      background: var(--card);
       border: 1px solid var(--card-border);
-      border-radius: 12px;
+      border-radius: 10px;
       outline: none;
-      word-break: break-all;
     }
     input[type="text"]:focus { border-color: var(--gold); }
     input[type="text"]::placeholder { color: var(--hint); opacity: .8; }
-
     button {
-      width: 100%;
-      padding: 14px 16px;
-      margin-top: 12px;
-      font-size: 16px;
+      flex: none;
+      padding: 10px 18px;
+      font-size: 15px;
       font-weight: 800;
       color: var(--btn-text);
       background: var(--btn);
       border: 0;
-      border-radius: 12px;
+      border-radius: 10px;
       cursor: pointer;
     }
-    button:disabled { opacity: .55; cursor: default; }
-    button.secondary {
-      background: transparent;
-      color: var(--text);
-      border: 1px solid var(--card-border);
-      font-weight: 700;
-    }
-    button.share { background: var(--blue); color: #ffffff; }
-
+    button:active { opacity: .85; }
     .error {
       display: none;
-      margin-top: 12px;
-      padding: 12px;
-      border-radius: 12px;
-      font-size: 14px;
+      flex: 1 1 100%;
+      font-size: 13px;
       font-weight: 600;
       color: #ffffff;
       background: #7f1d1d;
       border: 1px solid #b91c1c;
+      border-radius: 10px;
+      padding: 8px 12px;
     }
     .error.show { display: block; }
-    /* Light-theme error stays high contrast too: dark red bg, white text. */
 
-    .notice {
-      display: none;
-      padding: 12px;
-      border-radius: 12px;
-      font-size: 14px;
-      margin-bottom: 14px;
-      color: #000000;
-      background: var(--gold);
-      border: 1px solid var(--gold);
-      font-weight: 600;
+    /* ---- Scanner iframe: takes all remaining height ---- */
+    .frame-wrap { position: relative; flex: 1 1 auto; min-height: 0; background: #000000; }
+    iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #000000;
     }
-    .notice.show { display: block; }
-
-    .loading { display: none; text-align: center; padding: 18px 0 4px; color: var(--hint); font-size: 14px; }
-    .loading.show { display: block; }
+    .frame-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--hint);
+      font-size: 14px;
+      background: #000000;
+      pointer-events: none;
+    }
+    .frame-loading.hide { display: none; }
     .spinner {
-      width: 26px; height: 26px; margin: 0 auto 8px;
+      width: 26px; height: 26px;
       border: 3px solid var(--card-border); border-top-color: var(--gold);
       border-radius: 50%; animation: spin 0.9s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ---- Result ---- */
-    #result { display: none; }
-    #result.show { display: block; }
-    .score-row { display: flex; align-items: center; gap: 16px; }
-    .score {
-      flex: none;
-      width: 92px; height: 92px;
-      border-radius: 50%;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      border: 4px solid var(--gold);
-      background: var(--bg);
-    }
-    .score b { font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
-    .score small { font-size: 11px; color: var(--hint); }
-    .score.safe { border-color: var(--green); }
-    .score.caution { border-color: var(--amber); }
-    .score.high { border-color: var(--red); }
-    .verdict { font-size: 18px; font-weight: 800; margin: 0; }
-    .verdict.safe { color: var(--green); }
-    .verdict.caution { color: var(--amber); }
-    .verdict.high { color: var(--red); }
-    .band { font-size: 13px; color: var(--hint); margin: 2px 0 0; }
-    .contract-line {
-      margin-top: 12px; padding-top: 12px;
-      border-top: 1px solid var(--card-border);
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 12px; color: var(--hint);
-      word-break: break-all;
-    }
-    .stats {
-      display: flex; gap: 8px; margin-top: 12px;
-    }
-    .stat {
-      flex: 1; text-align: center;
-      background: var(--bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px; padding: 10px 4px;
-    }
-    .stat small { display: block; font-size: 11px; color: var(--hint); text-transform: uppercase; letter-spacing: .06em; }
-    .stat b { display: block; font-size: 14px; margin-top: 2px; word-break: break-word; }
-
-    .reasons { list-style: none; margin: 14px 0 0; padding: 0; }
-    .reasons li {
-      display: flex; gap: 10px; align-items: flex-start;
-      padding: 10px 0; border-top: 1px solid var(--card-border);
-      font-size: 14px;
-    }
-    .reasons .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; background: var(--silver); }
-    .reasons li.ok .dot { background: var(--green); }
-    .reasons li.warn .dot { background: var(--amber); }
-    .reasons li.bad .dot { background: var(--red); }
-    .reasons .r-label { font-weight: 700; }
-    .reasons .r-text { color: var(--hint); }
-
-    footer {
-      margin-top: 20px;
-      font-size: 12px;
-      color: var(--hint);
-      text-align: center;
-      line-height: 1.6;
-    }
-    footer .free { color: var(--gold); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <img src="/orbitx-icon-512.png" alt="OrbitX logo" width="44" height="44" />
+  <div class="bar">
+    <div class="brand">
+      <img src="/orbitx-icon-512.png" alt="OrbitX logo" width="30" height="30" />
       <div>
         <div class="title">ORBIT<span>X</span> OG SCANNER</div>
-        <div class="sub">Risk signals for Solana tokens</div>
+        <div class="greeting" id="greeting">Free forever — the full scanner</div>
       </div>
-    </header>
-    <p class="greeting" id="greeting">Scan any Solana token before you ape in.</p>
-
-    <div class="notice" id="outsideNotice">
-      Open this page inside Telegram to scan — tap the OrbitX scanner button in the bot chat.
-      The scanner needs your Telegram session to verify each scan.
     </div>
-
-    <div class="card" id="scanCard">
-      <h2>Scan a token</h2>
-      <p class="hint">Paste a Solana contract address (mint). We never ask for your wallet.</p>
-      <label for="contract">Contract address</label>
+    <div class="mint-row">
       <input id="contract" type="text" inputmode="text" autocomplete="off" autocapitalize="off"
-        spellcheck="false" placeholder="e.g. So11111111111111111111111111111111111111112" />
-      <button id="scanBtn" type="button">Scan token</button>
-      <div class="error" id="errorBox" role="alert"></div>
-      <div class="loading" id="loadingBox"><div class="spinner"></div>Scanning on-chain data&hellip;</div>
+        spellcheck="false" placeholder="Paste a Solana contract address" />
+      <button id="scanBtn" type="button">Scan</button>
     </div>
+    <div class="error" id="errorBox" role="alert"></div>
+  </div>
 
-    <div class="card" id="result">
-      <div class="score-row">
-        <div class="score" id="scoreRing"><b id="scoreNum">–</b><small>/ 100</small></div>
-        <div>
-          <p class="verdict" id="verdictText">—</p>
-          <p class="band" id="bandText"></p>
-        </div>
-      </div>
-      <div class="contract-line" id="contractLine"></div>
-      <div class="stats">
-        <div class="stat"><small>Price</small><b id="statPrice">—</b></div>
-        <div class="stat"><small>Liquidity</small><b id="statLiq">—</b></div>
-        <div class="stat"><small>Holders</small><b id="statHolders">—</b></div>
-      </div>
-      <ul class="reasons" id="reasonsList"></ul>
-      <button class="share" id="shareBtn" type="button">Share result</button>
-      <button class="secondary" id="againBtn" type="button">Scan another</button>
-    </div>
-
-    <footer>
-      Risk signals only — not financial advice. Scores can be wrong; a clean
-      scan does not mean a token is safe.<br />
-      <span class="free">Free forever</span>
-    </footer>
+  <div class="frame-wrap">
+    <iframe id="scannerFrame" title="OrbitX OG Scanner" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
+    <div class="frame-loading" id="frameLoading"><div class="spinner"></div>Loading the scanner&hellip;</div>
   </div>
 
 <script>
 "use strict";
 
-/* =====================================================================
-   BACKEND CONTRACT — single point of alignment.
-   The scan endpoint is not final yet. The coordinator aligns this one
-   constant with the backend agent's endpoint in a single edit.
-   Request:  POST { initData, mint }
-             initData = raw tg.initData string (backend validates it)
-             mint = Solana mint address the user typed
-   Response: { score, verdict, band, reasons[], price, liquidity,
-               holders, honeypot, mintAuthority, freezeAuthority,
-               lpLockedPct, lpBurned, devExited, topHolderPct }
-             with null for anything unavailable.
-   ===================================================================== */
-const SCAN_API = "/api/ogdex/tg-scan";
-
-/* How long we wait for the backend before calling it a timeout. */
-const SCAN_TIMEOUT_MS = 30000;
-
 /* Telegram WebApp object — absent outside Telegram. Never crash on it. */
 const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
-const inTelegram = !!tg;
+
+/* The real scanner route inside the iframe. No mint -> scanner home,
+   which has its own input. */
+const SCANNER_HOME = "/scanner";
+function scannerUrl(mint) {
+  return mint ? ("/scanner/" + encodeURIComponent(mint)) : SCANNER_HOME;
+}
 
 /* ------------------------------------------------------------------ */
-/* Theme: match Telegram light/dark via themeParams.                   */
+/* Theme: match Telegram light/dark via themeParams (shell chrome only). */
 /* ------------------------------------------------------------------ */
 function applyTheme() {
   if (!tg) return; // defaults in :root are the OrbitX dark theme
@@ -304,21 +198,17 @@ function applyTheme() {
   const root = document.documentElement.style;
   // Take Telegram's own bg/text pair so contrast is always correct:
   // light Telegram bg ships with dark text, dark bg with light text.
-  // Only fill in a value when Telegram actually provides it.
   if (p.bg_color) root.setProperty("--bg", p.bg_color);
   if (p.text_color) root.setProperty("--text", p.text_color);
   if (p.hint_color) root.setProperty("--hint", p.hint_color);
   if (p.secondary_bg_color) root.setProperty("--card", p.secondary_bg_color);
   if (p.button_color) root.setProperty("--btn", p.button_color);
   if (p.button_text_color) root.setProperty("--btn-text", p.button_text_color);
-  // Card border: keep subtle in both schemes; derive from hint if present.
   if (p.hint_color) root.setProperty("--card-border", p.hint_color);
   document.querySelector('meta[name="theme-color"]')
     .setAttribute("content", p.bg_color || "#000000");
 }
 
-/* ------------------------------------------------------------------ */
-/* Small helpers                                                       */
 /* ------------------------------------------------------------------ */
 const $ = (id) => document.getElementById(id);
 function esc(s) {
@@ -333,279 +223,48 @@ function showError(msg) {
 }
 function clearError() { $("errorBox").classList.remove("show"); $("errorBox").textContent = ""; }
 
-function fmtUsd(v) {
-  if (v == null || v === "" || Number.isNaN(Number(v))) return "Unknown";
-  const n = Number(v);
-  if (n === 0) return "$0";
-  if (n < 0.01) return "$" + n.toFixed(6);
-  if (n < 1000) return "$" + n.toFixed(2);
-  if (n < 1e6) return "$" + (n / 1000).toFixed(1) + "K";
-  return "$" + (n / 1e6).toFixed(2) + "M";
-}
-function fmtNum(v) {
-  if (v == null || v === "" || Number.isNaN(Number(v))) return "Unknown";
-  return Number(v).toLocaleString("en-US");
-}
-function fmtPct(v) {
-  if (v == null || v === "" || Number.isNaN(Number(v))) return "Unknown";
-  return Number(v).toFixed(1) + "%";
-}
-function fmtBool(v, goodWhen) {
-  // v: true/false/null. goodWhen=true means "true is good" (e.g. lpBurned).
-  if (v == null) return "Unknown";
-  return v ? (goodWhen ? "Yes" : "Yes") : "No";
-}
-
 /* Solana mint: base58, 32–44 chars (no 0, O, I, l). */
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-function isValidMint(a) { return MINT_RE.test(a.trim()); }
+function isValidMint(a) { return MINT_RE.test((a || "").trim()); }
 
-/* ------------------------------------------------------------------ */
-/* Verdict: prefer the engine's own verdict/band; derive only as a    */
-/* fallback so the card never renders blank.                           */
-/* ------------------------------------------------------------------ */
-function verdictClass(score, verdict) {
-  const v = (verdict || "").toUpperCase();
-  if (v.includes("HIGH")) return "high";
-  if (v.includes("CAUTION") || v.includes("MEDIUM") || v.includes("RISK")) return "caution";
-  if (v.includes("SAFE") || v.includes("LOW")) return "safe";
-  if (score == null) return "caution";
-  if (score >= 70) return "safe";
-  if (score >= 40) return "caution";
-  return "high";
-}
-function deriveVerdict(score) {
-  if (score == null) return "CAUTION";
-  if (score >= 70) return "SAFE";
-  if (score >= 40) return "CAUTION";
-  return "HIGH RISK";
+/* Mint sources, in priority order:
+   1. ?mint= on the shell URL (direct link / debug)
+   2. Telegram start_param — t.me/orbitxapirbot?startapp=<mint> */
+function initialMint() {
+  try {
+    const q = new URLSearchParams(window.location.search).get("mint");
+    if (q && isValidMint(q)) return q.trim();
+  } catch (e) { /* ignore */ }
+  if (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
+    const sp = String(tg.initDataUnsafe.start_param).trim();
+    if (isValidMint(sp)) return sp;
+  }
+  return null;
 }
 
-/* ------------------------------------------------------------------ */
-/* Reasons: backend reasons[] win; otherwise build rows from the       */
-/* individual risk fields so the card still explains the score.        */
-/* A reason may be a string or { label, text, status } where status    */
-/* is "ok" | "warn" | "bad".                                           */
-/* ------------------------------------------------------------------ */
-function reasonRow(label, text, status) {
-  return { label, text, status: status || "ok" };
-}
-function buildReasons(d) {
-  if (Array.isArray(d.reasons) && d.reasons.length) {
-    return d.reasons.map((r) => {
-      if (typeof r === "string") return reasonRow("Signal", r, "warn");
-      return reasonRow(r.label || r.title || "Signal", r.text || r.detail || r.message || "", r.status || r.level || "warn");
-    }).slice(0, 5);
+let currentMint = null;
+function loadScanner(mint) {
+  currentMint = mint || null;
+  if (currentMint) {
+    $("contract").value = currentMint;
   }
-  const rows = [];
-  if (d.honeypot != null)
-    rows.push(reasonRow("Honeypot check", d.honeypot ? "Selling looks blocked — buyers may not be able to exit." : "No honeypot detected — selling looks possible.",
-      d.honeypot ? "bad" : "ok"));
-  if (d.mintAuthority != null || d.freezeAuthority != null) {
-    const mint = d.mintAuthority, freeze = d.freezeAuthority;
-    const risky = mint === true || freeze === true;
-    const parts = [];
-    if (mint != null) parts.push(mint ? "mint authority still live (supply can grow)" : "mint authority revoked");
-    if (freeze != null) parts.push(freeze ? "freeze authority still live (wallets can be frozen)" : "freeze authority revoked");
-    rows.push(reasonRow("Mint / freeze authority", parts.join(" · ") + ".", risky ? "bad" : "ok"));
-  }
-  if (d.lpLockedPct != null || d.lpBurned != null) {
-    const locked = d.lpLockedPct, burned = d.lpBurned;
-    const good = (locked != null && Number(locked) >= 95) || burned === true;
-    const parts = [];
-    if (locked != null) parts.push(fmtPct(locked) + " of LP locked");
-    if (burned != null) parts.push(burned ? "LP burned" : "LP not burned");
-    rows.push(reasonRow("Liquidity lock", parts.join(" · ") + ".", good ? "ok" : "warn"));
-  }
-  if (d.devExited != null)
-    rows.push(reasonRow("Developer", d.devExited ? "Dev wallets have sold out — dev has exited." : "Dev wallets still hold tokens.",
-      d.devExited ? "bad" : "ok"));
-  if (d.topHolderPct != null) {
-    const pct = Number(d.topHolderPct);
-    rows.push(reasonRow("Holder concentration",
-      "Top holder owns " + fmtPct(pct) + " of supply" + (pct >= 20 ? " — a single wallet can move the price hard." : "."),
-      pct >= 20 ? "bad" : pct >= 10 ? "warn" : "ok"));
-  }
-  return rows.slice(0, 5);
+  $("frameLoading").classList.remove("hide");
+  $("scannerFrame").src = scannerUrl(currentMint);
 }
 
 /* ------------------------------------------------------------------ */
-/* Rendering                                                           */
+/* Scan from the shell input                                           */
 /* ------------------------------------------------------------------ */
-let lastResult = null; // { contract, score, verdict, band } for sharing
-
-function renderResult(d, contract) {
-  const score = (d.score == null || Number.isNaN(Number(d.score))) ? null : Math.round(Number(d.score));
-  const verdict = d.verdict || deriveVerdict(score);
-  const cls = verdictClass(score, d.verdict);
-  lastResult = { contract, score, verdict, band: d.band || null };
-
-  $("scoreNum").textContent = score == null ? "–" : String(score);
-  $("scoreRing").className = "score " + cls;
-  const vEl = $("verdictText");
-  vEl.textContent = verdict;
-  vEl.className = "verdict " + cls;
-  $("bandText").textContent = d.band ? ("OG band: " + d.band) : "";
-  $("contractLine").textContent = contract;
-  $("statPrice").textContent = fmtUsd(d.price);
-  $("statLiq").textContent = fmtUsd(d.liquidity);
-  $("statHolders").textContent = fmtNum(d.holders);
-
-  const list = $("reasonsList");
-  list.innerHTML = "";
-  const rows = buildReasons(d);
-  if (!rows.length) {
-    list.innerHTML = "<li><span class='dot'></span><span><span class='r-label'>No detail returned.</span> " +
-      "<span class='r-text'>The scan finished but the backend sent no reason rows.</span></span></li>";
-  } else {
-    rows.forEach((r) => {
-      const li = document.createElement("li");
-      li.className = r.status === "bad" ? "bad" : r.status === "warn" ? "warn" : "ok";
-      const dot = document.createElement("span"); dot.className = "dot";
-      const body = document.createElement("span");
-      const lab = document.createElement("span"); lab.className = "r-label"; lab.textContent = r.label + ": ";
-      const txt = document.createElement("span"); txt.className = "r-text"; txt.textContent = r.text || "";
-      body.appendChild(lab); body.appendChild(txt);
-      li.appendChild(dot); li.appendChild(body);
-      list.appendChild(li);
-    });
-  }
-
-  $("scanCard").style.display = "none";
-  $("result").classList.add("show");
-  if (tg && tg.HapticFeedback) { try { tg.HapticFeedback.notificationOccurred(cls === "high" ? "error" : "success"); } catch (e) {} }
-}
-
-/* ------------------------------------------------------------------ */
-/* Scan                                                                */
-/* ------------------------------------------------------------------ */
-let scanning = false;
-async function doScan() {
-  if (scanning) return;
+function doScan() {
   clearError();
   const contract = $("contract").value.trim();
-
-  if (!inTelegram) {
-    showError("Open this page inside Telegram to scan. The scanner verifies each scan with your Telegram session.");
-    return;
-  }
   if (!contract) { showError("Paste a contract address first."); return; }
   if (!isValidMint(contract)) {
     showError("That doesn't look like a Solana contract address — it should be 32–44 letters and numbers, with no 0, O, I or l.");
     return;
   }
-  if (!tg.initData) {
-    showError("Telegram didn't hand over a session (no init data). Close this Mini App and reopen it from the bot.");
-    return;
-  }
-
-  scanning = true;
-  $("scanBtn").disabled = true;
-  $("loadingBox").classList.add("show");
-
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), SCAN_TIMEOUT_MS);
-  try {
-    const res = await fetch(SCAN_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ initData: tg.initData, mint: contract }),
-      signal: ctrl.signal,
-    });
-    let data = null;
-    try { data = await res.json(); } catch (e) { /* non-JSON body */ }
-
-    if (res.status === 401 || res.status === 403) {
-      showError("Telegram couldn't verify this session. Close the Mini App and reopen it from the bot, then try again.");
-      return;
-    }
-    if (res.status === 404) {
-      showError("Token not found — no on-chain data for this address. Double-check the contract and try again.");
-      return;
-    }
-    if (res.status === 400) {
-      showError((data && data.error) || "That address was rejected. Double-check the contract and try again.");
-      return;
-    }
-    if (res.status === 429) {
-      showError("Too many scans right now — wait a minute and try again.");
-      return;
-    }
-    if (!res.ok) {
-      showError("The scanner is having trouble right now (server error). Try again in a bit.");
-      return;
-    }
-    if (!data || typeof data !== "object") {
-      showError("The scanner answered in a format we can't read. Try again.");
-      return;
-    }
-    renderResult(data, contract);
-  } catch (e) {
-    if (e && e.name === "AbortError") {
-      showError("The scan timed out — the data source is slow right now. Try again.");
-    } else {
-      showError("Can't reach the scanner backend right now. Check your connection and try again.");
-    }
-  } finally {
-    clearTimeout(timer);
-    scanning = false;
-    $("scanBtn").disabled = false;
-    $("loadingBox").classList.remove("show");
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/* Share — Telegram-native only. No external links anywhere.           */
-/*                                                                     */
-/* tg.shareMessage(msgId) shares a message the bot already sent, so    */
-/* it needs a message id. If the backend ever returns one as           */
-/* shareMessageId we use it; v1 has no such id, so the working path    */
-/* is tg.switchInlineQuery: Telegram opens the chat picker and drops   */
-/* the result text into the chosen chat. That is the viral loop.       */
-/* ------------------------------------------------------------------ */
-function shareText() {
-  if (!lastResult) return "OrbitX OG Scanner — free token risk scan.";
-  const r = lastResult;
-  const score = r.score == null ? "?" : String(r.score);
-  const band = r.band ? " (" + r.band + ")" : "";
-  return "🔍 OrbitX OG Scanner\n" +
-    "Token: " + r.contract + "\n" +
-    "OG Score: " + score + "/100 — " + r.verdict + band + "\n" +
-    "Risk signals only, not financial advice. Scan free in the OrbitX bot.";
-}
-function shareResult() {
-  if (!lastResult) return;
-  if (!tg) return;
-  // Path 1: backend-minted bot message id (not present in v1).
-  if (tg.shareMessage && lastResult.shareMessageId) {
-    try {
-      tg.shareMessage(lastResult.shareMessageId, function (ok) {
-        if (!ok && tg.switchInlineQuery) tg.switchInlineQuery(shareText(), ["users", "groups", "channels"]);
-      }, function () {
-        if (tg.switchInlineQuery) tg.switchInlineQuery(shareText(), ["users", "groups", "channels"]);
-      });
-      return;
-    } catch (e) { /* fall through to inline query */ }
-  }
-  // Path 2 (v1 working path): chat picker with the result as message text.
-  if (tg.switchInlineQuery) {
-    tg.switchInlineQuery(shareText(), ["users", "groups", "channels"]);
-  } else if (tg.openTelegramLink) {
-    tg.openTelegramLink("https://t.me/share/url?url=" +
-      encodeURIComponent("https://orbitx.world/tg-scanner.html") +
-      "&text=" + encodeURIComponent(shareText()));
-  } else if (tg.showAlert) {
-    tg.showAlert(shareText());
-  }
-}
-
-function resetScan() {
-  lastResult = null;
-  $("result").classList.remove("show");
-  $("scanCard").style.display = "";
-  $("contract").value = "";
-  clearError();
-  $("contract").focus();
+  loadScanner(contract);
+  if (tg && tg.HapticFeedback) { try { tg.HapticFeedback.impactOccurred("light"); } catch (e) {} }
 }
 
 /* ------------------------------------------------------------------ */
@@ -620,23 +279,21 @@ function boot() {
     // Greeting is display-only — never used for auth.
     const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
     if (user && user.first_name) {
-      $("greeting").innerHTML = "Hey, <b>" + esc(user.first_name) + "</b> — scan any Solana token before you ape in.";
+      $("greeting").innerHTML = "Hey, <b>" + esc(user.first_name) + "</b> — the full scanner";
     }
     if (tg.onEvent) {
       try { tg.onEvent("themeChanged", applyTheme); } catch (e) {}
     }
-  } else {
-    // Outside Telegram: explain, don't crash, don't let a scan be attempted.
-    $("outsideNotice").classList.add("show");
-    $("scanBtn").disabled = true;
-    $("contract").disabled = true;
   }
 
+  $("scannerFrame").addEventListener("load", function () {
+    $("frameLoading").classList.add("hide");
+  });
   $("scanBtn").addEventListener("click", doScan);
   $("contract").addEventListener("keydown", (e) => { if (e.key === "Enter") doScan(); });
   $("contract").addEventListener("input", clearError);
-  $("shareBtn").addEventListener("click", shareResult);
-  $("againBtn").addEventListener("click", resetScan);
+
+  loadScanner(initialMint());
 }
 document.addEventListener("DOMContentLoaded", boot);
 </script>
