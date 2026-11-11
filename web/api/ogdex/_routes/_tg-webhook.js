@@ -107,10 +107,20 @@ function fmtPct(v, digits = 1) {
   return (v >= 0 ? "+" : "") + v.toFixed(digits) + "%";
 }
 
+function fmtPrice(v) {
+  if (v == null || !Number.isFinite(v)) return null;
+  if (v >= 1) return "$" + v.toFixed(2);
+  if (v >= 0.01) return "$" + v.toFixed(4);
+  return "$" + Number(v.toPrecision(4)).toString();
+}
+
 function shortNote(s, max = 90) {
   if (s == null) return null;
   const t = String(s).trim();
-  return t.length > max ? t.slice(0, max - 1) + "…" : t;
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max - 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > max * 0.5 ? cut.slice(0, lastSpace) : cut) + "…";
 }
 
 function shortAddr(s) {
@@ -136,7 +146,7 @@ function scanReply(result) {
   // Market
   if (result.price != null) {
     const chg = result.change24h != null ? ` (${fmtPct(result.change24h)} 24h)` : "";
-    lines.push(`Price: $${result.price}${chg}`);
+    lines.push(`Price: ${fmtPrice(result.price)}${chg}`);
   }
   if (result.marketCap != null) lines.push(`MCAP: ${fmtUsd(result.marketCap)}`);
   if (result.liquidity != null) lines.push(`Liquidity: ${fmtUsd(result.liquidity)}`);
@@ -144,8 +154,8 @@ function scanReply(result) {
   // Holders
   const holderBits = [];
   if (result.holders != null) holderBits.push(`Holders: ${result.holders}`);
-  if (result.topHolderPct != null) holderBits.push(`Top: ${result.topHolderPct}%`);
-  if (result.top10Pct != null) holderBits.push(`Top 10: ${result.top10Pct}%`);
+  if (result.topHolderPct != null) holderBits.push(`Top: ${Number(result.topHolderPct).toFixed(1)}%`);
+  if (result.top10Pct != null) holderBits.push(`Top 10: ${Number(result.top10Pct).toFixed(1)}%`);
   if (holderBits.length) lines.push(holderBits.join(" · "));
   lines.push("");
   // Safety
@@ -189,10 +199,12 @@ function scanReply(result) {
   // Bundle
   const b = result.bundle;
   if (b && b.available) {
-    const bits = [];
-    if (b.bundledSupplyPct != null) bits.push(`${b.bundledSupplyPct.toFixed(1)}% bundled`);
-    if (b.clusterCount != null) bits.push(`${b.clusterCount} clusters`);
-    lines.push(`Bundle: ${bits.join(" · ")} — ${b.verdict || "—"}`);
+    let bundleLine = `Bundle: ${b.verdict || "—"}`;
+    if (b.bundledSupplyPct != null && !bundleLine.includes("% bundled")) {
+      bundleLine += ` (${Number(b.bundledSupplyPct).toFixed(1)}% bundled)`;
+    }
+    if (b.clusterCount != null && b.clusterCount > 0) bundleLine += ` · ${b.clusterCount} clusters`;
+    lines.push(bundleLine);
     const note = shortNote(b.note);
     if (note) lines.push(`  ${note}`);
   } else {
