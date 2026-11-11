@@ -131,9 +131,10 @@ function shortAddr(s) {
 /**
  * Full scan report, in the chat — like a normal TG bot scanner. Paste a CA,
  * get everything the scanner UI shows, as one detailed report: market,
- * holders, safety, bundle, dev/source, social, the score breakdown and
- * the risk factors. No Mini App needed. Kept under Telegram's 4096-char
- * message limit (truncated as a last resort).
+ * chart (price action), pairs (coins paired), holders, dev, safety,
+ * bundle, social, clones (vamp or OG + the clone list), the score
+ * breakdown and the risk factors. No Mini App needed. Kept under
+ * Telegram's 4096-char message limit (truncated as a last resort).
  */
 function scanReply(result) {
   const lines = [];
@@ -162,6 +163,35 @@ function scanReply(result) {
   }
   lines.push("");
 
+  // — Chart — price history (the chart in text form).
+  const pa = [];
+  if (result.change5m != null) pa.push(`5m ${fmtPct(result.change5m)}`);
+  if (result.change1h != null) pa.push(`1h ${fmtPct(result.change1h)}`);
+  if (result.change6h != null) pa.push(`6h ${fmtPct(result.change6h)}`);
+  if (result.change24h != null) pa.push(`24h ${fmtPct(result.change24h)}`);
+  if (pa.length) {
+    lines.push("— Chart —");
+    lines.push(`Price action: ${pa.join(" · ")}`);
+    lines.push("");
+  }
+
+  // — Pairs — which coins this token is paired to (the liquidity pools).
+  const pairs = Array.isArray(result.pairs) ? result.pairs : null;
+  lines.push("— Pairs —");
+  if (pairs && pairs.length) {
+    for (const p of pairs) {
+      const dex = p.dex ? String(p.dex).replace(/^\w/, (c) => c.toUpperCase()) : "Unknown";
+      const quote = p.quote || "?";
+      const bits = [`${dex} — ${quote}`];
+      if (p.liquidity != null) bits.push(`Liq ${fmtUsd(p.liquidity)}`);
+      if (p.volume24h != null) bits.push(`Vol ${fmtUsd(p.volume24h)}`);
+      lines.push(bits.join(" · "));
+    }
+  } else {
+    lines.push("Pairs: unknown — no DEX pairs found");
+  }
+  lines.push("");
+
   // — Holders —
   lines.push("— Holders —");
   const holderBits = [];
@@ -170,6 +200,33 @@ function scanReply(result) {
   if (result.top10Pct != null) holderBits.push(`Top 10: ${Number(result.top10Pct).toFixed(1)}%`);
   if (result.whaleCount != null) holderBits.push(`Whales: ${result.whaleCount}`);
   if (holderBits.length) lines.push(holderBits.join(" · "));
+  lines.push("");
+
+  // — Dev — who launched it, how many tokens, still holding or exited.
+  lines.push("— Dev —");
+  const devWallet = shortAddr(result.devWallet);
+  if (devWallet) lines.push(`Dev: ${devWallet}`);
+  const devLine =
+    result.devExited === true
+      ? "👋 Dev has exited"
+      : result.devExited === false
+        ? "✅ Dev still holds"
+        : "❓ Dev position — unknown";
+  lines.push(
+    result.devTokensCreated != null
+      ? `${devLine} · ${result.devTokensCreated} tokens created`
+      : devLine,
+  );
+  const st = result.sourceTrace;
+  if (st && st.available) {
+    const bits = [];
+    const w = shortAddr(st.sourceWallet);
+    if (w) bits.push(`Source: ${w}`);
+    if (st.sourceTokensCreated != null) bits.push(`${st.sourceTokensCreated} tokens created`);
+    if (bits.length) lines.push(bits.join(" · "));
+    const note = shortNote(st.note);
+    if (note) lines.push(`  ${note}`);
+  }
   lines.push("");
 
   // — Safety —
@@ -203,17 +260,6 @@ function scanReply(result) {
         : "❓ LP lock — unknown",
   );
   if (result.lpBurned === true) lines.push("🔥 LP burned");
-  const devLine =
-    result.devExited === true
-      ? "👋 Dev has exited"
-      : result.devExited === false
-        ? "✅ Dev still holds"
-        : "❓ Dev position — unknown";
-  lines.push(
-    result.devTokensCreated != null
-      ? `${devLine} · ${result.devTokensCreated} tokens created`
-      : devLine,
-  );
   const checks = Array.isArray(result.honeypotChecks) ? result.honeypotChecks : [];
   const rt = checks.find((c) => c.id === "round-trip");
   if (rt) lines.push(rt.label);
@@ -234,16 +280,6 @@ function scanReply(result) {
   } else {
     lines.push("Bundle: unknown — bundle check unavailable");
   }
-  const st = result.sourceTrace;
-  if (st && st.available) {
-    const bits = [];
-    const w = shortAddr(st.sourceWallet);
-    if (w) bits.push(`Source: ${w}`);
-    if (st.sourceTokensCreated != null) bits.push(`${st.sourceTokensCreated} tokens created`);
-    if (bits.length) lines.push(bits.join(" · "));
-    const note = shortNote(st.note);
-    if (note) lines.push(`  ${note}`);
-  }
   lines.push("");
 
   // — Social —
@@ -256,8 +292,37 @@ function scanReply(result) {
       if (n) lines.push(`X: ${n}`);
     }
   }
+  lines.push("");
+
+  // — Clones — vamp or OG, how many, and the clones themselves.
+  lines.push("— Clones —");
   const cl = result.clones;
-  if (cl) lines.push(`Clones: ${cl.label}`);
+  if (cl && cl.state !== "unknown") {
+    const isVamp = cl.biggerClone === true;
+    const verdict = isVamp
+      ? "🧛 VAMP — a bigger same-name token exists"
+      : cl.count > 0
+        ? "👑 OG — this is the biggest same-name token"
+        : "👑 OG — no same-name clones";
+    lines.push(`Originality: ${verdict}`);
+    if (cl.count != null && cl.count > 0) {
+      lines.push(`Same-name clones: ${cl.count}`);
+      const list = Array.isArray(cl.list) ? cl.list : [];
+      for (const c of list) {
+        const sym = c.symbol || c.name || "—";
+        const m = shortAddr(c.mint);
+        const bits = [sym];
+        if (c.mcap != null) bits.push(`MCAP ${fmtUsd(c.mcap)}`);
+        if (c.liquidity != null) bits.push(`Liq ${fmtUsd(c.liquidity)}`);
+        if (m) bits.push(m);
+        lines.push(`· ${bits.join(" · ")}`);
+      }
+    } else {
+      lines.push(cl.label || "No same-name clones found");
+    }
+  } else {
+    lines.push("Clones: unknown — clone check unavailable");
+  }
   lines.push("");
 
   // — Score breakdown —

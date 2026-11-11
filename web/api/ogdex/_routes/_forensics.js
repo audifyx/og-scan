@@ -132,12 +132,17 @@ export default async function handler(req, res) {
 
     const safety = intel?.safety || {};
     let holders = intel?.holders || [];
+    // Local Helius holders, fetched once — the ground truth for
+    // concentration. The intel feed's holder sample is unstable and
+    // mis-attributes multi-pool vaults: a token with several pools
+    // (MAGGIE) swung top-10 84% -> 22% across scans minutes apart,
+    // because vaults from the other pools leaked into "real holders".
+    // Local holders are direct getTokenLargestAccounts + properly
+    // pool-labeled, so concentration below prefers them.
+    const localH = await getLabeledHolders(mint).catch(() => null);
     // Intel edge fn down/empty -> local holders fallback (same backfill the
     // token route uses) so a dead upstream doesn't blank forensics.
-    if (!holders.length) {
-      const local = await getLabeledHolders(mint).catch(() => ({ holders: [] }));
-      if (local.holders?.length) holders = local.holders;
-    }
+    if (!holders.length && localH?.holders?.length) holders = localH.holders;
     const dev = pump?.creator || safety.creator || null;
 
     // Liquidity pools are NOT holders. A pool vault's owner account is owned
@@ -177,8 +182,18 @@ export default async function handler(req, res) {
     }
 
     // Concentration snapshot — real holders only, pools excluded.
-    const top10Pct = realHolders.length ? realHolders.slice(0, 10).reduce((s, h) => s + (h.pct || 0), 0) : null;
-    const whales = realHolders.filter((h) => (h.pct || 0) >= 1).length;
+    // Prefer the local Helius holders (ground truth, properly
+    // pool-labeled) so a multi-pool token's top-10 is stable and
+    // correct; fall back to the intel-derived list when local is
+    // unavailable. concPools below is the pool list for the same source.
+    const concList = localH?.holders?.length ? localH.holders : realHolders;
+    const concReal = concList.filter((h) => !h.isPool);
+    const top10Pct = concReal.length ? concReal.slice(0, 10).reduce((s, h) => s + (h.pct || 0), 0) : null;
+    const topHolderPctConc = concReal.length ? (concReal[0].pct ?? null) : null;
+    const whales = concReal.filter((h) => (h.pct || 0) >= 1).length;
+    const concPools = localH?.holders?.length
+      ? (localH.pools || concList.filter((h) => h.isPool))
+      : pools;
 
     // Pump.fun rule (user-confirmed 2026-11-08): a MIGRATED pump.fun token
     // has its LP tokens BURNED at migration — nobody can pull the liquidity.
@@ -224,7 +239,7 @@ export default async function handler(req, res) {
       isPumpFun: isPumpLaunch || !!pump || !!safety.isPumpFun,
       bondingComplete: pump ? !!pump.complete : (pumpMigrated ? true : null),
       concentration: {
-        top10Pct, whales, pools,
+        top10Pct, topHolderPct: topHolderPctConc, whales, pools: concPools,
         // Prefer Rugcheck / intel totals — never the top-N sample length.
         totalHolders: safety.totalHolders ??
           (intel?.holderCount != null &&

@@ -258,6 +258,45 @@ function callRoute(handler, url) {
   });
 }
 
+/** DexScreener pairs for a mint — which coins the token is paired to
+ * (SOL/USDC/…) and on which DEX, with liquidity. Public API, no auth;
+ * degrades to null on any failure. */
+async function fetchDexPairs(mint) {
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 10_000);
+    const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${encodeURIComponent(mint)}`, {
+      headers: { Accept: "application/json" },
+      signal: ctl.signal,
+    }).catch(() => null);
+    clearTimeout(timer);
+    if (!r || !r.ok) return null;
+    const d = await r.json().catch(() => null);
+    if (!Array.isArray(d)) return null;
+    const seen = new Set();
+    const out = [];
+    for (const p of d) {
+      if (!p || p.baseToken?.address !== mint) continue;
+      const dex = String(p.dexId || "").toLowerCase() || "unknown";
+      const quote = p.quoteToken?.symbol || null;
+      const key = dex + "|" + (quote || "");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        dex,
+        quote,
+        liquidity: finiteNum(p.liquidity?.usd),
+        volume24h: finiteNum(p.volume?.h24),
+        pairAddress: p.pairAddress || null,
+      });
+    }
+    out.sort((a, b) => (b.liquidity || 0) - (a.liquidity || 0));
+    return out.slice(0, 6);
+  } catch {
+    return null;
+  }
+}
+
 /** Top non-pool holder share (0–100) from the intel holders sample. */
 function topHolderPct(holders) {
   if (!Array.isArray(holders) || !holders.length) return null;
@@ -466,14 +505,16 @@ export async function scanMint(mint) {
   }
 
   // 5. Data — the same routes the web scanner uses, invoked in-process.
-  // Token + forensics + bundle + research run in parallel; each is capped
-  // by UPSTREAM_TIMEOUT_MS and a slow/failed one degrades to unavailable
-  // (the engine never treats it as clean).
-  const [tokenOut, forensics, bundleOut, researchOut] = await Promise.all([
+  // Token + forensics + bundle + research + DexScreener pairs run in
+  // parallel; each is capped by UPSTREAM_TIMEOUT_MS (pairs 10s) and a
+  // slow/failed one degrades to unavailable (the engine never treats it
+  // as clean).
+  const [tokenOut, forensics, bundleOut, researchOut, dexPairs] = await Promise.all([
     callRoute(tokenHandler, `/api/ogdex/token?mint=${encodeURIComponent(mint)}`),
     callRoute(forensicsHandler, `/api/ogdex/forensics?mint=${encodeURIComponent(mint)}&first=0`),
     callRoute(bundleHandler, `/api/ogdex/bundle?mint=${encodeURIComponent(mint)}`),
     callRoute(researchHandler, `/api/ogdex/research?mint=${encodeURIComponent(mint)}`),
+    fetchDexPairs(mint),
   ]);
 
   const token = tokenOut?.token ?? null;
@@ -563,11 +604,16 @@ export async function scanMint(mint) {
     marketCap,
     volume24h,
     change24h: finiteNum(token?.change24h),
+    change5m: finiteNum(token?.change5m),
+    change1h: finiteNum(token?.change1h),
+    change6h: finiteNum(token?.change6h),
+    pairs: dexPairs,
     name: token?.name ?? null,
     symbol: token?.symbol ?? null,
     top10Pct,
     ageDays: finiteNum(token?.ageDays),
     whaleCount: finiteNum(concentration?.whales),
+    devWallet: dev?.wallet ?? null,
     devTokensCreated: finiteNum(dev?.tokensCreated),
     honeypotChecks: checks,
     caps: og.caps,
@@ -578,7 +624,12 @@ export async function scanMint(mint) {
     lpLockedPct,
     lpBurned: lpBurnedPct === 100 ? true : lpBurnedPct == null ? null : false,
     devExited: dev?.sold ?? null,
-    topHolderPct: topHolderPct(tokenOut?.intel?.holders),
+    // Top holder from the forensics concentration (local Helius holders,
+    // pools excluded) — the token-route intel sample mis-attributes
+    // multi-pool vaults. Fall back to the intel sample only when the
+    // concentration has no value.
+    topHolderPct:
+      finiteNum(concentration?.topHolderPct) ?? topHolderPct(tokenOut?.intel?.holders),
     categories: og.categories,
     unknowns: og.unknowns,
     bundle: {
@@ -597,7 +648,22 @@ export async function scanMint(mint) {
     clones: {
       count: clones ? cv.count : null,
       biggerClone: clones ? cv.biggerClone : null,
+      state: clones ? cv.state : "unknown",
       label: cv.label,
+      // Top same-name clones by mcap (for the "show the clones" list).
+      list: clones
+        ? [...clones]
+            .sort((a, b) => (Number(b.mcap) || 0) - (Number(a.mcap) || 0))
+            .slice(0, 5)
+            .map((c) => ({
+              mint: c.mint || null,
+              name: c.name || null,
+              symbol: c.symbol || null,
+              mcap: finiteNum(c.mcap),
+              liquidity: finiteNum(c.liquidity),
+              volume24h: finiteNum(c.volume24h),
+            }))
+        : null,
     },
     sourceTrace: sourceTrace
       ? {
