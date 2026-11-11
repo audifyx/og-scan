@@ -175,6 +175,11 @@ async function fetchHoldersLive(mint, price, limit = 20) {
   const total = num(supplyRes.result?.value?.uiAmount) || top.reduce((s, a) => s + (num(a.uiAmount) || 0), 0) || 0;
   const owners = await resolveOwners(top.map((a) => a.address));
   const ownerPrograms = await classifyHolderOwners(Object.values(owners));
+  // If owner resolution AND classification both came back empty, the
+  // pool labels are unusable — every vault would read as a "whale" and
+  // poison the top-10 (and the KV cache). Return [] so callers fall back
+  // instead of using/caching mislabeled data.
+  if (!Object.keys(owners).length && !Object.keys(ownerPrograms).length) return [];
   return top.map((a, i) => {
     const amt = num(a.uiAmount) || 0;
     const pct = total ? (amt / total) * 100 : null;
