@@ -13,6 +13,13 @@
   https://orbitx.world/tg-app.html before the SPA catch-all rewrite
   (same precedent as tg-scanner.html / hunter.html / landing.html).
 
+  Deep links: the bot's /start keyboard links straight into the main
+  routes via ?route=<key> (e.g. tg-app.html?route=dex). The key is
+  validated against an allowlist in the script below — anything else
+  (or nothing) loads the full /app desktop. The iframe src is set
+  from JS on boot (not hardcoded in the markup) so a deep link never
+  loads /app first.
+
   Framing is allowed: web/vercel.json sets X-Frame-Options SAMEORIGIN
   on the catch-all, and the shell + iframe are the same origin
   (orbitx.world). The desktop inside is the public /app route —
@@ -140,7 +147,7 @@
   </div>
 
   <div class="frame-wrap">
-    <iframe id="appFrame" title="OrbitX" src="/app" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
+    <iframe id="appFrame" title="OrbitX" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
     <div class="frame-loading" id="frameLoading"><div class="spinner"></div>Loading OrbitX&hellip;</div>
   </div>
 
@@ -154,6 +161,30 @@ const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp 
    to it — same origin, stays inside the bot's webview, works in a
    plain browser too. */
 const SCANNER_URL = "/tg-scanner.html";
+
+/* Deep-link routes for the bot's /start keyboard (?route=<key>).
+   Allowlist only — the raw query value is NEVER used as a URL, so a
+   crafted link can't point the iframe anywhere else. */
+const ROUTES = {
+  app:       { path: "/app",            name: "the full platform" },
+  social:    { path: "/orbitx-social", name: "Social" },
+  dex:       { path: "/ORBITX_DEX",     name: "the DEX" },
+  trade:     { path: "/trade",          name: "Trade" },
+  nft:       { path: "/nft",            name: "the NFT Market" },
+  launchpad: { path: "/ORBITX_DEX/launchpad", name: "the Launchpad" },
+  intel:     { path: "/intel",          name: "Intel" },
+  play:      { path: "/play",           name: "Play" },
+};
+
+function resolveRoute() {
+  try {
+    const key = (new URLSearchParams(window.location.search).get("route") || "app")
+      .trim().toLowerCase();
+    return ROUTES[key] || ROUTES.app;
+  } catch (e) {
+    return ROUTES.app;
+  }
+}
 
 function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({
@@ -187,6 +218,12 @@ function applyTheme() {
 function boot() {
   applyTheme();
 
+  /* Load the destination (deep link or the full desktop). The src is
+     set here, on boot, so a ?route= link never loads /app first. */
+  const route = resolveRoute();
+  const frame = document.getElementById("appFrame");
+  frame.src = route.path;
+  document.getElementById("greeting").textContent = route.name + " — free forever";
   if (tg) {
     try { tg.ready(); } catch (e) {}
     try { tg.expand(); } catch (e) {}
@@ -194,7 +231,7 @@ function boot() {
     const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
     if (user && user.first_name) {
       document.getElementById("greeting").innerHTML =
-        "Hey, <b>" + esc(user.first_name) + "</b> — the full platform";
+        "Hey, <b>" + esc(user.first_name) + "</b> — " + esc(route.name);
     }
     if (tg.onEvent) {
       try { tg.onEvent("themeChanged", applyTheme); } catch (e) {}
