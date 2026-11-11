@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<!--
+  OrbitX — Telegram Mini App (Main Site)
+  ======================================
+  Thin full-screen shell: it embeds the ACTUAL OrbitX OS desktop — the
+  same <HubOS /> the web app serves at /app — in a same-origin iframe.
+  Nothing about the platform is replicated here: same UI, same data,
+  same routes, nothing to drift. The shell only adds:
+    - a compact top bar (logo + "OrbitX" + a Scanner button)
+    - Telegram.WebApp expand() + theme handling for the shell chrome
+
+  This page is a static file in web/public/, served at
+  https://orbitx.world/tg-app.html before the SPA catch-all rewrite
+  (same precedent as tg-scanner.html / hunter.html / landing.html).
+
+  Framing is allowed: web/vercel.json sets X-Frame-Options SAMEORIGIN
+  on the catch-all, and the shell + iframe are the same origin
+  (orbitx.world). The desktop inside is the public /app route —
+  no Telegram session is needed to view it, and it works in a plain
+  browser too. The Scanner lives in its own Mini App at
+  /tg-scanner.html (same pattern); the button here just navigates
+  the webview to it.
+
+  Known limit (Mini Apps are TON-only): there is no Solana wallet
+  inside Telegram's webview, so wallet connect / signing inside the
+  desktop needs the browser. Browsing and using the platform works
+  here; wallet actions still need orbitx.world in the browser.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <title>OrbitX</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    /*
+      Shell chrome only — the OS desktop is the React app inside the
+      iframe and brings its own theme. Contrast rule (user-set, all
+      OrbitX platforms, forever): never light-on-light or dark-on-dark.
+      The shell takes Telegram's own bg/text pair when run inside
+      Telegram, and defaults to the OrbitX dark theme.
+    */
+    :root {
+      --bg: #000000;
+      --text: #ffffff;
+      --hint: #a8a8a8;
+      --card: #111111;
+      --card-border: #2a2a2a;
+      --btn: #c9a227;          /* OrbitX gold */
+      --btn-text: #000000;
+      --gold: #d4af37;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.45;
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ---- Shell top bar: logo + title + Scanner button ---- */
+    .bar {
+      flex: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px calc(10px + env(safe-area-inset-top, 0px));
+      padding-top: calc(10px + env(safe-area-inset-top));
+      background: var(--bg);
+      border-bottom: 1px solid var(--card-border);
+    }
+    .brand { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; }
+    .brand img { width: 30px; height: 30px; border-radius: 7px; object-fit: cover; flex: none; }
+    .brand .title { font-size: 15px; font-weight: 800; letter-spacing: .02em; line-height: 1.1; white-space: nowrap; }
+    .brand .title span { color: var(--gold); }
+    .brand .subtitle { font-size: 12px; color: var(--hint); line-height: 1.1; white-space: nowrap; }
+    button {
+      flex: none;
+      padding: 10px 18px;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--btn-text);
+      background: var(--btn);
+      border: 0;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    button:active { opacity: .85; }
+
+    /* ---- Desktop iframe: takes all remaining height ---- */
+    .frame-wrap { position: relative; flex: 1 1 auto; min-height: 0; background: #000000; }
+    iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #000000;
+    }
+    .frame-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--hint);
+      font-size: 14px;
+      background: #000000;
+      pointer-events: none;
+    }
+    .frame-loading.hide { display: none; }
+    .spinner {
+      width: 26px; height: 26px;
+      border: 3px solid var(--card-border); border-top-color: var(--gold);
+      border-radius: 50%; animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <div class="brand">
+      <img src="/orbitx-icon-512.png" alt="OrbitX logo" width="30" height="30" />
+      <div>
+        <div class="title">ORBIT<span>X</span></div>
+        <div class="subtitle" id="greeting">The full platform — free forever</div>
+      </div>
+    </div>
+    <button id="scannerBtn" type="button">Scanner</button>
+  </div>
+
+  <div class="frame-wrap">
+    <iframe id="appFrame" title="OrbitX" src="/app" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
+    <div class="frame-loading" id="frameLoading"><div class="spinner"></div>Loading OrbitX&hellip;</div>
+  </div>
+
+<script>
+"use strict";
+
+/* Telegram WebApp object — absent outside Telegram. Never crash on it. */
+const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+
+/* The Scanner lives in its own Mini App shell. Navigate the webview
+   to it — same origin, stays inside the bot's webview, works in a
+   plain browser too. */
+const SCANNER_URL = "/tg-scanner.html";
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+/* ------------------------------------------------------------------ */
+/* Theme: match Telegram light/dark via themeParams (shell chrome only). */
+/* ------------------------------------------------------------------ */
+function applyTheme() {
+  if (!tg) return; // defaults in :root are the OrbitX dark theme
+  const p = tg.themeParams || {};
+  const root = document.documentElement.style;
+  // Take Telegram's own bg/text pair so contrast is always correct:
+  // light Telegram bg ships with dark text, dark bg with light text.
+  if (p.bg_color) root.setProperty("--bg", p.bg_color);
+  if (p.text_color) root.setProperty("--text", p.text_color);
+  if (p.hint_color) root.setProperty("--hint", p.hint_color);
+  if (p.secondary_bg_color) root.setProperty("--card", p.secondary_bg_color);
+  if (p.button_color) root.setProperty("--btn", p.button_color);
+  if (p.button_text_color) root.setProperty("--btn-text", p.button_text_color);
+  if (p.hint_color) root.setProperty("--card-border", p.hint_color);
+  document.querySelector('meta[name="theme-color"]')
+    .setAttribute("content", p.bg_color || "#000000");
+}
+
+/* ------------------------------------------------------------------ */
+/* Boot                                                                */
+/* ------------------------------------------------------------------ */
+function boot() {
+  applyTheme();
+
+  if (tg) {
+    try { tg.ready(); } catch (e) {}
+    try { tg.expand(); } catch (e) {}
+    // Greeting is display-only — never used for auth.
+    const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
+    if (user && user.first_name) {
+      document.getElementById("greeting").innerHTML =
+        "Hey, <b>" + esc(user.first_name) + "</b> — the full platform";
+    }
+    if (tg.onEvent) {
+      try { tg.onEvent("themeChanged", applyTheme); } catch (e) {}
+    }
+  }
+
+  document.getElementById("appFrame").addEventListener("load", function () {
+    document.getElementById("frameLoading").classList.add("hide");
+  });
+  document.getElementById("scannerBtn").addEventListener("click", function () {
+    if (tg && tg.HapticFeedback) { try { tg.HapticFeedback.impactOccurred("light"); } catch (e) {} }
+    window.location.href = SCANNER_URL;
+  });
+}
+document.addEventListener("DOMContentLoaded", boot);
+</script>
+</body>
+</html>

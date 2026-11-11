@@ -33,9 +33,14 @@ const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const seen = new Set(); // update_id — dropped duplicates (Telegram retries)
 const SEEN_MAX = 2000;
 
+const APP_URL = "https://orbitx.world/tg-app.html";
+
 function openScannerKeyboard() {
   return {
-    inline_keyboard: [[{ text: "Open Scanner", web_app: { url: WEBAPP_URL } }]],
+    inline_keyboard: [
+      [{ text: "Scanner", web_app: { url: WEBAPP_URL } }],
+      [{ text: "Open OrbitX", web_app: { url: APP_URL } }],
+    ],
   };
 }
 
@@ -98,9 +103,9 @@ function scanReply(result) {
 }
 
 const START_TEXT =
-  "OrbitX OG Scanner\n\nPaste any Solana token address and I will give you its OG score (0-100) plus the headline checks: honeypot, mint/freeze authority, LP lock/burn, dev exit.\n\nFree forever. Not financial advice.\n\nTap below to open the scanner, or just send me a token address here.";
+  "OrbitX — the official OrbitX bot\n\nPaste any Solana token address and I will give you its OG score (0-100) plus the headline checks: honeypot, mint/freeze authority, LP lock/burn, dev exit.\n\nOr open the full platform below: Terminal, Launchpad, Social and the OrbitX OS desktop.\n\nFree forever. Not financial advice.\n\nTap below to open the scanner or the full app, or just send me a token address here.";
 const HELP_TEXT =
-  "How the scanner works:\n\n• /scan <address> — scan a token, e.g. /scan 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9\n• Or just paste a token address — no command needed.\n• Open the scanner button below for the full score card.\n\nScores come from the real OrbitX engine: contract, liquidity, holders, dev and trading signals. Unknown means unknown — never guessed. Free forever. Not financial advice.";
+  "How the scanner works:\n\n• /scan <address> — scan a token, e.g. /scan 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9\n• Or just paste a token address — no command needed.\n• Open the scanner button below for the full score card.\n• Open OrbitX below for the full platform: Terminal, Launchpad, Social and the OrbitX OS desktop.\n\nScores come from the real OrbitX engine: contract, liquidity, holders, dev and trading signals. Unknown means unknown — never guessed. Free forever. Not financial advice.";
 
 function sendMethod(res, payload) {
   res.statusCode = 200;
