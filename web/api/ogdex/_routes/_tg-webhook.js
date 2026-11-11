@@ -89,9 +89,8 @@ function openScannerKeyboard() {
        { text: "DEX", web_app: { url: APP_URL + "?route=dex" } }],
       [{ text: "Trade", web_app: { url: APP_URL + "?route=trade" } },
        { text: "NFT Market", web_app: { url: APP_URL + "?route=nft" } }],
-      [{ text: "Launchpad", web_app: { url: APP_URL + "?route=launchpad" } },
-       { text: "Intel", web_app: { url: APP_URL + "?route=intel" } }],
-      [{ text: "Play", web_app: { url: APP_URL + "?route=play" } }],
+      [{ text: "Intel", web_app: { url: APP_URL + "?route=intel" } },
+       { text: "Play", web_app: { url: APP_URL + "?route=play" } }],
     ],
   };
 }
@@ -155,9 +154,9 @@ function scanReply(result) {
 }
 
 const START_TEXT =
-  "OrbitX — the official OrbitX bot\n\nPaste any Solana token address and I will give you its OG score (0-100) plus the headline checks: honeypot, mint/freeze authority, LP lock/burn, dev exit.\n\nOr jump straight into any part of the platform below — Social, DEX, Trade, NFT Market, Launchpad, Intel, Play — or open the full OrbitX OS desktop.\n\nFree forever. Not financial advice.\n\nTap below to open the scanner or any part of the app, or just send me a token address here.";
+  "OrbitX — the official OrbitX bot\n\nPaste any Solana token address and I will give you its OG score (0-100) plus the headline checks: honeypot, mint/freeze authority, LP lock/burn, dev exit.\n\nOr jump straight into any part of the platform below — Social, DEX, Trade, NFT Market, Intel, Play — or open the full OrbitX OS desktop.\n\nFree forever. Not financial advice.\n\nTap below to open the scanner or any part of the app, or just send me a token address here.";
 const HELP_TEXT =
-  "How the scanner works:\n\n• /scan <address> — scan a token, e.g. /scan 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9\n• Or just paste a token address — no command needed.\n• Open the scanner button below for the full score card.\n• The buttons below jump straight into Social, DEX, Trade, NFT Market, Launchpad, Intel, Play — or open the full OrbitX OS desktop.\n\nScores come from the real OrbitX engine: contract, liquidity, holders, dev and trading signals. Unknown means unknown — never guessed. Free forever. Not financial advice.";
+  "How the scanner works:\n\n• /scan <address> — scan a token, e.g. /scan 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9\n• Or just paste a token address — no command needed.\n• Open the scanner button below for the full score card.\n• The buttons below jump straight into Social, DEX, Trade, NFT Market, Intel, Play — or open the full OrbitX OS desktop.\n\nScores come from the real OrbitX engine: contract, liquidity, holders, dev and trading signals. Unknown means unknown — never guessed. Free forever. Not financial advice.";
 
 function sendMethod(res, payload) {
   res.statusCode = 200;
