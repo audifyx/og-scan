@@ -48,6 +48,18 @@
  */
 import { scanMint } from "./_tg-scan.js";
 import { buildScanWidget, buildRefreshData, parseWidgetRequest } from "./_tg-widget.js";
+import {
+  buildPriceWidget,
+  buildHoldersWidget,
+  buildBundleWidget,
+  buildTrendingWidget,
+  fetchTrending,
+  parseCmdWidgetRequest,
+  buildPriceRefreshData,
+  buildHoldersRefreshData,
+  buildBundleRefreshData,
+  buildTrendingRefreshData,
+} from "./_tg-cmd-widgets.js";
 import { readBody } from "../_lib.js";
 
 const SUPABASE_URL =
@@ -159,6 +171,135 @@ function shortNote(s, max = 90) {
 function shortAddr(s) {
   if (!s || s.length < 10) return s || null;
   return s.slice(0, 6) + "…" + s.slice(-4);
+}
+
+// ── widget-command text fallbacks (groups — widgets are private-only) ──
+function cmdTitle(result) {
+  const short = result.mint.slice(0, 6) + "…" + result.mint.slice(-4);
+  const title = [result.symbol, result.name]
+    .filter(Boolean)
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .join(" ");
+  return title ? `${title} (${short})` : `Token ${short}`;
+}
+function priceText(result) {
+  const lines = [cmdTitle(result)];
+  lines.push(
+    `Price: ${fmtPrice(result.price) ?? "—"}${result.change24h != null ? ` (${fmtPct(result.change24h)} 24h)` : ""}`,
+  );
+  const mkt = [];
+  if (result.marketCap != null) mkt.push(`MCAP: ${fmtUsd(result.marketCap)}`);
+  if (result.liquidity != null) mkt.push(`Liquidity: ${fmtUsd(result.liquidity)}`);
+  if (result.volume24h != null) mkt.push(`Vol 24h: ${fmtUsd(result.volume24h)}`);
+  if (mkt.length) lines.push(mkt.join(" · "));
+  const chgs = [result.change5m, result.change1h, result.change6h, result.change24h];
+  const labels = ["5m", "1h", "6h", "24h"];
+  const pa = chgs.map((v, i) => (v != null ? `${labels[i]} ${fmtPct(v)}` : null)).filter(Boolean);
+  if (pa.length) lines.push(`Price action: ${pa.join(" · ")}`);
+  if (result.numBuys24h != null || result.numSells24h != null) {
+    lines.push(
+      `24h: ${fmtInt(result.numBuys24h ?? 0)} buys · ${fmtInt(result.numSells24h ?? 0)} sells` +
+        (result.numTraders24h != null ? ` · ${fmtInt(result.numTraders24h)} traders` : ""),
+    );
+  }
+  lines.push("");
+  lines.push("Not financial advice.");
+  return lines.join("\n");
+}
+function holdersText(result) {
+  const lines = [cmdTitle(result)];
+  const conc = [];
+  if (result.holders != null) {
+    conc.push(
+      `Holders: ${fmtInt(result.holders)}${result.holderChange24h != null ? ` (${fmtPct(result.holderChange24h)} 24h)` : ""}`,
+    );
+  }
+  if (result.topHolderPct != null) conc.push(`Top: ${Number(result.topHolderPct).toFixed(1)}%`);
+  if (result.top10Pct != null) conc.push(`Top 10: ${Number(result.top10Pct).toFixed(1)}%`);
+  if (result.whaleCount != null) conc.push(`Whales: ${result.whaleCount}`);
+  if (conc.length) lines.push(conc.join(" · "));
+  const th = Array.isArray(result.topHolders) ? result.topHolders : null;
+  if (th && th.length) {
+    lines.push("Top holders:");
+    for (const h of th) {
+      const who = shortAddr(h.owner) || h.label || "?";
+      lines.push(`· ${who} · ${Number(h.pct).toFixed(1)}%${h.usdValue != null ? ` · ${fmtUsd(h.usdValue)}` : ""}`);
+    }
+  }
+  lines.push(
+    result.devExited === true
+      ? "Dev: has exited"
+      : result.devExited === false
+        ? "Dev: still holds"
+        : "Dev position: unknown",
+  );
+  lines.push("");
+  lines.push("Not financial advice.");
+  return lines.join("\n");
+}
+function bundleText(result) {
+  const lines = [cmdTitle(result)];
+  const b = result.bundle || {};
+  if (b.available === false) {
+    lines.push("Bundle: check unavailable — unknown, not safe");
+  } else {
+    lines.push(
+      `Bundle: ${b.verdict || "—"}${b.bundledSupplyPct != null ? ` (${Number(b.bundledSupplyPct).toFixed(1)}% bundled)` : ""}${b.clusterCount != null ? ` · ${b.clusterCount} clusters` : ""}`,
+    );
+    if (b.bundleRisk) lines.push(`Risk: ${b.bundleRisk}`);
+    const note = shortNote(b.note, 150);
+    if (note) lines.push(note);
+  }
+  lines.push(
+    result.devExited === true
+      ? "Dev: has exited"
+      : result.devExited === false
+        ? "Dev: still holds"
+        : "Dev position: unknown",
+  );
+  if (result.topHolderPct != null) lines.push(`Top holder: ${Number(result.topHolderPct).toFixed(1)}%`);
+  lines.push("");
+  lines.push("Not financial advice.");
+  return lines.join("\n");
+}
+function trendingText(rows) {
+  const lines = ["Trending on Solana — GeckoTerminal"];
+  for (let i = 0; i < rows.length; i++) {
+    const x = rows[i];
+    lines.push(
+      `#${i + 1} ${x.symbol || "?"} — ${fmtPrice(x.price) ?? "—"}${x.change24h != null ? ` (${fmtPct(x.change24h)} 24h)` : ""}${x.mcap != null ? ` · MCAP ${fmtUsd(x.mcap)}` : ""}`,
+    );
+  }
+  lines.push("");
+  lines.push("Not financial advice.");
+  return lines.join("\n");
+}
+
+/** Answer a widget command: HTML widget in a private chat, text summary
+ * elsewhere (groups — widgets are private-only in production) or when
+ * the widget can't be built. buildFn returns { html, caption }. */
+function replyCmdWidget(res, chatId, chatType, buildFn, result, textFn) {
+  if (chatType === "private") {
+    try {
+      const w = buildFn(result);
+      return sendMethod(res, {
+        method: "sendWidget",
+        chat_id: chatId,
+        html: w.html,
+        allow_queries: true,
+        caption: w.caption,
+        reply_markup: openScannerKeyboard(),
+      });
+    } catch (e) {
+      console.error("cmd widget build failed, text fallback", String((e && e.message) || e).slice(0, 120));
+    }
+  }
+  return sendMethod(res, {
+    method: "sendMessage",
+    chat_id: chatId,
+    text: textFn(result),
+    reply_markup: openScannerKeyboard(),
+  });
 }
 
 /**
@@ -530,7 +671,7 @@ function scanReply(result) {
 const START_TEXT =
   "OrbitX — the official OrbitX bot\n\nPaste any Solana token address and I will give you its OG score (0-100) plus the headline checks: honeypot, mint/freeze authority, LP lock/burn, dev exit.\n\nOr jump straight into any part of the platform below — Social, DEX, Trade, NFT Market, Intel, Play — or open the full OrbitX OS desktop.\n\nFree forever. Not financial advice.\n\nTap below to open the scanner or any part of the app, or just send me a token address here.";
 const HELP_TEXT =
-  "How the scanner works:\n\n• /scan <address> — scan a token, e.g. /scan 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9\n• Or just paste a token address — no command needed.\n• Open the scanner button below for the full score card.\n• The buttons below jump straight into Social, DEX, Trade, NFT Market, Intel, Play — or open the full OrbitX OS desktop.\n\nScores come from the real OrbitX engine: contract, liquidity, holders, dev and trading signals. Unknown means unknown — never guessed. Free forever. Not financial advice.";
+  "How the scanner works:\n\n• /scan <address> — scan a token, e.g. /scan 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9\n• /price <address> — live price card · /holders <address> — holder breakdown · /bundle <address> — bundle check · /trending — what's trending on Solana now. Each opens as an interactive widget in this chat.\n• Or just paste a token address — no command needed.\n• Open the scanner button below for the full score card.\n• The buttons below jump straight into Social, DEX, Trade, NFT Market, Intel, Play — or open the full OrbitX OS desktop.\n\nScores come from the real OrbitX engine: contract, liquidity, holders, dev and trading signals. Unknown means unknown — never guessed. Free forever. Not financial advice.";
 
 function sendMethod(res, payload) {
   res.statusCode = 200;
@@ -566,25 +707,47 @@ function replyScan(res, chatId, chatType, result) {
   });
 }
 
-/** Handle a widget_query / shared_widget_query: only "r:<mint>" (refresh)
- * is supported. Re-runs the scan (90s cache — cheap) and answers with
+/** Handle a widget_query / shared_widget_query: "r:<mint>" refreshes
+ * the scanner widget; "p:/h:/b:<mint>" refresh the /price, /holders,
+ * /bundle widgets; "t:" re-ranks /trending. Re-runs the scan (90s
+ * cache — cheap) or re-fetches the trending feed and answers with
  * compact fresh numbers. Always answers, even on error, so the widget's
  * request promise settles instead of timing out. */
 async function handleWidgetQuery(res, query) {
   const parsed = parseWidgetRequest(query && query.data);
-  const mint = parsed ? parsed.mint : null;
+  const cmdParsed = !parsed ? parseCmdWidgetRequest(query && query.data) : null;
+  const mint = parsed ? parsed.mint : (cmdParsed && cmdParsed.mint) || null;
   if (mint) {
     await logBotUse({ user: query.from, chat: query.chat || null, kind: "widget_query", detail: mint });
+  } else if (cmdParsed) {
+    await logBotUse({ user: query.from, chat: query.chat || null, kind: "widget_query", detail: "trending" });
   }
   let data;
-  if (!parsed) {
+  if (!parsed && !cmdParsed) {
     data = JSON.stringify({ e: "unknown request" });
-  } else {
+  } else if (parsed) {
     try {
       const result = await scanMint(mint);
       data = buildRefreshData(result);
     } catch {
       data = JSON.stringify({ e: "scan failed" });
+    }
+  } else {
+    try {
+      if (cmdParsed.kind === "trending") {
+        const rows = await fetchTrending(8);
+        data = buildTrendingRefreshData(rows);
+      } else {
+        const result = await scanMint(cmdParsed.mint);
+        data =
+          cmdParsed.kind === "price"
+            ? buildPriceRefreshData(result)
+            : cmdParsed.kind === "holders"
+              ? buildHoldersRefreshData(result)
+              : buildBundleRefreshData(result);
+      }
+    } catch {
+      data = JSON.stringify({ e: "refresh failed" });
     }
   }
   return sendMethod(res, {
@@ -640,10 +803,16 @@ export default async function handler(req, res) {
     command === "/start" ? "start"
     : command === "/help" ? "help"
     : command === "/scan" ? "scan"
+    : command === "/price" ? "price"
+    : command === "/holders" ? "holders"
+    : command === "/bundle" ? "bundle"
+    : command === "/trending" ? "trending"
     : MINT_RE.test(text) ? "scan"
     : "text";
   const detail =
-    kind === "scan" ? (MINT_RE.test(arg) ? arg : MINT_RE.test(text) ? text : null) : null;
+    kind === "scan" || kind === "price" || kind === "holders" || kind === "bundle"
+      ? (MINT_RE.test(arg) ? arg : MINT_RE.test(text) ? text : null)
+      : null;
   await logBotUse({ user: msg.from, chat: msg.chat, kind, detail });
 
   const reply = (textOut, extra = {}) =>
@@ -678,6 +847,63 @@ export default async function handler(req, res) {
       return replyScan(res, chatId, msg.chat.type, result);
     } catch {
       return reply("Scan failed — the data sources didn't answer. Try again in a moment.");
+    }
+  }
+  // Widget commands: /price, /holders, /bundle take a mint; /trending
+  // needs none. Bare command → ask for a CA. Private chat → widget,
+  // group → text summary.
+  if (command === "/price" || command === "/holders" || command === "/bundle") {
+    if (!arg) {
+      return reply(
+        `Send me a token address for ${command} — e.g. ${command} 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9 — or just paste the address.`,
+        { reply_markup: openScannerKeyboard() },
+      );
+    }
+    if (!MINT_RE.test(arg)) {
+      return reply("That doesn't look like a token address — it should be 32-44 letters and numbers, with no 0, O, I or l.");
+    }
+    try {
+      const result = await scanMint(arg);
+      if (command === "/price") {
+        return replyCmdWidget(res, chatId, msg.chat.type, buildPriceWidget, result, priceText);
+      }
+      if (command === "/holders") {
+        return replyCmdWidget(res, chatId, msg.chat.type, buildHoldersWidget, result, holdersText);
+      }
+      return replyCmdWidget(res, chatId, msg.chat.type, buildBundleWidget, result, bundleText);
+    } catch {
+      return reply("That command failed — the data sources didn't answer. Try again in a moment.");
+    }
+  }
+  if (command === "/trending") {
+    try {
+      const rows = await fetchTrending(8);
+      if (!rows || !rows.length) {
+        return reply("Trending didn't answer — the feed is down right now. Try again in a moment.");
+      }
+      if (msg.chat.type === "private") {
+        try {
+          const w = buildTrendingWidget(rows, new Date().toISOString());
+          return sendMethod(res, {
+            method: "sendWidget",
+            chat_id: chatId,
+            html: w.html,
+            allow_queries: true,
+            caption: w.caption,
+            reply_markup: openScannerKeyboard(),
+          });
+        } catch (e) {
+          console.error("trending widget build failed, text fallback", String((e && e.message) || e).slice(0, 120));
+        }
+      }
+      return sendMethod(res, {
+        method: "sendMessage",
+        chat_id: chatId,
+        text: trendingText(rows),
+        reply_markup: openScannerKeyboard(),
+      });
+    } catch {
+      return reply("Trending didn't answer — the feed is down right now. Try again in a moment.");
     }
   }
   return reply(
