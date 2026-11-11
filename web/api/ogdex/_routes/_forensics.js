@@ -187,13 +187,32 @@ export default async function handler(req, res) {
     // correct; fall back to the intel-derived list when local is
     // unavailable. concPools below is the pool list for the same source.
     const concList = localH?.holders?.length ? localH.holders : realHolders;
-    const concReal = concList.filter((h) => !h.isPool);
+    // Pool vaults by TOKEN ACCOUNT — union of the intel-derived pools
+    // and the local pools. Owner resolution (resolveOwners /
+    // classifyHolderOwners) can fail under load, leaving a vault
+    // mislabeled as a "whale" with owner == its own token account;
+    // the token account is the same in both sources, so a vault the
+    // intel feed correctly flags is still excluded here.
+    const poolTokenAccounts = new Set([
+      ...pools.map((p) => p.tokenAccount).filter(Boolean),
+      ...((localH?.pools || []).map((p) => p.tokenAccount).filter(Boolean)),
+    ]);
+    const concReal = concList.filter(
+      (h) => !h.isPool && !poolTokenAccounts.has(h.tokenAccount),
+    );
     const top10Pct = concReal.length ? concReal.slice(0, 10).reduce((s, h) => s + (h.pct || 0), 0) : null;
     const topHolderPctConc = concReal.length ? (concReal[0].pct ?? null) : null;
     const whales = concReal.filter((h) => (h.pct || 0) >= 1).length;
-    const concPools = localH?.holders?.length
-      ? (localH.pools || concList.filter((h) => h.isPool))
-      : pools;
+    // Pool list for the response: union of intel + local pools, deduped
+    // by token account, so a vault mislabeled in one source still shows.
+    const concPools = (() => {
+      const byAcct = new Map();
+      for (const p of [...pools, ...(localH?.pools || [])]) {
+        const key = p.tokenAccount || p.owner;
+        if (key && !byAcct.has(key)) byAcct.set(key, p);
+      }
+      return [...byAcct.values()];
+    })();
 
     // Pump.fun rule (user-confirmed 2026-11-08): a MIGRATED pump.fun token
     // has its LP tokens BURNED at migration — nobody can pull the liquidity.
