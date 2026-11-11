@@ -66,7 +66,6 @@ import forensicsHandler from "./_forensics.js";
 import bundleHandler from "../../_bundle.js";
 import researchHandler from "./_research.js";
 import safetyHandler from "./_safety.js";
-import { poolKindFor } from "../_holders.js";
 import { readBody } from "../_lib.js";
 
 // @orbitxapirbot — the Mini App's bot. Pinned so initData issued for any
@@ -338,19 +337,6 @@ async function fetchClonesDirect(mint, symbol) {
   }
 }
 
-/** Top non-pool holder share (0–100) from the intel holders sample. */
-function topHolderPct(holders) {
-  if (!Array.isArray(holders) || !holders.length) return null;
-  let best = null;
-  for (const h of holders) {
-    const isPool = h.isPool === true || poolKindFor(h.poolProgram) === "liquidity pool";
-    if (isPool) continue;
-    const pct = finiteNum(h.pct);
-    if (pct != null && (best == null || pct > best)) best = pct;
-  }
-  return best;
-}
-
 /** SPL token program id -> human label. Jupiter reports this on every token. */
 function tokenProgramLabel(programId) {
   if (!programId) return null;
@@ -619,7 +605,12 @@ export async function scanMint(mint) {
   const marketCap = finiteNum(token?.marketCap ?? token?.mcap);
   const volume24h = finiteNum(token?.volume24h ?? token?.volume);
   const totalHolders = finiteNum(concentration?.totalHolders ?? token?.holderCount);
-  const top10Pct = finiteNum(concentration?.top10Pct);
+  const top10Pct =
+    finiteNum(concentration?.top10Pct) ??
+    // Jupiter audit's topHoldersPercentage is the same top-10 share
+    // (MAGGIE 22.24 vs 22.2, ORBITX 27.10 vs 27.1, verified live) — a
+    // stable fallback when the forensics concentration guard fires.
+    finiteNum(token?.audit?.topHoldersPercentage);
   const lpLockedPct = finiteNum(flags?.lpLockedPct);
   const lpBurnedPct = finiteNum(flags?.lpBurnedPct);
 
@@ -804,12 +795,13 @@ export async function scanMint(mint) {
     lpLockedPct,
     lpBurned: lpBurnedPct === 100 ? true : lpBurnedPct == null ? null : false,
     devExited: dev?.sold ?? null,
-    // Top holder from the forensics concentration (local Helius holders,
-    // pools excluded) — the token-route intel sample mis-attributes
-    // multi-pool vaults. Fall back to the intel sample only when the
-    // concentration has no value.
-    topHolderPct:
-      finiteNum(concentration?.topHolderPct) ?? topHolderPct(tokenOut?.intel?.holders),
+    // Top holder ONLY from the forensics concentration (local Helius
+    // holders, pools excluded). NEVER fall back to the intel sample: when
+    // the concentration guard fires (a vault leaked through) the intel
+    // sample is the thing that mislabels it — falling back resurrected
+    // the wrong number (MAGGIE showed Top 43.3% while Top 10 was
+    // honestly unknown). Unknown beats wrong.
+    topHolderPct: finiteNum(concentration?.topHolderPct),
     categories: og.categories,
     unknowns: og.unknowns,
     bundle: {
