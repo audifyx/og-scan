@@ -16,6 +16,18 @@
  * scanMint() from ./_tg-scan.js (same data, same real OG engine, same
  * 90s cache as the Mini App endpoint).
  *
+ * Widget scans (Bot API 10.4, ./_tg-widget.js): a scan in a PRIVATE chat
+ * is answered with sendWidget — the full report as an interactive HTML
+ * widget (expandable sections, Refresh, Copy CA, Open in OrbitX). Groups
+ * keep the plain-text report: in production, widgets work only in the
+ * private chat with the bot, so a widget can never be sent to a group.
+ * The widget's Refresh button sends a widget_query update ("r:<mint>");
+ * the webhook answers it with answerWidgetQuery carrying compact fresh
+ * numbers (<=1024 bytes). If the widget can't be built (size cap), the
+ * reply falls back to the text report. The widget caption carries the
+ * headline (score, price, safety) so clients without widget support
+ * still see the essentials.
+ *
  * A scan takes a few seconds (live data + real engine). Telegram retries
  * slow webhook deliveries, so an in-memory seen-set drops duplicate
  * update_ids instead of answering twice.
@@ -35,6 +47,7 @@
  * but it can never break the reply — any failure is swallowed.
  */
 import { scanMint } from "./_tg-scan.js";
+import { buildScanWidget, buildRefreshData, parseWidgetRequest } from "./_tg-widget.js";
 import { readBody } from "../_lib.js";
 
 const SUPABASE_URL =
@@ -526,6 +539,61 @@ function sendMethod(res, payload) {
   res.end(JSON.stringify(payload));
 }
 
+/** Answer a scan: HTML widget in a private chat, text report elsewhere
+ * (groups — widgets are private-only in production) or when the widget
+ * can't be built. Same data either way. */
+function replyScan(res, chatId, chatType, result) {
+  if (chatType === "private") {
+    try {
+      const w = buildScanWidget(result);
+      return sendMethod(res, {
+        method: "sendWidget",
+        chat_id: chatId,
+        html: w.html,
+        allow_queries: true,
+        caption: w.caption,
+        reply_markup: openScannerKeyboard(),
+      });
+    } catch (e) {
+      console.error("buildScanWidget failed, text fallback", String((e && e.message) || e).slice(0, 120));
+    }
+  }
+  return sendMethod(res, {
+    method: "sendMessage",
+    chat_id: chatId,
+    text: scanReply(result),
+    reply_markup: openScannerKeyboard(),
+  });
+}
+
+/** Handle a widget_query / shared_widget_query: only "r:<mint>" (refresh)
+ * is supported. Re-runs the scan (90s cache — cheap) and answers with
+ * compact fresh numbers. Always answers, even on error, so the widget's
+ * request promise settles instead of timing out. */
+async function handleWidgetQuery(res, query) {
+  const parsed = parseWidgetRequest(query && query.data);
+  const mint = parsed ? parsed.mint : null;
+  if (mint) {
+    await logBotUse({ user: query.from, chat: query.chat || null, kind: "widget_query", detail: mint });
+  }
+  let data;
+  if (!parsed) {
+    data = JSON.stringify({ e: "unknown request" });
+  } else {
+    try {
+      const result = await scanMint(mint);
+      data = buildRefreshData(result);
+    } catch {
+      data = JSON.stringify({ e: "scan failed" });
+    }
+  }
+  return sendMethod(res, {
+    method: "answerWidgetQuery",
+    widget_query_id: query.id,
+    data,
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.statusCode = 405;
@@ -541,19 +609,27 @@ export default async function handler(req, res) {
   } catch {
     update = {};
   }
-  const msg = update && update.message;
-  if (!msg || typeof msg.text !== "string" || !msg.chat || msg.chat.id == null) {
-    // Not a text-message update (edited message, callback, etc.) — ack, send nothing.
-    return sendMethod(res, {});
-  }
-  const chatId = msg.chat.id;
-
-  // Drop duplicate deliveries (Telegram retries slow webhooks).
+  // Drop duplicate deliveries (Telegram retries slow webhooks) — applies
+  // to every update type, including widget queries.
   if (update.update_id != null) {
     if (seen.has(update.update_id)) return sendMethod(res, {});
     seen.add(update.update_id);
     if (seen.size > SEEN_MAX) seen.delete(seen.values().next().value);
   }
+
+  const msg = update && update.message;
+  // Widget queries (Refresh button) — no message attached. Answer within
+  // the 15s window; the update itself is the auth (it only arrives via
+  // the registered webhook URL).
+  const wq = update && (update.widget_query || update.shared_widget_query);
+  if (wq && wq.id) {
+    return handleWidgetQuery(res, wq);
+  }
+  if (!msg || typeof msg.text !== "string" || !msg.chat || msg.chat.id == null) {
+    // Not a text-message update (edited message, callback, etc.) — ack, send nothing.
+    return sendMethod(res, {});
+  }
+  const chatId = msg.chat.id;
 
   const text = msg.text.trim();
   const command = text.split(/\s+/)[0].replace(/@.+$/, "").toLowerCase();
@@ -591,7 +667,7 @@ export default async function handler(req, res) {
     }
     try {
       const result = await scanMint(arg);
-      return reply(scanReply(result), { reply_markup: openScannerKeyboard() });
+      return replyScan(res, chatId, msg.chat.type, result);
     } catch {
       return reply("Scan failed — the data sources didn't answer. Try again in a moment.");
     }
@@ -599,7 +675,7 @@ export default async function handler(req, res) {
   if (MINT_RE.test(text)) {
     try {
       const result = await scanMint(text);
-      return reply(scanReply(result), { reply_markup: openScannerKeyboard() });
+      return replyScan(res, chatId, msg.chat.type, result);
     } catch {
       return reply("Scan failed — the data sources didn't answer. Try again in a moment.");
     }
