@@ -24,9 +24,51 @@
  * replies to the chat_id inside the update Telegram sent, with read-only
  * scanner output. Add secret_token + a Vercel env var as a hardening step.
  * No persistence: the seen-set lives in function memory.
+ *
+ * User logging (2026-11-10): every unique update is recorded in Supabase
+ * (telegram_bot_users + telegram_bot_events) via the telegram_bot_log RPC,
+ * so the operator can see bot stats at /api/ogdex/tg-stats. Only what
+ * Telegram already sends with the update is stored (user id, username,
+ * first/last name, chat id/type, the kind of action, the token address
+ * for a scan). Arbitrary message text is NEVER stored. The log call is
+ * awaited before the reply (so the row lands before the function freezes)
+ * but it can never break the reply — any failure is swallowed.
  */
 import { scanMint } from "./_tg-scan.js";
 import { readBody } from "../_lib.js";
+
+const SUPABASE_URL =
+  process.env.SUPABASE_URL ||
+  process.env.VITE_SUPABASE_URL ||
+  "https://ibojtmeqgzabgeiwbvhf.supabase.co";
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
+async function logBotUse({ user, chat, kind, detail }) {
+  if (!SERVICE_KEY || !user || user.id == null) return;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/telegram_bot_log`, {
+      method: "POST",
+      headers: {
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        p_user_id: user.id,
+        p_username: user.username || null,
+        p_first_name: user.first_name || null,
+        p_last_name: user.last_name || null,
+        p_chat_id: chat ? chat.id : null,
+        p_chat_type: chat ? chat.type || null : null,
+        p_kind: kind,
+        p_detail: detail || null,
+      }),
+    });
+    if (!r.ok) console.error("telegram_bot_log failed", r.status);
+  } catch (e) {
+    console.error("telegram_bot_log error", String((e && e.message) || e).slice(0, 120));
+  }
+}
 
 const WEBAPP_URL = "https://orbitx.world/tg-scanner.html";
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -146,6 +188,17 @@ export default async function handler(req, res) {
   const text = msg.text.trim();
   const command = text.split(/\s+/)[0].replace(/@.+$/, "").toLowerCase();
   const arg = text.slice(text.split(/\s+/)[0].length).trim();
+
+  // Log the user + what they did (never blocks or breaks the reply).
+  const kind =
+    command === "/start" ? "start"
+    : command === "/help" ? "help"
+    : command === "/scan" ? "scan"
+    : MINT_RE.test(text) ? "scan"
+    : "text";
+  const detail =
+    kind === "scan" ? (MINT_RE.test(arg) ? arg : MINT_RE.test(text) ? text : null) : null;
+  await logBotUse({ user: msg.from, chat: msg.chat, kind, detail });
 
   const reply = (textOut, extra = {}) =>
     sendMethod(res, { method: "sendMessage", chat_id: chatId, text: textOut, ...extra });

@@ -27,6 +27,7 @@ import rpc from "./ogdex/_routes/_rpc.js";
 import forensics from "./ogdex/_routes/_forensics.js";
 import tgScan from "./ogdex/_routes/_tg-scan.js";
 import tgWebhook from "./ogdex/_routes/_tg-webhook.js";
+import tgStats from "./ogdex/_routes/_tg-stats.js";
 import chat from "./ogdex/_routes/_chat.js";
 import ath from "./ogdex/_routes/_ath.js";
 import openapi from "./ogdex/_routes/_openapi.js";
@@ -58,6 +59,7 @@ const ROUTES = {
   "replay-trades": replayTrades,
   "tg-scan": tgScan,
   "tg-webhook": tgWebhook,
+  "tg-stats": tgStats,
   "platform-stats": platformStats,
   traders,
   waitlist,
@@ -69,7 +71,7 @@ const ROUTES = {
 };
 
 const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "llms", "llms.txt", "desk-unlock", "mcp-life-tick"]);
-const LIMITS = { chat: 12, forensics: 20, bundle: 20, report: 10, track: 30, rpc: 40, alerts: 20, watchlist: 20, admin: 30, mcp: 30, "replay-trades": 10, "tg-scan": 20, "tg-webhook": 30 };
+const LIMITS = { chat: 12, forensics: 20, bundle: 20, report: 10, track: 30, rpc: 40, alerts: 20, watchlist: 20, admin: 30, mcp: 30, "replay-trades": 10, "tg-scan": 20, "tg-webhook": 30, "tg-stats": 30 };
 const DEFAULT_LIMIT = 60;
 const WINDOW_MS = 10_000;
 /** Soft API keys get a higher cap — never unlimited. */
