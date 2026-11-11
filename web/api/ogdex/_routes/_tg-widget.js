@@ -31,8 +31,14 @@
  *   (answer data <=1024 bytes, 5 queries / 5s per user). One request in
  *   flight, one per tap, in the tap's handler.
  * - Height: content height 50-600 px, nothing scrolls — content past 600
- *   is clipped. The widget is an accordion (one section open at a time,
- *   Market open by default) so the height stays bounded.
+ *   is clipped. A plain 10-section accordion is NOT bounded (measured
+ *   677px with Market open, 987px with Score open at 390px wide), so the
+ *   widget fits by design: sections sit in a 2-column grid and only the
+ *   OPEN section spans full width; and the hero collapses to a compact
+ *   bar (body.cx) whenever a non-Market section opens — Market open is
+ *   the full hero landing view. Score-bar notes are dropped from the
+ *   widget (the text report keeps them) to fund the ring within the
+ *   4KB compressed cap.
  * - No network in the sandbox (fetch/XHR/WebSocket throw), no external
  *   scripts/styles/fonts/images (data: URLs or inline SVG only), no
  *   keyboard input, only <button> as a form control.
@@ -40,9 +46,9 @@
  *
  * Refresh: the Refresh button re-runs scanMint() (90s cache — cheap) and
  * answerWidgetQuery returns the headline numbers + score breakdown;
- * the widget updates the score, verdict, quick row, safety line, top
- * holder / top 10 and the score bars in place. Section bodies keep the
- * original scan's values; the as-of line says which is which.
+ * the widget updates the score, verdict, ring arc, quick row, safety
+ * line, top holder / top 10 and the score bars in place. Section bodies
+ * keep the original scan's values; the as-of line says which is which.
  *
  * Data parity: buildScanWidget takes the SAME scanMint() payload as the
  * plain-text report (scanReply in _tg-webhook.js). Every field the engine
@@ -133,35 +139,43 @@ function tstr(iso) {
 
 const WIDGET_CSS =
   "*{box-sizing:border-box}" +
-  "body{margin:0;font-family:inherit;--S:var(--tg-theme-section-separator-color);--H:var(--tg-theme-hint-color);--G:var(--tg-theme-secondary-bg-color);--T:var(--tg-theme-text-color);--A:var(--tg-theme-accent-text-color)}" +
+  "body{margin:0;background:#0A0A0A;color:#FFF;font-family:system-ui,-apple-system,sans-serif;--S:#232323;--H:#9A9A9A;--G:#191919;--T:#FFF;--A:#D4AF37}" +
+  ".br{font-size:10px;font-weight:700;letter-spacing:.2em;color:var(--A);padding:0 0 3px}" +
   ".hd{display:flex;gap:10px;align-items:center;padding:2px 0 6px}" +
-  ".sc{font-size:34px;font-weight:800;line-height:1;text-align:center;min-width:62px}" +
-  ".sc small{display:block;font-size:10px;font-weight:600;color:var(--H);margin-top:2px}" +
+  ".sc{position:relative;width:64px;height:64px;min-width:64px;display:flex;align-items:center;justify-content:center;color:var(--A);font-size:26px;font-weight:800}" +
+  ".rg{position:absolute;inset:0;border-radius:50%;background:conic-gradient(var(--A) 0 var(--a),var(--G) var(--a));-webkit-mask:radial-gradient(circle closest-side,transparent 76%,#FFF 79%)}" +
+  ".sc span{position:relative}" +
   ".tt{flex:1;min-width:0}" +
   ".nm{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
   ".mt{font-size:12px;color:var(--H)}" +
-  ".vd{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--G);margin-top:3px}" +
-  ".ds{font-size:12px;color:var(--H);margin:4px 0 6px}" +
-  ".kv{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;padding:6px 0;border-top:1px solid var(--S)}" +
+  ".vd{display:inline-block;font-size:13px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid var(--A);color:var(--A);margin-top:3px}" +
+  ".ds{font-size:12px;color:var(--H);margin:3px 0 4px}" +
+  ".kv{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:14px;padding:4px 0;border-top:1px solid var(--S)}" +
   ".kv b,.ds b{color:var(--T);font-weight:700}" +
-  ".row{display:flex;gap:6px;margin:8px 0 4px}" +
+  ".row{display:flex;gap:6px;margin:6px 0 3px}" +
   ".row button{flex:1}" +
-  "button{font-size:13px;padding:7px 4px}" +
-  ".s{border-top:1px solid var(--S)}" +
-  ".h{width:100%;text-align:left;background:none;border:0;color:var(--T);font-size:13px;font-weight:700;padding:7px 2px;cursor:pointer}" +
-  ".h::after{content:'▸';float:right;font-weight:400;color:var(--H)}" +
+  "button{font:inherit;font-size:13px;padding:7px 4px;border-radius:8px;border:1px solid #2C2C2C;background:#161616;color:#FFF;cursor:pointer}" +
+  "#btn-refresh{background:var(--A);border-color:var(--A);color:#0A0A0A;font-weight:700}" +
+  ".ss{display:grid;grid-template-columns:1fr 1fr;gap:0 8px}" +
+  ".s{border-top:1px solid #2A2416}" +
+  ".s.o{grid-column:1/-1}" +
+  ".h{width:100%;text-align:left;background:none;border:0;color:var(--A);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:4px 2px;cursor:pointer}" +
+  ".h::after{content:'▸';float:right;font-weight:400;color:var(--A)}" +
   ".s.o .h::after{content:'▾'}" +
-  ".b{display:none;padding:0 2px 8px;font-size:13px;line-height:1.45}" +
+  ".b{display:none;padding:0 2px 2px;font-size:13px;line-height:1.4}" +
   ".s.o .b{display:block}" +
-  ".b>div{display:flex;justify-content:space-between;gap:8px;padding:1px 0;color:var(--H)}" +
+  ".b>div{display:flex;justify-content:space-between;gap:8px;padding:0;color:var(--H)}" +
   ".b>div b{color:var(--T);text-align:right}" +
   ".x{display:block!important;margin-top:4px}" +
   ".bar{display:block!important;font-size:12px}" +
-  ".bar .n{color:var(--H)}" +
-  ".t{height:6px;background:var(--G);border-radius:3px;margin:2px 0 6px}" +
-  ".f{height:6px;border-radius:3px;background:var(--A)}" +
-  ".ft{font-size:11px;color:var(--H);padding:6px 0 8px;border-top:1px solid var(--S)}" +
-  ".st{font-size:12px;color:var(--H);min-height:15px}";
+  ".t{height:5px;background:var(--G);border-radius:3px;margin:1px 0 3px}" +
+  ".f{height:5px;border-radius:3px;background:var(--A)}" +
+  ".ft{font-size:11px;color:var(--H);padding:4px 0 5px;border-top:1px solid var(--S)}" +
+  ".st{font-size:12px;color:var(--H)}" +
+  "body.cx .br,body.cx .mt,body.cx .ds{display:none}" +
+  "body.cx .sc{width:36px;height:36px;min-width:36px;font-size:15px}" +
+  "body.cx .kv{font-size:12px;padding:3px 0}" +
+  "body.cx .row{margin:4px 0 2px}";
 
 const WIDGET_JS =
   "(function(){" +
@@ -169,13 +183,13 @@ const WIDGET_JS =
   "function $(id){return document.getElementById(id)}" +
   "function set(id,t){var e=$(id);if(e)e.textContent=t}" +
   "function st(s){var e=$('status');if(e)e.textContent=s}" +
-  "function usd(v){if(v===null||v===undefined||isNaN(v))return'unknown';if(v>=1e6)return '$'+(v/1e6).toFixed(2)+'M';if(v>=1e3)return '$'+(v/1e3).toFixed(1)+'K';return '$'+v.toFixed(2)}" +
-  "function prc(v){if(v===null||v===undefined||isNaN(v))return'unknown';if(v>=1)return '$'+v.toFixed(2);if(v>=0.01)return '$'+v.toFixed(4);return '$'+Number(v.toPrecision(4)).toString()}" +
+  "function usd(v){if(v==null||isNaN(v))return'unknown';if(v>=1e6)return '$'+(v/1e6).toFixed(2)+'M';if(v>=1e3)return '$'+(v/1e3).toFixed(1)+'K';return '$'+v.toFixed(2)}" +
+  "function prc(v){if(v==null||isNaN(v))return'unknown';if(v>=1)return '$'+v.toFixed(2);if(v>=0.01)return '$'+v.toFixed(4);return '$'+Number(v.toPrecision(4)).toString()}" +
   "function tstr(iso){return iso?iso.slice(11,16)+' UTC':''}" +
-  "function esc(s){return String(s===null||s===undefined?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" +
+  "function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" +
   "function bar(c){var p=c[2]>0?Math.max(0,Math.min(100,Math.round(c[1]/c[2]*100))):0;return '<div class=bar>'+esc(c[0])+' '+c[1]+'/'+c[2]+'<div class=t><div class=f style=\"width:'+p+'%\"></div></div></div>'}" +
   "var hs=document.querySelectorAll('.h');" +
-  "for(var i=0;i<hs.length;i++){hs[i].addEventListener('click',function(){var s=this.parentNode,o=s.classList.contains('o');for(var j=0;j<hs.length;j++)hs[j].parentNode.classList.remove('o');if(!o)s.classList.add('o');if(W&&W.setResizeAnchor)W.setResizeAnchor('top')})}" +
+  "for(var i=0;i<hs.length;i++){hs[i].addEventListener('click',function(){var s=this.parentNode,o=s.classList.contains('o');for(var j=0;j<hs.length;j++)hs[j].parentNode.classList.remove('o');if(!o)s.classList.add('o');var B=document.body;if(B)B.classList[!o&&this!==hs[0]?'add':'remove']('cx');if(W&&W.setResizeAnchor)W.setResizeAnchor('top')})}" +
   "$('btn-refresh').addEventListener('click',function(){" +
   "if(!W||typeof W.request!=='function'){st('Refresh needs the Telegram app');return}" +
   "var b=$('btn-refresh');b.disabled=true;b.textContent='Refreshing…';st('');" +
@@ -184,6 +198,7 @@ const WIDGET_JS =
   "var d=null;try{d=JSON.parse(a.result||'null')}catch(e){d=null}" +
   "if(!d||d.e){st(d&&d.e?('Refresh failed — '+d.e):'Refresh failed — try again');return}" +
   "set('score',d.s===null?'--':d.s);" +
+  "var rg=$('rg');if(rg&&rg.style&&rg.style.setProperty)rg.style.setProperty('--a',(d.s===null?0:Math.round(Math.max(0,Math.min(100,d.s))*3.6))+'deg');" +
   "set('verdict',d.v||'Unknown');" +
   "set('qp',d.p===null?'—':prc(d.p));set('qm',d.mc===null?'—':usd(d.mc));set('ql',d.l===null?'—':usd(d.l));" +
   "set('hp',d.hp||'unknown');set('lp',d.lp||'unknown');set('dv',d.dv||'unknown');" +
@@ -202,12 +217,11 @@ const WIDGET_JS =
 function row(k, v) {
   return `<div>${k}<b>${v}</b></div>`;
 }
-function barHtml(label, points, max, note) {
+function barHtml(label, points, max) {
   const pc = max > 0 ? Math.max(0, Math.min(100, Math.round((points / max) * 100))) : 0;
   return (
     `<div class=bar>${escHtml(label)} ${points}/${max}` +
     `<div class=t><div class=f style="width:${pc}%"></div></div>` +
-    (note ? `<div class=n>${escHtml(note)}</div>` : "") +
     `</div>`
   );
 }
@@ -252,7 +266,7 @@ function buildSections(r) {
   // Pairs
   h = "";
   if (Array.isArray(r.pairs) && r.pairs.length) {
-    for (const p of r.pairs.slice(0, 3)) {
+    for (const p of r.pairs.slice(0, 2)) {
       h += row(
         `${p.dex || "unknown"} — ${p.quote || "?"}`,
         (p.liquidity != null ? `Liq ${fmtUsd(p.liquidity)}` : "") +
@@ -273,7 +287,7 @@ function buildSections(r) {
   if (r.kolHolderCount) h += row("KOL holders", String(r.kolHolderCount));
   if (Array.isArray(r.topHolders) && r.topHolders.length) {
     h += `<div class=x>Top holders:</div>`;
-    for (const t of r.topHolders.slice(0, 5)) {
+    for (const t of r.topHolders.slice(0, 4)) {
       h += row(`· ${escHtml(shortAddr(t.owner) || t.label || "?")}`, `${Number(t.pct).toFixed(1)}%${t.usdValue != null ? ` · ${fmtUsd(t.usdValue)}` : ""}`);
     }
   }
@@ -295,7 +309,7 @@ function buildSections(r) {
   if (r.sourceTrace && r.sourceTrace.available) {
     h += row("Source", txt(shortAddr(r.sourceTrace.sourceWallet), "unknown"));
     if (r.sourceTrace.sourceTokensCreated != null) h += row("Source launches", String(r.sourceTrace.sourceTokensCreated));
-    if (r.sourceTrace.note) h += row("Trace", escHtml(shortNote(r.sourceTrace.note, 60)));
+    if (r.sourceTrace.note) h += row("Trace", escHtml(shortNote(r.sourceTrace.note, 40)));
   }
   h += row("Honeypot", r.honeypot === true ? "Honeypot — no sell route" : r.honeypot === false ? "No honeypot — sell route open" : "unknown");
   h += row("Mint authority", r.mintAuthority === "revoked" ? "Revoked" : r.mintAuthority === "live" ? "Still live" : "unknown");
@@ -315,7 +329,7 @@ function buildSections(r) {
   if (r.bundle && r.bundle.available) {
     h += row("Bundle", escHtml(r.bundle.verdict || "—") + (r.bundle.bundledSupplyPct != null ? ` (${Number(r.bundle.bundledSupplyPct).toFixed(1)}% bundled)` : ""));
     if (r.bundle.clusterCount) h += row("Clusters", String(r.bundle.clusterCount));
-    if (r.bundle.note) h += row("Note", escHtml(shortNote(r.bundle.note, 60)));
+    if (r.bundle.note) h += row("Note", escHtml(shortNote(r.bundle.note, 40)));
   } else {
     h += `<div class=x>Bundle: unknown — bundle check unavailable</div>`;
   }
@@ -324,7 +338,7 @@ function buildSections(r) {
     if (r.clones.count > 0) {
       h += row("Same-name clones", String(r.clones.count));
       if (Array.isArray(r.clones.list)) {
-        for (const c of r.clones.list.slice(0, 3)) {
+        for (const c of r.clones.list.slice(0, 2)) {
           h += row(
             `· ${escHtml(c.symbol || c.name || "—")}`,
             (c.mcap != null ? `MCAP ${fmtUsd(c.mcap)}` : "") + (c.liquidity != null ? ` · Liq ${fmtUsd(c.liquidity)}` : "") + (c.mint ? ` · ${shortAddr(c.mint)}` : ""),
@@ -351,13 +365,13 @@ function buildSections(r) {
   if (Array.isArray(r.categories) && r.categories.length) {
     h += `<div class=x id=scorebars>`;
     for (const c of r.categories) {
-      h += barHtml(c.label || "?", c.points ?? 0, c.max ?? 0, shortNote(c.note, 30));
+      h += barHtml(c.label || "?", c.points ?? 0, c.max ?? 0);
     }
     h += `</div>`;
   }
   if (Array.isArray(r.caps)) {
     const caps = r.caps.filter(Boolean);
-    for (const c of caps.slice(0, 3)) h += row("· Cap", escHtml(shortNote(c, 60)));
+    for (const c of caps.slice(0, 3)) h += row("· Cap", escHtml(shortNote(c, 40)));
     if (caps.length > 3) h += row("· Caps", `+${caps.length - 3} more`);
   }
   {
@@ -365,7 +379,7 @@ function buildSections(r) {
       (x) => x.state === "fail" || x.state === "warn",
     );
     for (const c of checks.slice(0, 3)) {
-      h += row(`· ${escHtml(c.label)}`, c.detail ? escHtml(shortNote(c.detail, 40)) : "");
+      h += row(`· ${escHtml(c.label)}`, c.detail ? escHtml(shortNote(c.detail, 30)) : "");
     }
     if (checks.length > 3) h += row("· Checks", `+${checks.length - 3} more`);
   }
@@ -400,19 +414,23 @@ export function buildScanWidget(result) {
       ? null
       : `${result.lpLockedPct}% locked${result.lpBurned ? " + burned" : ""}`;
   const dv = result.devExited === true ? "Exited" : result.devExited === false ? "Holds" : null;
+  const spc = result.score == null ? 0 : Math.max(0, Math.min(100, Math.round(result.score)));
   const html =
     "<!doctype html><html><head><meta charset='utf-8'><style>" +
     WIDGET_CSS +
     "</style></head><body>" +
-    "<div class='hd'><div class='sc'><span id='score'>" +
+    "<div class=br>ORBITX SCANNER</div>" +
+    "<div class='hd'><div class='sc'><div class=rg id=rg style=\"--a:" +
+    Math.round(spc * 3.6) +
+    "deg\"></div><span id='score'>" +
     (result.score ?? "--") +
-    "</span><small>/100 OG</small></div>" +
+    "</span></div>" +
     "<div class='tt'><div class='nm'>" +
     escHtml(title || "Token") +
     " (" +
     escHtml(short) +
     ")</div><div class='mt'>" +
-    (result.description ? escHtml(shortNote(result.description, 70)) : "OrbitX scanner") +
+    (result.description ? escHtml(shortNote(result.description, 40)) : "OrbitX scanner") +
     "</div><span class='vd' id='verdict'>" +
     escHtml(result.verdict || "Unknown") +
     "</span></div></div>" +
@@ -436,7 +454,9 @@ export function buildScanWidget(result) {
     "<button id='btn-open'>Open in OrbitX</button>" +
     "</div>" +
     "<div class='st' id='status'></div>" +
+    "<div class=ss>" +
     buildSections(result) +
+    "</div>" +
     "<div class='ft' id='asof'>Scanned " +
     tstr(result.scannedAt) +
     " · Not financial advice.</div>" +
