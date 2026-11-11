@@ -200,9 +200,19 @@ export default async function handler(req, res) {
     const concReal = concList.filter(
       (h) => !h.isPool && !poolTokenAccounts.has(h.tokenAccount),
     );
-    const top10Pct = concReal.length ? concReal.slice(0, 10).reduce((s, h) => s + (h.pct || 0), 0) : null;
-    const topHolderPctConc = concReal.length ? (concReal[0].pct ?? null) : null;
-    const whales = concReal.filter((h) => (h.pct || 0) >= 1).length;
+    // Sanity guard: a single "real" holder owning 30%+ of supply on a
+    // token with multiple pools is almost certainly a vault that leaked
+    // through (owner classification failed in both sources). Report the
+    // concentration as unknown rather than a wrong, inflated top-10 —
+    // the user flagged exactly this (MAGGIE 84% was a leaked vault).
+    // A genuinely concentrated token just shows unknown here, not a
+    // fabricated number.
+    const topHolderSuspect = concReal.length > 0 && (concReal[0].pct ?? 0) >= 30;
+    const top10Pct = !topHolderSuspect && concReal.length
+      ? concReal.slice(0, 10).reduce((s, h) => s + (h.pct || 0), 0)
+      : null;
+    const topHolderPctConc = !topHolderSuspect && concReal.length ? (concReal[0].pct ?? null) : null;
+    const whales = !topHolderSuspect ? concReal.filter((h) => (h.pct || 0) >= 1).length : null;
     // Pool list for the response: union of intel + local pools, deduped
     // by token account, so a vault mislabeled in one source still shows.
     const concPools = (() => {
