@@ -1,5 +1,5 @@
 /**
- * POST /api/ogdex/tg-scan — OG scanner for the Telegram Mini App (v1).
+ * POST /api/ogdex/tg-scan — OG scanner for the Telegram Mini App.
  *
  * Read-only scanner. No wallet, no trading, no payments, no links out.
  * Plugged into the ogdex.js connector (ROUTES map) — NOT a standalone
@@ -8,7 +8,8 @@
  * Request (JSON): { initData: "<raw Telegram.WebApp.initData>", mint: "<solana mint>" }
  * Response: { ok, mint, score, verdict, band, reasons[], price, liquidity,
  *   holders, honeypot, mintAuthority, freezeAuthority, lpLockedPct, lpBurned,
- *   devExited, topHolderPct, categories, unknowns, cached, scannedAt }
+ *   devExited, topHolderPct, categories, unknowns, bundle, x, clones,
+ *   sourceTrace, cached, scannedAt }
  * Every field the engine could not compute comes back as `null` (with the
  * reason in `reasons[]` / `unknowns`), never 0 or an invented value.
  *
@@ -25,32 +26,26 @@
  * 3. Data comes from the SAME routes the web scanner uses, invoked
  *    in-process (no HTTP round-trip, no duplicated fetching logic):
  *    ./_token.js (Jupiter-primary price/mcap/liquidity/volume/age + the
- *    intel safety probe) and ./_forensics.js (LP lock/burn incl. the
+ *    intel safety probe), ./_forensics.js (LP lock/burn incl. the
  *    pump.fun migration rule, holder concentration with pools excluded,
- *    dev position). The forensics first-buyer trace is skipped (?first=0) —
- *    the score doesn't use it.
+ *    dev position), ../_bundle.js (bundle analysis: clusters, bundled
+ *    supply, dev-linked funding source) and ./_research.js (same-name
+ *    clones + the linked X account). The forensics first-buyer trace is
+ *    skipped (?first=0) — the source trace comes from the bundle scan
+ *    instead, exactly like the web client derives it.
  * 4. Scoring is the REAL engine: computeOgScore from
- *    web/shared/og-score.js — the same module the web scanner imports.
- *    The input is assembled exactly like the web client's useTokenIntel
- *    ogScore useMemo. Bundle / X / source-trace / clone checks are NOT run
- *    in v1 (see DELIBERATE OMISSIONS) — the engine treats them as
- *    unavailable (adjustment 0, listed in `unknowns`), exactly as the web
- *    client does before those scans land.
+ *    web/shared/og-score.js — the same module the web scanner imports —
+ *    with the input assembled EXACTLY like the web client's useTokenIntel
+ *    ogScore useMemo: cloneCount/biggerClone from the research clones,
+ *    bundle from adaptBundleAnalysis(bundle), x from adaptXIntel (linked
+ *    handle; followers/sentiment null, same as the web client when no
+ *    profile enrichment is available), sourceTrace from
+ *    adaptSourceTrace(bundle). The adapters below are server ports of the
+ *    client's (useTokenIntel.ts) — same shapes, same nulls, same notes.
+ *    A check that fails or times out comes back as unavailable (adjustment
+ *    0, listed in `unknowns`), never as clean.
  * 5. Results are cached per mint for 90s (in-memory, warm-function only)
  *    and rate-limited per Telegram user id (15 scans / 60s).
- *
- * DELIBERATE OMISSIONS (v1):
- * - Bundle analysis, X intel, source-wallet trace, same-name clone check:
- *   not run. Each is a separate heavy scan (Helius holder tracing / X
- *   lookup / research route); the engine's own design treats unavailable as
- *   0 adjustment, so the core score (contract / liquidity / holders /
- *   deployer / trading / market) is the honest number. Add them later by
- *   passing adaptBundleAnalysis(bundle) / adaptXIntel(x) /
- *   adaptSourceTrace(bundle) / cloneVerdict(clones) results into the input.
- * - The token route's GeckoTerminal ATH work still runs (its handler has no
- *   fast path that keeps safety); a future `?sections=scan` could skip it.
- * - No persistence: cache + rate-limit buckets live in function memory and
- *   reset on cold start. Fine for a 90s cache on a free read-only scanner.
  *
  * LOCAL TESTING: there is no way to mint a real Telegram signature offline,
  * so a test bypass exists that is OFF by default and CANNOT turn on in
@@ -60,9 +55,16 @@
  * TG_SCAN_TEST_SECRET in Vercel env vars.
  */
 import { createHmac, createPublicKey, timingSafeEqual, verify as edVerify } from "node:crypto";
-import { authorityVerdict, computeOgScore, honeypotChecks } from "../../../shared/og-score.js";
+import {
+  authorityVerdict,
+  bundleRiskVerdict,
+  computeOgScore,
+  honeypotChecks,
+} from "../../../shared/og-score.js";
 import tokenHandler from "./_token.js";
 import forensicsHandler from "./_forensics.js";
+import bundleHandler from "../../_bundle.js";
+import researchHandler from "./_research.js";
 import { poolKindFor } from "../_holders.js";
 import { readBody } from "../_lib.js";
 
@@ -276,6 +278,116 @@ function authorityState(renounced) {
   return null;
 }
 
+// ── Adapters: server ports of the web client's useTokenIntel.ts helpers ──────
+// Same shapes, same nulls, same notes. An unavailable scan maps to "no
+// information", never to a clean bill of health.
+
+/** W1 bundle scan → scoring input. Unknown/partial maps to available:false when the scan never completed; partial keeps its numbers with a note. */
+function adaptBundleAnalysis(raw) {
+  if (!raw) return null;
+  if (raw.state === "unknown") {
+    return {
+      available: false,
+      bundledSupplyPct: null,
+      clusterCount: null,
+      largestClusterPct: null,
+      bundleRisk: null,
+      note: raw.reason ?? "Bundle scan unavailable.",
+    };
+  }
+  const clusters = Array.isArray(raw.clusters) ? raw.clusters : [];
+  const largest = clusters.reduce(
+    (m, c) => Math.max(m, Number.isFinite(c.supplyPct) ? c.supplyPct : 0),
+    0,
+  );
+  const risk =
+    raw.risk === "high"
+      ? "high"
+      : raw.risk === "medium"
+        ? "moderate"
+        : raw.risk === "low" || raw.risk === "none"
+          ? "low"
+          : null;
+  return {
+    available: true,
+    bundledSupplyPct: raw.bundledSupplyPct ?? null,
+    clusterCount: raw.clusterCount ?? null,
+    largestClusterPct: clusters.length > 0 ? largest : null,
+    bundleRisk: risk,
+    note:
+      raw.state === "partial"
+        ? `Partial scan — ${raw.holdersTraced} of ${raw.holdersAnalyzed} holders traced.${raw.reason ? ` ${raw.reason}` : ""}`
+        : null,
+  };
+}
+
+/** Dev-source trace derived from W1's bundle scan: a dev-linked cluster's funding source is the source behind the dev wallet. No dev-linked cluster → unavailable, never invented. */
+function adaptSourceTrace(raw) {
+  if (!raw || raw.state === "unknown") return null;
+  const clusters = Array.isArray(raw.clusters) ? raw.clusters : [];
+  const devCluster = clusters.find((c) => c.devLinked);
+  const devWallet = raw.creator ?? null;
+  if (!devWallet && !devCluster) return null;
+  const fundedBy = devCluster?.fundingSource ?? null;
+  const otherLaunches = devCluster?.sourceOtherLaunches ?? null;
+  return {
+    available: true,
+    devWallet,
+    fundedBy,
+    fundingHops: fundedBy ? 1 : null,
+    sourceWallet: fundedBy,
+    sourceTokensCreated: otherLaunches,
+    sourceOtherLaunches: null,
+    note: devCluster
+      ? `Dev-linked cluster funded by ${fundedBy ? fundedBy.slice(0, 8) : "an untraced source"}${otherLaunches != null ? ` — that source is behind ${otherLaunches} other launch${otherLaunches === 1 ? "" : "es"}` : ""}.`
+      : "No dev-linked funding cluster detected.",
+  };
+}
+
+/** Linked X account → scoring input. The handle comes from the same sources
+ * the web client merges (DexScreener socials on the token route, Jupiter /
+ * pump metadata on the research route). Followers / sentiment are null —
+ * the web client returns the same when no profile enrichment is available,
+ * so the X adjustment stays 0 in both places. */
+function adaptXIntel(twitterUrls) {
+  let handle = null;
+  let source = null;
+  for (const [url, src] of twitterUrls) {
+    if (typeof url !== "string" || !url) continue;
+    const m = url.match(/(?:x\.com|twitter\.com)\/([A-Za-z0-9_]{1,15})/i);
+    if (m) {
+      handle = m[1];
+      source = src;
+      break;
+    }
+  }
+  return {
+    availability: handle ? "available" : "unavailable",
+    handle,
+    followers: null,
+    mentions24h: null,
+    kolMentions: null,
+    sentiment: null,
+    accountAgeDays: null,
+    note: handle
+      ? `Linked X account @${handle} confirmed via ${source}.`
+      : "No linked X account found.",
+  };
+}
+
+/** Same-name clones → verdict. A bigger same-name clone is the dangerous case (the scanned one is likely the copy). */
+function cloneVerdict(clones, ownMcap) {
+  if (!clones) return { state: "unknown", label: "Unknown — clone check unavailable", count: 0, biggerClone: false };
+  const count = clones.length;
+  if (count === 0) return { state: "pass", label: "No same-name clones found", count: 0, biggerClone: false };
+  const biggerClone =
+    ownMcap != null && clones.some((c) => c.mcap != null && Number(c.mcap) > ownMcap);
+  if (biggerClone) {
+    return { state: "fail", label: `${count} same-name token(s) — a bigger one exists`, count, biggerClone: true };
+  }
+  return { state: "warn", label: `${count} same-name token(s) found`, count, biggerClone: false };
+}
+
 function sendJson(res, status, obj) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
@@ -354,9 +466,14 @@ export async function scanMint(mint) {
   }
 
   // 5. Data — the same routes the web scanner uses, invoked in-process.
-  const [tokenOut, forensics] = await Promise.all([
+  // Token + forensics + bundle + research run in parallel; each is capped
+  // by UPSTREAM_TIMEOUT_MS and a slow/failed one degrades to unavailable
+  // (the engine never treats it as clean).
+  const [tokenOut, forensics, bundleOut, researchOut] = await Promise.all([
     callRoute(tokenHandler, `/api/ogdex/token?mint=${encodeURIComponent(mint)}`),
     callRoute(forensicsHandler, `/api/ogdex/forensics?mint=${encodeURIComponent(mint)}&first=0`),
+    callRoute(bundleHandler, `/api/ogdex/bundle?mint=${encodeURIComponent(mint)}`),
+    callRoute(researchHandler, `/api/ogdex/research?mint=${encodeURIComponent(mint)}`),
   ]);
 
   const token = tokenOut?.token ?? null;
@@ -374,10 +491,18 @@ export async function scanMint(mint) {
   const lpLockedPct = finiteNum(flags?.lpLockedPct);
   const lpBurnedPct = finiteNum(flags?.lpBurnedPct);
 
-  // 6. The REAL engine — same input assembly as the web client's
-  //    useTokenIntel ogScore useMemo. Bundle / X / source-trace / clones are
-  //    null in v1 (not run) — the engine scores them as unavailable, never
-  //    as clean.
+  // The full engine — input assembled exactly like the web client's
+  // useTokenIntel ogScore useMemo.
+  const rawBundle = bundleOut?.ok ? bundleOut.analysis ?? null : null;
+  const bundle = adaptBundleAnalysis(rawBundle);
+  const sourceTrace = adaptSourceTrace(rawBundle);
+  const clones = Array.isArray(researchOut?.clones) ? researchOut.clones : null;
+  const cv = cloneVerdict(clones, marketCap);
+  const x = adaptXIntel([
+    [tokenOut?.meta?.socials?.twitter ?? null, "DexScreener"],
+    [researchOut?.meta?.links?.twitter ?? null, "token metadata"],
+  ]);
+
   const og = computeOgScore({
     mintRenounced: flags?.mintRenounced ?? null,
     freezeRenounced: flags?.freezeRenounced ?? null,
@@ -396,16 +521,17 @@ export async function scanMint(mint) {
     devSerial: dev?.serial ?? null,
     creatorTokensCount: finiteNum(dev?.tokensCreated),
     ageDays: finiteNum(token?.ageDays),
-    cloneCount: null,
-    biggerClone: null,
-    bundle: null,
-    x: null,
-    sourceTrace: null,
+    cloneCount: clones ? clones.length : null,
+    biggerClone: clones ? cv.biggerClone : null,
+    bundle,
+    x,
+    sourceTrace,
   });
 
   const checks = honeypotChecks(safety ?? null);
   const honeypot =
     safety == null ? null : safety.canSell === false ? true : safety.canSell === true ? false : null;
+  const bundleVerdict = bundleRiskVerdict(bundle);
 
   const reasons = [
     ...og.categories.map((c) => `${c.label}: ${c.note} (${c.points}/${c.max})`),
@@ -413,6 +539,10 @@ export async function scanMint(mint) {
     ...checks
       .filter((c) => c.state === "fail" || c.state === "warn")
       .map((c) => `${c.label} — ${c.detail}`),
+    `Bundle — ${bundleVerdict.label}${bundle?.bundledSupplyPct != null ? ` (${bundle.bundledSupplyPct.toFixed(1)}% bundled)` : ""}${bundle?.note ? ` — ${bundle.note}` : ""}`,
+    `X — ${x.note}`,
+    `Clones — ${cv.label}`,
+    ...(sourceTrace?.note ? [`Source trace — ${sourceTrace.note}`] : []),
     ...(og.unknowns.length
       ? [`Not checked yet: ${og.unknowns.join(", ")} — treated as unknown, not as safe or risky.`]
       : []),
@@ -440,6 +570,32 @@ export async function scanMint(mint) {
     topHolderPct: topHolderPct(tokenOut?.intel?.holders),
     categories: og.categories,
     unknowns: og.unknowns,
+    bundle: {
+      available: bundle?.available ?? false,
+      bundledSupplyPct: bundle?.bundledSupplyPct ?? null,
+      clusterCount: bundle?.clusterCount ?? null,
+      bundleRisk: bundle?.bundleRisk ?? null,
+      verdict: bundleVerdict.label,
+      note: bundle?.note ?? null,
+    },
+    x: {
+      availability: x.availability,
+      handle: x.handle,
+      note: x.note,
+    },
+    clones: {
+      count: clones ? cv.count : null,
+      biggerClone: clones ? cv.biggerClone : null,
+      label: cv.label,
+    },
+    sourceTrace: sourceTrace
+      ? {
+          available: true,
+          sourceWallet: sourceTrace.sourceWallet,
+          sourceTokensCreated: sourceTrace.sourceTokensCreated,
+          note: sourceTrace.note,
+        }
+      : null,
     cached: false,
     scannedAt: new Date().toISOString(),
   };
