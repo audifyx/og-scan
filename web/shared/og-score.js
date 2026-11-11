@@ -110,6 +110,7 @@
  * @property {boolean | null | undefined} [canBuy]
  * @property {boolean | null | undefined} [canSell]
  * @property {number | null | undefined} [roundTripLossPct]
+ * @property {string | null | undefined} [tokenProgram] SPL token program id — when known, "Token program" is no longer listed as unknown.
  * @property {boolean | null | undefined} [devSold]
  * @property {boolean | null | undefined} [devSerial]
  * @property {number | null | undefined} [creatorTokensCount]
@@ -314,7 +315,10 @@ export function computeOgScore(input) {
   if (input.freezeRenounced === true) { pts += 12; evidence++; }
   else if (input.freezeRenounced === false) { evidence++; }
   else unknowns.push("Freeze authority");
-  unknowns.push("Mutable metadata", "Token program"); // no source reports these
+  unknowns.push("Mutable metadata"); // no source reports this yet
+  // Token program IS reported by Jupiter (tokenProgram) — only unknown when
+  // the caller didn't supply it.
+  if (input.tokenProgram == null) unknowns.push("Token program");
   cats.push({
     id: "contract",
     label: "Contract",

@@ -65,6 +65,7 @@ import tokenHandler from "./_token.js";
 import forensicsHandler from "./_forensics.js";
 import bundleHandler from "../../_bundle.js";
 import researchHandler from "./_research.js";
+import safetyHandler from "./_safety.js";
 import { poolKindFor } from "../_holders.js";
 import { readBody } from "../_lib.js";
 
@@ -287,6 +288,8 @@ async function fetchDexPairs(mint) {
         quote,
         liquidity: finiteNum(p.liquidity?.usd),
         volume24h: finiteNum(p.volume?.h24),
+        buys24h: finiteNum(p.txns?.h24?.buys),
+        sells24h: finiteNum(p.txns?.h24?.sells),
         pairAddress: p.pairAddress || null,
       });
     }
@@ -346,6 +349,33 @@ function topHolderPct(holders) {
     if (pct != null && (best == null || pct > best)) best = pct;
   }
   return best;
+}
+
+/** SPL token program id -> human label. Jupiter reports this on every token. */
+function tokenProgramLabel(programId) {
+  if (!programId) return null;
+  if (programId === "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb") return "Token-2022";
+  if (programId === "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") return "SPL Token";
+  return "Token program";
+}
+
+/** Top real holders for the "Top holders" list — same pool-exclusion the
+ * forensics concentration uses (token-account cross-check + the >=30%
+ * leaked-vault guard), so the list can never show a pool vault as a holder. */
+function topHoldersList(intelHolders, poolTokenAccounts) {
+  if (!Array.isArray(intelHolders) || !intelHolders.length) return null;
+  const pools = poolTokenAccounts instanceof Set ? poolTokenAccounts : new Set();
+  const real = intelHolders
+    .filter((h) => h && h.isPool !== true && !pools.has(h.tokenAccount))
+    .sort((a, b) => (Number(b.pct) || 0) - (Number(a.pct) || 0));
+  if (!real.length) return null;
+  if ((Number(real[0].pct) || 0) >= 30) return null; // leaked vault — show nothing, not a wrong list
+  return real.slice(0, 5).map((h) => ({
+    owner: h.owner || null,
+    label: h.label || null,
+    pct: finiteNum(h.pct),
+    usdValue: finiteNum(h.usdValue),
+  }));
 }
 
 function authorityState(renounced) {
@@ -547,12 +577,16 @@ export async function scanMint(mint) {
   // parallel; each is capped by UPSTREAM_TIMEOUT_MS (pairs 10s) and a
   // slow/failed one degrades to unavailable (the engine never treats it
   // as clean).
-  const [tokenOut, forensics, bundleOut, researchOut, dexPairs] = await Promise.all([
+  const [tokenOut, forensics, bundleOut, researchOut, dexPairs, safetyOut] = await Promise.all([
     callRoute(tokenHandler, `/api/ogdex/token?mint=${encodeURIComponent(mint)}`),
     callRoute(forensicsHandler, `/api/ogdex/forensics?mint=${encodeURIComponent(mint)}&first=0`),
     callRoute(bundleHandler, `/api/ogdex/bundle?mint=${encodeURIComponent(mint)}`),
     callRoute(researchHandler, `/api/ogdex/research?mint=${encodeURIComponent(mint)}`),
     fetchDexPairs(mint),
+    // Real tradeability: Jupiter round-trip quotes (buy 0.1 SOL, sell it
+    // back) — the intel safety probe returns nothing for most tokens, so
+    // without this honeypot + tradeability stay "unknown" forever.
+    callRoute(safetyHandler, `/api/ogdex/safety?mint=${encodeURIComponent(mint)}`),
   ]);
 
   const token = tokenOut?.token ?? null;
@@ -560,6 +594,25 @@ export async function scanMint(mint) {
   const flags = forensics?.safetyFlags ?? null;
   const concentration = forensics?.concentration ?? null;
   const dev = forensics?.dev ?? null;
+  // The safety route is authoritative for tradeability; the intel probe is
+  // the fallback when the route fails or times out.
+  const safetyCheck = safetyOut?.ok
+    ? {
+        canBuy: safetyOut.canBuy ?? null,
+        canSell: safetyOut.canSell ?? null,
+        roundTripLossPct: finiteNum(safetyOut.roundTripLossPct),
+        verdict: safetyOut.verdict ?? null,
+        note: safetyOut.note ?? null,
+      }
+    : safety != null
+      ? {
+          canBuy: safety.canBuy ?? null,
+          canSell: safety.canSell ?? null,
+          roundTripLossPct: finiteNum(safety.roundTripLossPct),
+          verdict: null,
+          note: null,
+        }
+      : null;
 
   const price = finiteNum(token?.priceUsd);
   const liquidity = finiteNum(token?.liquidityUsd ?? token?.liquidity);
@@ -599,9 +652,10 @@ export async function scanMint(mint) {
     top10Pct,
     totalHolders,
     whaleCount: finiteNum(concentration?.whales),
-    canBuy: safety?.canBuy ?? null,
-    canSell: safety?.canSell ?? null,
-    roundTripLossPct: finiteNum(safety?.roundTripLossPct),
+    canBuy: safetyCheck?.canBuy ?? null,
+    canSell: safetyCheck?.canSell ?? null,
+    roundTripLossPct: safetyCheck?.roundTripLossPct ?? null,
+    tokenProgram: token?.tokenProgram ?? null,
     devSold: dev?.sold ?? null,
     devSerial: dev?.serial ?? null,
     creatorTokensCount: finiteNum(dev?.tokensCreated),
@@ -613,10 +667,53 @@ export async function scanMint(mint) {
     sourceTrace,
   });
 
-  const checks = honeypotChecks(safety ?? null);
+  const checks = honeypotChecks(safetyCheck ?? null);
   const honeypot =
-    safety == null ? null : safety.canSell === false ? true : safety.canSell === true ? false : null;
+    safetyCheck == null
+      ? null
+      : safetyCheck.canSell === false
+        ? true
+        : safetyCheck.canSell === true
+          ? false
+          : null;
   const bundleVerdict = bundleRiskVerdict(bundle);
+
+  // Pool vault token accounts (forensics concentration) — the top-holders
+  // list below excludes exactly these, so a vault never shows as a holder.
+  const poolAccts = new Set(
+    (Array.isArray(concentration?.pools) ? concentration.pools : [])
+      .map((p) => p?.tokenAccount)
+      .filter(Boolean),
+  );
+  // ATH + drawdown (token route, GeckoTerminal candles).
+  const athPrice = finiteNum(tokenOut?.athPrice ?? tokenOut?.meta?.athPrice);
+  const downFromAthPct =
+    athPrice != null && price != null && athPrice > 0
+      ? Number((((athPrice - price) / athPrice) * 100).toFixed(1))
+      : null;
+  // Social links — token route socials + research links, research wins.
+  const metaSocials = tokenOut?.meta?.socials ?? {};
+  const researchLinks = researchOut?.meta?.links ?? {};
+  const socials = {
+    telegram: researchLinks.telegram || metaSocials.telegram || null,
+    discord: metaSocials.discord || null,
+    website: researchLinks.website || metaSocials.website || null,
+  };
+  // Top traders by PnL (research route; null when it timed out).
+  const topTradersRaw = Array.isArray(researchOut?.onchain?.topTraders)
+    ? researchOut.onchain.topTraders
+    : null;
+  const topTraders = topTradersRaw
+    ? [...topTradersRaw]
+        .sort((a, b) => (Number(b.pnl) || 0) - (Number(a.pnl) || 0))
+        .slice(0, 3)
+        .map((t) => ({
+          wallet: t.wallet || t.address || null,
+          pnl: finiteNum(t.pnl),
+          winRate: finiteNum(t.winRate),
+          trades: finiteNum(t.trades),
+        }))
+    : null;
 
   const reasons = [
     ...og.categories.map((c) => `${c.label}: ${c.note} (${c.points}/${c.max})`),
@@ -659,7 +756,46 @@ export async function scanMint(mint) {
     whaleCount: finiteNum(concentration?.whales),
     devWallet: dev?.wallet ?? null,
     devTokensCreated: finiteNum(dev?.tokensCreated),
+    devSerial: dev?.serial ?? null,
     honeypotChecks: checks,
+    tradeability: safetyCheck,
+    // — Token — (Jupiter + forensics, already fetched)
+    decimals: finiteNum(token?.decimals),
+    totalSupply: finiteNum(token?.totalSupply),
+    fdv: finiteNum(token?.fdv),
+    tokenProgram: tokenProgramLabel(token?.tokenProgram ?? null),
+    isVerified: token?.isVerified ?? null,
+    createdAt: token?.createdAt ?? tokenOut?.meta?.createdAt ?? null,
+    launchpad: forensics?.launchpad ?? null,
+    bondingComplete: forensics?.bondingComplete ?? null,
+    // — History — ATH + drawdown.
+    athPrice,
+    athMcap: finiteNum(tokenOut?.athMcap ?? tokenOut?.meta?.athMcap),
+    downFromAthPct,
+    // — Activity — Jupiter 24h stats.
+    numBuys24h: finiteNum(token?.numBuys ?? tokenOut?.meta?.numBuys24h),
+    numSells24h: finiteNum(token?.numSells ?? tokenOut?.meta?.numSells24h),
+    numTraders24h: finiteNum(token?.numTraders ?? tokenOut?.meta?.numTraders24h),
+    netBuyers24h: finiteNum(token?.netBuyers ?? tokenOut?.meta?.netBuyers24h),
+    buyVolume24h: finiteNum(token?.buyVolume ?? tokenOut?.meta?.buyVolume24h),
+    sellVolume24h: finiteNum(token?.sellVolume ?? tokenOut?.meta?.sellVolume24h),
+    organicScore: finiteNum(token?.organicScore),
+    organicScoreLabel: token?.organicScoreLabel ?? null,
+    momentum: finiteNum(tokenOut?.momentum),
+    momentumLabel: tokenOut?.momentumLabel ?? null,
+    holderChange24h: finiteNum(token?.holderChange24h),
+    // — Holders — top-5 list, pool-filtered + leaked-vault guard.
+    topHolders: topHoldersList(tokenOut?.intel?.holders, poolAccts),
+    kolHolderCount: finiteNum(tokenOut?.intel?.kolHolderCount),
+    // — Social — links + mention counts (research route; null if it timed out).
+    socials,
+    xMentions: finiteNum(researchOut?.social?.twitter?.total),
+    redditMentions: finiteNum(researchOut?.social?.reddit?.total),
+    topTraders,
+    description:
+      (typeof researchOut?.meta?.description === "string" && researchOut.meta.description.trim()) ||
+      (typeof researchOut?.launch?.description === "string" && researchOut.launch.description.trim()) ||
+      null,
     caps: og.caps,
     holders: totalHolders,
     honeypot,

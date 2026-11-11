@@ -114,6 +114,26 @@ function fmtPrice(v) {
   return "$" + Number(v.toPrecision(4)).toString();
 }
 
+function fmtInt(v) {
+  if (v == null || !Number.isFinite(v)) return null;
+  return Math.round(v).toLocaleString("en-US");
+}
+
+function fmtSupply(v) {
+  if (v == null || !Number.isFinite(v)) return null;
+  if (v >= 1e9) return (v / 1e9).toFixed(2) + "B";
+  if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
+  if (v >= 1e3) return (v / 1e3).toFixed(1) + "K";
+  return String(Math.round(v));
+}
+
+function fmtDate(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
 function shortNote(s, max = 90) {
   if (s == null) return null;
   const t = String(s).trim();
@@ -144,6 +164,8 @@ function scanReply(result) {
   const title = sym && nm && sym.toLowerCase() !== nm.toLowerCase() ? `${sym} ${nm}` : sym || nm || null;
   lines.push(title ? `${title} (${short})` : `Token ${short}`);
   lines.push(`OG Score: ${result.score ?? "—"}/100 — ${result.verdict}`);
+  const desc = shortNote(result.description, 120);
+  if (desc) lines.push(desc);
   lines.push("");
 
   // — Market —
@@ -161,7 +183,31 @@ function scanReply(result) {
     const age = result.ageDays < 1 ? "<1 day" : `${Math.floor(result.ageDays)} days`;
     lines.push(`Age: ${age}`);
   }
+  if (result.momentumLabel || result.momentum != null) {
+    lines.push(
+      `Momentum: ${result.momentumLabel || ""}${result.momentum != null ? ` (${Math.round(result.momentum)}/100)` : ""}`.trim(),
+    );
+  }
   lines.push("");
+
+  // — Token — supply, program, launchpad, verification.
+  const tokenLines = [];
+  const supplyBits = [];
+  if (result.totalSupply != null) supplyBits.push(`Supply: ${fmtSupply(result.totalSupply)}`);
+  if (result.decimals != null) supplyBits.push(`Decimals: ${result.decimals}`);
+  if (result.fdv != null) supplyBits.push(`FDV: ${fmtUsd(result.fdv)}`);
+  if (supplyBits.length) tokenLines.push(supplyBits.join(" · "));
+  const progBits = [];
+  if (result.tokenProgram) progBits.push(`Program: ${result.tokenProgram}`);
+  if (result.launchpad) progBits.push(`Launchpad: ${result.launchpad}`);
+  if (result.isVerified === true) progBits.push("✅ Jupiter verified");
+  else if (result.isVerified === false) progBits.push("⚠️ Not Jupiter-verified");
+  if (progBits.length) tokenLines.push(progBits.join(" · "));
+  if (tokenLines.length) {
+    lines.push("— Token —");
+    for (const l of tokenLines) lines.push(l);
+    lines.push("");
+  }
 
   // — Chart — price history (the chart in text form).
   const pa = [];
@@ -175,6 +221,30 @@ function scanReply(result) {
     lines.push("");
   }
 
+  // — History — ATH, created date, migration.
+  const histLines = [];
+  if (result.athPrice != null || result.athMcap != null) {
+    const bits = [];
+    if (result.athPrice != null) bits.push(`ATH ${fmtPrice(result.athPrice)}`);
+    if (result.athMcap != null) bits.push(`${fmtUsd(result.athMcap)} MCAP`);
+    if (result.downFromAthPct != null) {
+      bits.push(`-${Number(result.downFromAthPct).toFixed(1)}% from ATH`);
+    }
+    histLines.push(bits.join(" · "));
+  }
+  if (result.createdAt) {
+    const cd = fmtDate(result.createdAt);
+    if (cd) histLines.push(`Created: ${cd}`);
+  }
+  if (result.bondingComplete === true) {
+    histLines.push("Migrated from the pump.fun bonding curve");
+  }
+  if (histLines.length) {
+    lines.push("— History —");
+    for (const l of histLines) lines.push(l);
+    lines.push("");
+  }
+
   // — Pairs — which coins this token is paired to (the liquidity pools).
   const pairs = Array.isArray(result.pairs) ? result.pairs : null;
   lines.push("— Pairs —");
@@ -185,6 +255,11 @@ function scanReply(result) {
       const bits = [`${dex} — ${quote}`];
       if (p.liquidity != null) bits.push(`Liq ${fmtUsd(p.liquidity)}`);
       if (p.volume24h != null) bits.push(`Vol ${fmtUsd(p.volume24h)}`);
+      if (p.buys24h != null || p.sells24h != null) {
+        bits.push(
+          `Buys ${fmtInt(p.buys24h ?? 0)} · Sells ${fmtInt(p.sells24h ?? 0)}`,
+        );
+      }
       lines.push(bits.join(" · "));
     }
   } else {
@@ -195,12 +270,57 @@ function scanReply(result) {
   // — Holders —
   lines.push("— Holders —");
   const holderBits = [];
-  if (result.holders != null) holderBits.push(`Holders: ${result.holders}`);
+  if (result.holders != null) {
+    const hc =
+      result.holderChange24h != null
+        ? ` (${fmtPct(result.holderChange24h)} 24h)`
+        : "";
+    holderBits.push(`Holders: ${fmtInt(result.holders)}${hc}`);
+  }
   if (result.topHolderPct != null) holderBits.push(`Top: ${Number(result.topHolderPct).toFixed(1)}%`);
   if (result.top10Pct != null) holderBits.push(`Top 10: ${Number(result.top10Pct).toFixed(1)}%`);
   if (result.whaleCount != null) holderBits.push(`Whales: ${result.whaleCount}`);
+  if (result.kolHolderCount != null && result.kolHolderCount > 0) {
+    holderBits.push(`KOL holders: ${result.kolHolderCount}`);
+  }
   if (holderBits.length) lines.push(holderBits.join(" · "));
+  const th = Array.isArray(result.topHolders) ? result.topHolders : null;
+  if (th && th.length) {
+    lines.push("Top holders:");
+    for (const h of th) {
+      const who = shortAddr(h.owner) || (h.label || "?");
+      const usd = h.usdValue != null ? ` · ${fmtUsd(h.usdValue)}` : "";
+      lines.push(`· ${who} · ${Number(h.pct).toFixed(1)}%${usd}`);
+    }
+  }
   lines.push("");
+
+  // — Activity — 24h trading activity (Jupiter stats).
+  const actLines = [];
+  const actBits = [];
+  if (result.numBuys24h != null) actBits.push(`${fmtInt(result.numBuys24h)} buys`);
+  if (result.numSells24h != null) actBits.push(`${fmtInt(result.numSells24h)} sells`);
+  if (result.numTraders24h != null) actBits.push(`${fmtInt(result.numTraders24h)} traders`);
+  if (result.netBuyers24h != null) {
+    actBits.push(
+      `Net ${result.netBuyers24h >= 0 ? "+" : ""}${fmtInt(result.netBuyers24h)} buyers`,
+    );
+  }
+  if (actBits.length) actLines.push(`24h: ${actBits.join(" · ")}`);
+  const volBits = [];
+  if (result.buyVolume24h != null) volBits.push(`Buy vol ${fmtUsd(result.buyVolume24h)}`);
+  if (result.sellVolume24h != null) volBits.push(`Sell vol ${fmtUsd(result.sellVolume24h)}`);
+  if (volBits.length) actLines.push(volBits.join(" · "));
+  if (result.organicScore != null) {
+    actLines.push(
+      `Organic score: ${Math.round(result.organicScore)}/100${result.organicScoreLabel ? ` (${result.organicScoreLabel})` : ""}`,
+    );
+  }
+  if (actLines.length) {
+    lines.push("— Activity —");
+    for (const l of actLines) lines.push(l);
+    lines.push("");
+  }
 
   // — Dev — who launched it, how many tokens, still holding or exited.
   lines.push("— Dev —");
@@ -212,10 +332,12 @@ function scanReply(result) {
       : result.devExited === false
         ? "✅ Dev still holds"
         : "❓ Dev position — unknown";
-  lines.push(
+  const devInfo =
     result.devTokensCreated != null
       ? `${devLine} · ${result.devTokensCreated} tokens created`
-      : devLine,
+      : devLine;
+  lines.push(
+    result.devSerial === true ? `${devInfo} · Serial deployer` : devInfo,
   );
   const st = result.sourceTrace;
   if (st && st.available) {
@@ -263,6 +385,12 @@ function scanReply(result) {
   const checks = Array.isArray(result.honeypotChecks) ? result.honeypotChecks : [];
   const rt = checks.find((c) => c.id === "round-trip");
   if (rt) lines.push(rt.label);
+  const tb = result.tradeability;
+  if (tb && tb.verdict) {
+    lines.push(
+      `Tradeability: ${tb.verdict}${tb.note ? ` — ${shortNote(tb.note, 80)}` : ""}`,
+    );
+  }
   lines.push("");
 
   // — Bundle —
@@ -292,7 +420,31 @@ function scanReply(result) {
       if (n) lines.push(`X: ${n}`);
     }
   }
+  if (result.xMentions != null) lines.push(`X posts found: ${fmtInt(result.xMentions)}`);
+  if (result.redditMentions != null) {
+    lines.push(`Reddit posts found: ${fmtInt(result.redditMentions)}`);
+  }
+  const soc = result.socials || {};
+  if (soc.telegram) lines.push(`Telegram: ${soc.telegram}`);
+  if (soc.discord) lines.push(`Discord: ${soc.discord}`);
+  if (soc.website) lines.push(`Website: ${soc.website}`);
   lines.push("");
+
+  // — Top traders — by PnL (research route; only when it answered).
+  const tt = Array.isArray(result.topTraders) ? result.topTraders : null;
+  if (tt && tt.length) {
+    lines.push("— Top traders —");
+    for (const t of tt) {
+      const bits = [shortAddr(t.wallet) || "?"];
+      if (t.pnl != null) {
+        bits.push(`PnL ${(t.pnl >= 0 ? "+" : "-") + fmtUsd(Math.abs(t.pnl))}`);
+      }
+      if (t.winRate != null) bits.push(`Win ${Number(t.winRate).toFixed(0)}%`);
+      if (t.trades != null) bits.push(`${fmtInt(t.trades)} trades`);
+      lines.push(`· ${bits.join(" · ")}`);
+    }
+    lines.push("");
+  }
 
   // — Clones — vamp or OG, how many, and the clones themselves.
   lines.push("— Clones —");
