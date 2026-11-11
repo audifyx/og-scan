@@ -130,9 +130,10 @@ function shortAddr(s) {
 
 /**
  * Full scan report, in the chat — like a normal TG bot scanner. Paste a CA,
- * get everything here: market, holders, safety, bundle, dev/source, X,
- * clones and the score breakdown. No Mini App needed. Kept under
- * Telegram's 4096-char message limit (truncated as a last resort).
+ * get everything the scanner UI shows, as one detailed report: market,
+ * holders, safety, bundle, dev/source, social, the score breakdown and
+ * the risk factors. No Mini App needed. Kept under Telegram's 4096-char
+ * message limit (truncated as a last resort).
  */
 function scanReply(result) {
   const lines = [];
@@ -143,22 +144,36 @@ function scanReply(result) {
   lines.push(title ? `${title} (${short})` : `Token ${short}`);
   lines.push(`OG Score: ${result.score ?? "—"}/100 — ${result.verdict}`);
   lines.push("");
-  // Market
+
+  // — Market —
+  lines.push("— Market —");
   if (result.price != null) {
     const chg = result.change24h != null ? ` (${fmtPct(result.change24h)} 24h)` : "";
     lines.push(`Price: ${fmtPrice(result.price)}${chg}`);
   }
-  if (result.marketCap != null) lines.push(`MCAP: ${fmtUsd(result.marketCap)}`);
-  if (result.liquidity != null) lines.push(`Liquidity: ${fmtUsd(result.liquidity)}`);
-  if (result.volume24h != null) lines.push(`Vol 24h: ${fmtUsd(result.volume24h)}`);
-  // Holders
+  const marketBits = [];
+  if (result.marketCap != null) marketBits.push(`MCAP: ${fmtUsd(result.marketCap)}`);
+  if (result.liquidity != null) marketBits.push(`Liquidity: ${fmtUsd(result.liquidity)}`);
+  if (result.volume24h != null) marketBits.push(`Vol 24h: ${fmtUsd(result.volume24h)}`);
+  if (marketBits.length) lines.push(marketBits.join(" · "));
+  if (result.ageDays != null) {
+    const age = result.ageDays < 1 ? "<1 day" : `${Math.floor(result.ageDays)} days`;
+    lines.push(`Age: ${age}`);
+  }
+  lines.push("");
+
+  // — Holders —
+  lines.push("— Holders —");
   const holderBits = [];
   if (result.holders != null) holderBits.push(`Holders: ${result.holders}`);
   if (result.topHolderPct != null) holderBits.push(`Top: ${Number(result.topHolderPct).toFixed(1)}%`);
   if (result.top10Pct != null) holderBits.push(`Top 10: ${Number(result.top10Pct).toFixed(1)}%`);
+  if (result.whaleCount != null) holderBits.push(`Whales: ${result.whaleCount}`);
   if (holderBits.length) lines.push(holderBits.join(" · "));
   lines.push("");
-  // Safety
+
+  // — Safety —
+  lines.push("— Safety —");
   lines.push(
     result.honeypot === false
       ? "✅ No honeypot — sell route open"
@@ -188,15 +203,24 @@ function scanReply(result) {
         : "❓ LP lock — unknown",
   );
   if (result.lpBurned === true) lines.push("🔥 LP burned");
-  lines.push(
+  const devLine =
     result.devExited === true
       ? "👋 Dev has exited"
       : result.devExited === false
         ? "✅ Dev still holds"
-        : "❓ Dev position — unknown",
+        : "❓ Dev position — unknown";
+  lines.push(
+    result.devTokensCreated != null
+      ? `${devLine} · ${result.devTokensCreated} tokens created`
+      : devLine,
   );
+  const checks = Array.isArray(result.honeypotChecks) ? result.honeypotChecks : [];
+  const rt = checks.find((c) => c.id === "round-trip");
+  if (rt) lines.push(rt.label);
   lines.push("");
-  // Bundle
+
+  // — Bundle —
+  lines.push("— Bundle —");
   const b = result.bundle;
   if (b && b.available) {
     let bundleLine = `Bundle: ${b.verdict || "—"}`;
@@ -210,7 +234,6 @@ function scanReply(result) {
   } else {
     lines.push("Bundle: unknown — bundle check unavailable");
   }
-  // Dev source trace
   const st = result.sourceTrace;
   if (st && st.available) {
     const bits = [];
@@ -221,7 +244,10 @@ function scanReply(result) {
     const note = shortNote(st.note);
     if (note) lines.push(`  ${note}`);
   }
-  // X + clones
+  lines.push("");
+
+  // — Social —
+  lines.push("— Social —");
   const x = result.x;
   if (x) {
     if (x.handle) lines.push(`X: @${x.handle}`);
@@ -233,15 +259,34 @@ function scanReply(result) {
   const cl = result.clones;
   if (cl) lines.push(`Clones: ${cl.label}`);
   lines.push("");
-  // Score breakdown (the "why" behind the score)
+
+  // — Score breakdown —
+  lines.push("— Score breakdown —");
   const cats = Array.isArray(result.categories) ? result.categories : [];
   if (cats.length) {
-    lines.push("Score breakdown:");
     for (const c of cats) {
       const note = shortNote(c.note, 70);
       lines.push(`· ${c.label}: ${note ? note + " " : ""}(${c.points}/${c.max})`);
     }
   }
+  lines.push("");
+
+  // — Risk factors — score caps + any failing/warning trade checks.
+  const caps = Array.isArray(result.caps) ? result.caps : [];
+  const riskChecks = checks.filter((c) => c.state === "fail" || c.state === "warn");
+  if (caps.length || riskChecks.length) {
+    lines.push("— Risk factors —");
+    for (const cap of caps) {
+      const n = shortNote(cap, 90);
+      if (n) lines.push(`· ${n}`);
+    }
+    for (const c of riskChecks) {
+      const detail = shortNote(c.detail, 70);
+      lines.push(`· ${c.label}${detail ? ` — ${detail}` : ""}`);
+    }
+    lines.push("");
+  }
+
   if (Array.isArray(result.unknowns) && result.unknowns.length) {
     lines.push(`Not checked yet: ${result.unknowns.join(", ")} — treated as unknown.`);
   }
