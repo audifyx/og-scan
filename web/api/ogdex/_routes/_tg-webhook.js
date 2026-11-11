@@ -102,15 +102,53 @@ function fmtUsd(v) {
   return "$" + v.toFixed(2);
 }
 
+function fmtPct(v, digits = 1) {
+  if (v == null || !Number.isFinite(v)) return null;
+  return (v >= 0 ? "+" : "") + v.toFixed(digits) + "%";
+}
+
+function shortNote(s, max = 90) {
+  if (s == null) return null;
+  const t = String(s).trim();
+  return t.length > max ? t.slice(0, max - 1) + "…" : t;
+}
+
+function shortAddr(s) {
+  if (!s || s.length < 10) return s || null;
+  return s.slice(0, 6) + "…" + s.slice(-4);
+}
+
+/**
+ * Full scan report, in the chat — like a normal TG bot scanner. Paste a CA,
+ * get everything here: market, holders, safety, bundle, dev/source, X,
+ * clones and the score breakdown. No Mini App needed. Kept under
+ * Telegram's 4096-char message limit (truncated as a last resort).
+ */
 function scanReply(result) {
   const lines = [];
   const short = result.mint.slice(0, 6) + "…" + result.mint.slice(-4);
-  lines.push("Token " + short);
-  lines.push("OG Score: " + (result.score ?? "—") + "/100 — " + result.verdict);
-  if (result.price != null) lines.push("Price: $" + result.price);
-  if (result.liquidity != null) lines.push("Liquidity: " + fmtUsd(result.liquidity));
-  if (result.holders != null) lines.push("Holders: " + result.holders);
+  const sym = result.symbol || null;
+  const nm = result.name || null;
+  const title = sym && nm && sym.toLowerCase() !== nm.toLowerCase() ? `${sym} ${nm}` : sym || nm || null;
+  lines.push(title ? `${title} (${short})` : `Token ${short}`);
+  lines.push(`OG Score: ${result.score ?? "—"}/100 — ${result.verdict}`);
   lines.push("");
+  // Market
+  if (result.price != null) {
+    const chg = result.change24h != null ? ` (${fmtPct(result.change24h)} 24h)` : "";
+    lines.push(`Price: $${result.price}${chg}`);
+  }
+  if (result.marketCap != null) lines.push(`MCAP: ${fmtUsd(result.marketCap)}`);
+  if (result.liquidity != null) lines.push(`Liquidity: ${fmtUsd(result.liquidity)}`);
+  if (result.volume24h != null) lines.push(`Vol 24h: ${fmtUsd(result.volume24h)}`);
+  // Holders
+  const holderBits = [];
+  if (result.holders != null) holderBits.push(`Holders: ${result.holders}`);
+  if (result.topHolderPct != null) holderBits.push(`Top: ${result.topHolderPct}%`);
+  if (result.top10Pct != null) holderBits.push(`Top 10: ${result.top10Pct}%`);
+  if (holderBits.length) lines.push(holderBits.join(" · "));
+  lines.push("");
+  // Safety
   lines.push(
     result.honeypot === false
       ? "✅ No honeypot — sell route open"
@@ -147,10 +185,59 @@ function scanReply(result) {
         ? "✅ Dev still holds"
         : "❓ Dev position — unknown",
   );
-  if (result.topHolderPct != null) lines.push("Top holder: " + result.topHolderPct + "%");
   lines.push("");
-  lines.push("Open the scanner for the full breakdown. Not financial advice.");
-  return lines.join("\n");
+  // Bundle
+  const b = result.bundle;
+  if (b && b.available) {
+    const bits = [];
+    if (b.bundledSupplyPct != null) bits.push(`${b.bundledSupplyPct.toFixed(1)}% bundled`);
+    if (b.clusterCount != null) bits.push(`${b.clusterCount} clusters`);
+    lines.push(`Bundle: ${bits.join(" · ")} — ${b.verdict || "—"}`);
+    const note = shortNote(b.note);
+    if (note) lines.push(`  ${note}`);
+  } else {
+    lines.push("Bundle: unknown — bundle check unavailable");
+  }
+  // Dev source trace
+  const st = result.sourceTrace;
+  if (st && st.available) {
+    const bits = [];
+    const w = shortAddr(st.sourceWallet);
+    if (w) bits.push(`Source: ${w}`);
+    if (st.sourceTokensCreated != null) bits.push(`${st.sourceTokensCreated} tokens created`);
+    if (bits.length) lines.push(bits.join(" · "));
+    const note = shortNote(st.note);
+    if (note) lines.push(`  ${note}`);
+  }
+  // X + clones
+  const x = result.x;
+  if (x) {
+    if (x.handle) lines.push(`X: @${x.handle}`);
+    else if (x.note) {
+      const n = shortNote(x.note);
+      if (n) lines.push(`X: ${n}`);
+    }
+  }
+  const cl = result.clones;
+  if (cl) lines.push(`Clones: ${cl.label}`);
+  lines.push("");
+  // Score breakdown (the "why" behind the score)
+  const cats = Array.isArray(result.categories) ? result.categories : [];
+  if (cats.length) {
+    lines.push("Score breakdown:");
+    for (const c of cats) {
+      const note = shortNote(c.note, 70);
+      lines.push(`· ${c.label}: ${note ? note + " " : ""}(${c.points}/${c.max})`);
+    }
+  }
+  if (Array.isArray(result.unknowns) && result.unknowns.length) {
+    lines.push(`Not checked yet: ${result.unknowns.join(", ")} — treated as unknown.`);
+  }
+  lines.push("");
+  lines.push("Not financial advice.");
+  let text = lines.join("\n");
+  if (text.length > 4000) text = text.slice(0, 3997) + "…";
+  return text;
 }
 
 const START_TEXT =
