@@ -297,6 +297,44 @@ async function fetchDexPairs(mint) {
   }
 }
 
+/** Same-name clones, direct from DexScreener search (same logic as the
+ * research route's findClones, but without the slow X/Reddit searches
+ * that make the research route time out inside scanMint). Used for the
+ * vamp-or-OG verdict and the clone list. */
+async function fetchClonesDirect(mint, symbol) {
+  try {
+    const q = encodeURIComponent(symbol || "");
+    if (!q) return null;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 10_000);
+    const r = await fetch(`https://api.dexscreener.com/latest/dex/search/?q=${q}`, {
+      headers: { Accept: "application/json" },
+      signal: ctl.signal,
+    }).catch(() => null);
+    clearTimeout(timer);
+    if (!r || !r.ok) return null;
+    const d = await r.json().catch(() => null);
+    const pairs = d?.pairs || [];
+    return pairs
+      .filter((p) => p.chainId === "solana" && p.baseToken?.address !== mint)
+      .sort((a, b) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0))
+      .slice(0, 20)
+      .map((p) => ({
+        mint: p.baseToken.address,
+        name: p.baseToken.name,
+        symbol: p.baseToken.symbol,
+        mcap: p.marketCap || 0,
+        volume24h: p.volume?.h24 || 0,
+        liquidity: p.liquidity?.usd || 0,
+        launchTime: p.pairCreatedAt || 0,
+        dexUrl: p.url || `https://dexscreener.com/solana/${p.baseToken.address}`,
+        price: Number(p.priceUsd || 0),
+      }));
+  } catch {
+    return null;
+  }
+}
+
 /** Top non-pool holder share (0–100) from the intel holders sample. */
 function topHolderPct(holders) {
   if (!Array.isArray(holders) || !holders.length) return null;
@@ -537,7 +575,13 @@ export async function scanMint(mint) {
   const rawBundle = bundleOut?.ok ? bundleOut.analysis ?? null : null;
   const bundle = adaptBundleAnalysis(rawBundle);
   const sourceTrace = adaptSourceTrace(rawBundle);
-  const clones = Array.isArray(researchOut?.clones) ? researchOut.clones : null;
+  let clones = Array.isArray(researchOut?.clones) ? researchOut.clones : null;
+  // The research route is slow (X/Reddit searches) and times out inside
+  // scanMint — fall back to a direct DexScreener search so the vamp/OG
+  // verdict and the clone list are actually populated.
+  if (!clones) {
+    clones = await fetchClonesDirect(mint, token?.symbol).catch(() => null);
+  }
   const cv = cloneVerdict(clones, marketCap);
   const x = adaptXIntel([
     [tokenOut?.meta?.socials?.twitter ?? null, "DexScreener"],

@@ -204,7 +204,11 @@ export async function getLabeledHolders(mint, price = null, limit = 20) {
   const live = await fetchHoldersLive(mint, price, limit).catch(() => []);
   if (live.length) {
     const pools = live.filter((h) => h.isPool);
-    kvPut(`holders/${mint}.json`, { ts: Date.now(), holders: live, pools }).catch(() => {});
+    // Await the cache write (not fire-and-forget): serverless freezes
+    // drop un-awaited writes, and a cold cache is what lets a later
+    // rate-limited call fall back to the intel sample's wrong top-10
+    // on multi-pool tokens.
+    await kvPut(`holders/${mint}.json`, { ts: Date.now(), holders: live, pools }).catch(() => {});
     return { holders: live, pools, source: "live", stale: false };
   }
   const cached = await kvGet(`holders/${mint}.json`).catch(() => null);
