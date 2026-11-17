@@ -167,6 +167,7 @@ import { SupportNotificationBanner } from "./components/SupportNotificationBanne
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import About from "./pages/About";
+import AiTrader from "./pages/AiTrader";
 import Contact from "./pages/Contact";
 import PlatformWhitepaper from "./pages/platform/Whitepaper";
 import PlatformRoadmap from "./pages/platform/Roadmap";
@@ -376,6 +377,7 @@ const App = () => (
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/about" element={<About />} />
+            <Route path="/aitrader" element={<AiTrader />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/vamp" element={<OwnerPreviewRoute><VampPortal /></OwnerPreviewRoute>} />
             <Route path="/whitepaper" element={<PlatformWhitepaper />} />
