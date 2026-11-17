@@ -214,8 +214,8 @@ const AiTrader = () => (
             of them in the app at any time.
           </p>
           <p>
-            AI Trading is invite-only right now. You need an <strong className="text-white">AGENT-</strong> invite
-            code — DM{" "}
+            AI Trading is invite-only right now. Use the OrbitX invite code below to get in — redeem it within 24
+            hours of activating. No code? DM{" "}
             <a href="https://x.com/mobyagent" target="_blank" rel="noreferrer" className="text-[#5aa2ff] hover:underline">
               @mobyagent on X
             </a>{" "}
@@ -224,6 +224,18 @@ const AiTrader = () => (
               moby.win/agents
             </a>
             .
+          </p>
+          <CopyBlock label="OrbitX invite code — copy it" text="AGENT-B8YK9A" />
+          <p>
+            Redeem it here:{" "}
+            <a
+              href="https://invite.mobyscreener.com/agent-AGENT-B8YK9A"
+              target="_blank"
+              rel="noreferrer"
+              className="text-[#5aa2ff] hover:underline"
+            >
+              invite.mobyscreener.com/agent-AGENT-B8YK9A
+            </a>
           </p>
         </div>
       </div>
