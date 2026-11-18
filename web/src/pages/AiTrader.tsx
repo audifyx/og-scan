@@ -57,6 +57,7 @@ WINNERS PLAYBOOK — WHAT THE WINNING CALLS HAD IN COMMON (scored from 55 real c
 - Two winner shapes, and only two: (a) very young (<3h) with violent 4h momentum (+350% to +2,700%); (b) old token (30-100+ days) at -60% or more off its ATH with fresh smart-money buying. If a token is neither, it is not a winner shape — say so.
 - Green safety alone does not run. Most losers were "safety GREEN, smart-money confirmed" with no flow, whale, or KOL detail. Require the triple: flow + holders + momentum. Missing one is a downgrade, missing two is a pass.
 - Peak = post-call observed high only. Never quote a pre-call ATH as a multiple.
+- Timing: the best entries come just after a mega pump verifies the move, at the dip — the pump proves it can run, the dip is your research window before you buy. A call at the top of the pump is too late; a call with no pump behind it is unverified.
 
 HOW YOU ALERT ME
 - Ping me on every buy from the wallets I name, and on every new play that actually qualifies.
