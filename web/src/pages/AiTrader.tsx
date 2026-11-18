@@ -47,6 +47,17 @@ HOW YOU RESEARCH (EVERY TOKEN, EVERY TIME)
 - If an RPC read returns 0 accounts, treat it as an error, not a sale. Confirm with a direct account read before reporting a zero.
 - A flag that arrives after the move says so plainly. Never present a stale call as live.
 
+WINNERS PLAYBOOK — WHAT THE WINNING CALLS HAD IN COMMON (scored from 55 real calls, 14 wins = 25%)
+- Check history before every call: run orbitx_call_history with the candidate's strategy and market cap. If the matched win rate is 0%, say so and downgrade the call. If it matches a past winner, say which one and why.
+- The youngest, fastest lanes win: microcap lane 46% (6/13), early launch hunter 40% (6/15), smart-money confirmed 13%, stonkfun trend rider 0/8 — treat its qualifiers with suspicion until the numbers change.
+- Small is the sweet spot: calls under $150K win a third to almost half the time; calls over $2M win 13% and average 1.3x — report them as slow movers, never as runners.
+- Winners had real flow, not just a green label: smart money green/Buying with h1 net +$6K-$25K across 17-26 wallets. A green safety tier with no flow number is not a signal.
+- Whales + KOLs entered in the last hour AND ARE STILL HOLDING (Marvin 3 whales + 5 KOLs, BUTTHOLE 11 + 11). Entries that already sold are not a signal — check holding, not entry.
+- Clean mint: mint + freeze renounced, dev 0%, insiders under 5% (or 0%).
+- Two winner shapes, and only two: (a) very young (<3h) with violent 4h momentum (+350% to +2,700%); (b) old token (30-100+ days) at -60% or more off its ATH with fresh smart-money buying. If a token is neither, it is not a winner shape — say so.
+- Green safety alone does not run. Most losers were "safety GREEN, smart-money confirmed" with no flow, whale, or KOL detail. Require the triple: flow + holders + momentum. Missing one is a downgrade, missing two is a pass.
+- Peak = post-call observed high only. Never quote a pre-call ATH as a multiple.
+
 HOW YOU ALERT ME
 - Ping me on every buy from the wallets I name, and on every new play that actually qualifies.
 - Re-ping a running token only when it is up 20% or more since the LAST ALERT YOU SENT — never vs the original call. Update the baseline only when an alert goes out.
@@ -162,8 +173,9 @@ const AiTrader = () => (
         <div className="premium-section__body">
           <p>
             This is the system you are about to install, running on the same lanes and the same rules. Peak is the
-            highest market cap reached after the call. Most calls do not run — these are the ones that did. Past
-            calls are not a promise.
+            highest market cap reached after the call. Most calls do not run — these are the ones that did. Across
+            55 tracked calls, 14 went 2x or better (25%): the microcap lane hits 46%, the early launch hunter
+            40%. Past calls are not a promise.
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-xl border border-[#d4af37]/40 bg-black px-3 py-3 text-center">
@@ -401,8 +413,9 @@ const AiTrader = () => (
         <div className="premium-section__body">
           <p>
             Now send your agent the setup prompt. One paste trains it on the whole system — the four hunting lanes,
-            the data-truth rules that keep its numbers honest, the alert rules, trade cards after every trade, and
-            the hard rules that keep it safe.
+            the winners playbook scored from 55 real calls, the call-history lookup it runs before every new
+            play, the data-truth rules that keep its numbers honest, the alert rules, trade cards after every
+            trade, and the hard rules that keep it safe.
           </p>
           <CopyBlock label="Master setup prompt — paste to your agent" text={SETUP_PROMPT} />
         </div>

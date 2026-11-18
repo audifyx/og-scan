@@ -320,7 +320,7 @@ const CHATGPT_TOOL_NAMES = new Set([
   "orbitx_trade_quote", "orbitx_quote_slip10_auto", "orbitx_app_buy", "orbitx_app_sell", "orbitx_swap",
   // token
   "orbitx_crypto_scan", "orbitx_screen_tokens", "orbitx_screen_trending_1m_solana",
-  "orbitx_adv_forensics_solana", "orbitx_get_forensics", "orbitx_dex_chart",
+  "orbitx_adv_forensics_solana", "orbitx_get_forensics", "orbitx_dex_chart", "orbitx_call_history",
   // wallet
   "orbitx_get_wallet", "orbitx_adv_wallet_pnl", "orbitx_adv_wallet_swaps", "orbitx_app_pnl", "orbitx_get_swaps", "orbitx_wallet_transactions",
   // media
@@ -2165,6 +2165,26 @@ const CORE_TOOLS = [
     description:
       "Why OrbitX MCP exists. Call when the user asks why use this MCP, why so many tools, which app to use, or how OrbitX is different from a charts-only site.",
     inputSchema: { type: "object", properties: { authCode: { type: "string" } }, additionalProperties: false },
+  },
+  {
+    name: "orbitx_call_history",
+    description:
+      "Look up what similar past OrbitX calls did before reporting a new play. Pass the candidate token's strategy (early_launch_hunter, smart_money_confirmed, stonkfun_trend_rider, stonkfun_whale_swarm, microcap) and market cap. Returns the closest past calls with call mcap, peak mcap after the call, multiple, and the win rate over the matched set. Win means the peak after the call reached 2x the call mcap. Always call this before reporting a new play.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        strategy: {
+          type: "string",
+          description: "Moby strategy of the candidate token",
+          enum: ["early_launch_hunter", "smart_money_confirmed", "stonkfun_trend_rider", "stonkfun_whale_swarm", "microcap"],
+        },
+        mcap_usd: { type: "number", description: "Candidate token market cap in USD" },
+        min_mcap_usd: { type: "number", description: "Optional lower bound on past call mcap" },
+        max_mcap_usd: { type: "number", description: "Optional upper bound on past call mcap" },
+        limit: { type: "integer", minimum: 1, maximum: 10, default: 5 },
+      },
+      additionalProperties: false,
+    },
   },
   {
     name: "orbitx_auth_link",
@@ -4058,6 +4078,50 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
   return result;
 }
 
+/** Call-history lookup: scored past calls from /calls-history.json (public static data). */
+async function callHistoryLookup(args, base) {
+  const strategy = String(args.strategy || "").trim();
+  const minMcap = Number(args.min_mcap_usd) || null;
+  const maxMcap = Number(args.max_mcap_usd) || null;
+  const q = Number(args.mcap_usd) || null;
+  const limit = Math.min(Math.max(Number(args.limit) || 5, 1), 10);
+  let data;
+  try {
+    const r = await fetch((base || "https://www.orbitx.world") + "/calls-history.json", {
+      headers: { Accept: "application/json" },
+    });
+    data = await r.json();
+  } catch (e) {
+    return { ok: false, error: "call_history_unavailable", message: String(e && e.message ? e.message : e) };
+  }
+  const all = Array.isArray(data && data.calls) ? data.calls : [];
+  const pool = all.filter((c) => {
+    if (!c.called) return false;
+    if (strategy && c.strategy !== strategy) return false;
+    if (minMcap != null && c.call_mcap_usd < minMcap) return false;
+    if (maxMcap != null && c.call_mcap_usd > maxMcap) return false;
+    return true;
+  });
+  pool.sort((a, b) => {
+    if (q != null) {
+      return Math.abs(Math.log(a.call_mcap_usd / q)) - Math.abs(Math.log(b.call_mcap_usd / q));
+    }
+    return b.multiple - a.multiple;
+  });
+  const picked = pool.slice(0, limit);
+  const wins = picked.filter((c) => c.win).length;
+  return {
+    ok: true,
+    tool: "orbitx_call_history",
+    summary: (data && data.summary) || null,
+    matched: picked.length,
+    wins,
+    win_rate: picked.length ? Number((wins / picked.length).toFixed(2)) : null,
+    calls: picked,
+    note: "Win = peak market cap after the call reached 2x the call market cap. Peaks are observed highs after the call, never pre-call ATHs.",
+  };
+}
+
 async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null) {
   // Always advertise www /api/mcp — apex 308s break Claude POSTs; /api/orbitx-mcp is an alias only.
   const mcpUrl = mcpUrls(req).mcpUrl;
@@ -4071,6 +4135,9 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
   }
   if (name === "orbitx_why") {
     return orbitxWhyPayload();
+  }
+  if (name === "orbitx_call_history") {
+    return callHistoryLookup(args, base);
   }
   if (name === "orbitx_agent_desk") {
     return snapshotHunter();
