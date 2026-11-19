@@ -386,6 +386,9 @@ const App = () => (
             <Route path="/r/:id" element={<ReportView />} />
             <Route path="/t/:mint" element={<OgdexRedirect to={(p) => `/ORBITX_DEX/token/${p.mint}`} />} />
             <Route path="/track-record" element={<OgdexRedirect to="/ORBITX_DEX" />} />
+            {/* Hub DEX (Terminal UI) lives at /hub-dex/ — the old pre-Terminal DEX is the main one at /ORBITX_DEX. */}
+            <Route path="/hub-dex" element={<OgdexRedirect to="/hub-dex/" />} />
+            <Route path="/hub-dex/*" element={<OgdexRedirect to="/hub-dex/" />} />
             <Route path="/cc-callback" element={<CCCallbackPage />} />
             <Route path="/x-callback" element={<XCallbackPage />} />
 

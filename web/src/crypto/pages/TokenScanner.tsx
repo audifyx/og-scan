@@ -1,7 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import "../crypto.css"; // Standalone /scanner mounts bypass IntelLayout, the only other importer — without this the oxc grid/panel/stat/factor classes never load and the page renders unstyled (stacked stats, adjacent factor spans) on mobile.
-import { dexChartUrl } from "@/trade/tradeFmt";
 import { useTokenIntel } from "../hooks/useTokenIntel";
 import { useScanVault } from "../hooks/useScanVault";
 import { RiskFactors, RiskGauge } from "../components/RiskGauge";
@@ -106,26 +105,6 @@ type TeamAIntel = {
   whaleAlerts?: unknown;
   riskLive?: unknown;
 };
-
-/** Chart-first: DexScreener chart at the top of the scan, same embed as the trade token page. */
-function ScannerChart({ mint, interval = "15" }: { mint: string; interval?: string }) {
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    setReady(false);
-  }, [mint, interval]);
-  return (
-    <div className="oxc-panel relative overflow-hidden" style={{ ...termPanel, height: 300, padding: 0 }}>
-      {!ready && <p className="oxc-empty oxc-pulse" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>Loading chart…</p>}
-      <iframe
-        title="DexScreener chart"
-        src={dexChartUrl(mint, interval)}
-        style={{ width: "100%", height: "100%", border: 0 }}
-        allow="clipboard-write"
-        onLoad={() => setReady(true)}
-      />
-    </div>
-  );
-}
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -325,7 +304,6 @@ function ScanSheet({ mint, intel, teamA }: { mint: string; intel: ReturnType<typ
             </span>
           </div>
         </div>
-        <ScannerChart mint={mint} interval={interval} />
       </div>
 
       {/* Bottom sheet — the verdict. */}

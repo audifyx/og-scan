@@ -86,7 +86,7 @@ function PlatformLinkItems({ pathname, onNavigate }: { pathname: string; onNavig
             <span className="ox-platform-fab__name">{app.name}</span>
           </>
         );
-        if (app.external || app.href.startsWith("/ORBITX_DEX") || app.href.startsWith("http")) {
+        if (app.external || app.href.startsWith("/ORBITX_DEX") || app.href.startsWith("/hub-dex") || app.href.startsWith("http")) {
           return (
             <a key={app.key} href={app.href} className={className} onClick={onNavigate}>
               {inner}
@@ -247,7 +247,7 @@ export function PlatformLinks({ className = "" }: { className?: string }) {
     <div className={`ox-platform-links ${className}`.trim()} aria-label="OrbitX apps">
       {menuApps.map((app) => {
         const on = matchPlatformPath(app.href, pathname);
-        const external = Boolean(app.external || app.href.startsWith("/ORBITX_DEX") || app.href.startsWith("http"));
+        const external = Boolean(app.external || app.href.startsWith("/ORBITX_DEX") || app.href.startsWith("/hub-dex") || app.href.startsWith("http"));
         if (external) {
           return (
             <a key={app.key} href={app.href} className={`ox-platform-links__a${on ? " is-on" : ""}`}>
