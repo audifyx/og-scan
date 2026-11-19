@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-title" content="OrbitX Terminal" />
     <meta name="application-name" content="OrbitX Terminal" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#050505" />
+    <meta name="theme-color" content="#04060E" />
     <title>OrbitX Terminal — Trade Everything</title>
     <meta name="description" content="OrbitX Terminal — Solana token screener with OrbitX Score, organic momentum, and instant safety checks." />
     <meta property="og:site_name" content="OrbitX" />
@@ -25,11 +25,11 @@
   </head>
   <body>
     <div id="root"></div>
-    <div id="boot-fallback" style="display:none;min-height:100dvh;place-items:center;background:#050505;color:#f4f4f2;text-align:center;padding:24px;">
+    <div id="boot-fallback" style="display:none;min-height:100dvh;place-items:center;background:#060609;color:#fff;text-align:center;padding:24px;">
       <div>
         <p style="font-size:18px;font-weight:800;margin:0 0 8px;">Terminal is taking too long to load</p>
-        <p style="color:rgba(244,244,242,.55);font-size:14px;margin:0 0 20px;">The app may have loaded stale files. A reload usually fixes it.</p>
-        <button onclick="window.location.reload()" style="background:#e8b84a;color:#050505;border:none;border-radius:12px;padding:12px 28px;font-weight:800;font-size:15px;cursor:pointer;">Reload terminal</button>
+        <p style="color:rgba(255,255,255,.5);font-size:14px;margin:0 0 20px;">The app may have loaded stale files. A reload usually fixes it.</p>
+        <button onclick="window.location.reload()" style="background:#3b82f6;color:#fff;border:none;border-radius:12px;padding:12px 28px;font-weight:800;font-size:15px;cursor:pointer;">Reload terminal</button>
       </div>
     </div>
     <script>
@@ -65,7 +65,6 @@ function ck(n){try{var m=document.cookie.match(new RegExp("(?:^|; )"+n+"=([^;]*)
 function sk(v){var d=(location.hostname==="orbitx.world"||location.hostname.slice(-13)===".orbitx.world")?"; Domain=.orbitx.world":"";try{document.cookie="orbitx_vid="+encodeURIComponent(v)+"; Path=/; Max-Age=31536000; SameSite=Lax"+(location.protocol==="https:"?"; Secure":"")+d;localStorage.setItem("site_vid",v)}catch(e){try{localStorage.setItem("site_vid",v)}catch(e2){}}}
 var k="site_vid",v=ck("orbitx_vid")||localStorage.getItem(k);if(!v){v=crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now()}sk(v);
 var _ua=navigator.userAgent||"";
-var _wd=false;try{_wd=navigator.webdriver===true}catch(e){}
 function _os(){if(/iPad|iPhone|iPod/.test(_ua))return"iOS";if(/Android/.test(_ua))return"Android";if(/Windows/.test(_ua))return"Windows";if(/Mac OS X/.test(_ua))return"macOS";if(/Linux/.test(_ua))return"Linux";return"Other"}
 function _br(){if(/Edg\//.test(_ua))return"Edge";if(/OPR\/|Opera/.test(_ua))return"Opera";if(/SamsungBrowser/.test(_ua))return"Samsung";if(/Chrome/.test(_ua))return"Chrome";if(/Firefox/.test(_ua))return"Firefox";if(/Safari/.test(_ua))return"Safari";return"Other"}
 var _coarse=matchMedia("(pointer:coarse)").matches;
@@ -77,12 +76,12 @@ var _utm={s:(_q.get("utm_source")||"").slice(0,40),m:(_q.get("utm_medium")||"").
 function vid(){try{return localStorage.getItem("orbitx_uid")||v}catch(e){return v}}
 function pth(){var p=location.pathname||"/";if(location.hash.length>1)p+=location.hash.split("/").slice(0,2).join("/");return p}
 function send(e,b){b.vid=vid();b.path=pth();var d=JSON.stringify(b),url=W+"/"+e+"?site="+S;if(e==="hit"&&navigator.sendBeacon){navigator.sendBeacon(url,new Blob([d],{type:"text/plain"}))}else{fetch(url,{method:"POST",body:d,keepalive:true}).catch(function(){})}}
-var last="";function hit(r){var p=pth();if(p===last)return;last=p;send("hit",{ref:r||"",device:dev,os:_os(),browser:_br(),screen:_scr,tz:_tz,utm_source:_utm.s,utm_medium:_utm.m,utm_campaign:_utm.c,auto:_wd})}
+var last="";function hit(r){var p=pth();if(p===last)return;last=p;send("hit",{ref:r||"",device:dev,os:_os(),browser:_br(),screen:_scr,tz:_tz,utm_source:_utm.s,utm_medium:_utm.m,utm_campaign:_utm.c})}
 hit(document.referrer);
 var ps=history.pushState;history.pushState=function(){ps.apply(this,arguments);setTimeout(hit,0)};
 addEventListener("popstate",function(){hit()});addEventListener("hashchange",function(){hit()});
-setInterval(function(){if(!document.hidden)send("ping",{auto:_wd})},20000);
-document.addEventListener("visibilitychange",function(){if(!document.hidden)send("ping",{auto:_wd})});
+setInterval(function(){if(!document.hidden)send("ping",{})},20000);
+document.addEventListener("visibilitychange",function(){if(!document.hidden)send("ping",{})});
 }catch(e){}})();</script>
   </body>
 </html>
