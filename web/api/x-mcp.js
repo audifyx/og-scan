@@ -4007,6 +4007,9 @@ async function handleAgent(req, res, parts) {
       "https://orbitx.world/x-callback",
       "https://www.ogscan.fun/x-callback",
       "https://ogscan.fun/x-callback",
+      // New Pages home (Render migration) — X auth must work from orbitx-world.pages.dev.
+      "https://orbitx-world.pages.dev/x-callback",
+      "https://orbitx-world.pages.dev",
     ];
     const isLocal =
       /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/x-callback$/.test(redirectUri);
