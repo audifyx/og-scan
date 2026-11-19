@@ -1,4 +1,5 @@
 import { fetchWithTimeout } from "@/lib/fetchTimeout";
+import { apiUrl } from "@/lib/apiBase";
 import { installSupabaseSession, tokensFromAuthPayload } from "@/lib/authSession";
 
 function errorText(raw: unknown): string {
@@ -44,14 +45,14 @@ async function postLogin(url: string, email: string, password: string): Promise<
   return { res, json };
 }
 
-/** Email login via same-origin /api/auth-login (never the hung public GoTrue /token). */
+/** Email login via the API origin (/api/auth-login) — apiUrl() points at Render on Pages, same-origin elsewhere (never the hung public GoTrue /token). */
 export async function signInWithEmailPassword(email: string, password: string): Promise<void> {
   let res: Response;
   let json: Record<string, unknown>;
   try {
-    ({ res, json } = await postLogin("/api/auth-login", email, password));
+    ({ res, json } = await postLogin(apiUrl("/api/auth-login"), email, password));
     if (looksLikePlatformCrash(res, json)) {
-      ({ res, json } = await postLogin("/ai-fn/auth-signin", email, password));
+      ({ res, json } = await postLogin(apiUrl("/ai-fn/auth-signin"), email, password));
     }
   } catch (err) {
     if (isAbort(err)) throw new Error("Login service timed out. Please try again.");
