@@ -1106,7 +1106,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     if (user && p.user_id === user.id) return true; // authors always see their own
     // 1) Contracted gate-check endpoint (Track 1): GET /api/social/gate-check?post_id=X
     try {
-      const r = await fetch(apiUrl(`/api/social/gate-check?post_id=${encodeURIComponent(p.id)}${user ? `)&viewer_id=${encodeURIComponent(user.id)}` : ""}`);
+      const r = await fetch(apiUrl(`/api/social/gate-check?post_id=${encodeURIComponent(p.id)}${user ? `&viewer_id=${encodeURIComponent(user.id)}` : ""}`));
       if (r.ok) {
         const d = await r.json();
         if (typeof d?.allowed === "boolean") return d.allowed;
