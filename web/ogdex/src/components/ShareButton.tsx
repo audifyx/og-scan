@@ -9,14 +9,14 @@ export default function ShareButton({ mint, symbol, score, mcap, verdict }: { mi
   const shareUrl = `https://ogscan.fun/share/${mint}?app=ogdex`;
   const sym = (symbol || "").replace(/^\$/, "");
   const mc = mcap != null ? "$" + compact(mcap) : null;
-  const lines = [`🔍 ${sym ? "$" + sym : "Token"} scanned on OrbitX Terminal`];
+  const lines = [`🔍 ${sym ? "$" + sym : "Token"} scanned on OrbitX DEX`];
   if (score != null) lines.push(`OrbitX Score ${Math.round(score)}/100${mc ? ` · MC ${mc}` : ""}`);
   else if (mc) lines.push(`MC ${mc}`);
   if (verdict) lines.push(String(verdict).replace(/[^\w\s.+-]/g, "").trim());
   lines.push("Live on-chain report 👇");
   const intent = `https://twitter.com/intent/tweet?text=${encodeURIComponent(lines.join("\n"))}&url=${encodeURIComponent(shareUrl)}`;
   const copy = () => { navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 1200); };
-  const native = async () => { try { if (navigator.share) { await navigator.share({ title: `${sym || "Token"} — OrbitX Terminal`, text: lines.join(" "), url: shareUrl }); return true; } } catch {} return false; };
+  const native = async () => { try { if (navigator.share) { await navigator.share({ title: `${sym || "Token"} — OrbitX DEX`, text: lines.join(" "), url: shareUrl }); return true; } } catch {} return false; };
   return (
     <span className="inline-flex items-center gap-1.5">
       <a href={intent} target="_blank" rel="noreferrer" onClick={(e) => { /* prefer native sheet on mobile */ if (navigator.share && /Mobi|Android/i.test(navigator.userAgent)) { e.preventDefault(); native(); } }}
