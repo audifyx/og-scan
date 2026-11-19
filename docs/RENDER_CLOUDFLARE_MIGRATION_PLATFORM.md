@@ -13,8 +13,15 @@ Moves orbitx.world off Vercel (team paused, 402) to free Cloudflare Pages
   handlers load). It routes `/api/*` to the EXISTING `web/api/` handlers —
   the same files Vercel runs, untouched — plus `/health`. Routing mirrors
   `web/vercel.json` rewrites. No new files under `web/api/` (12-function cap).
-- **Render service:** `orbitx-platform-api`, free, Oregon, rootDir `web`,
-  build `pnpm install --no-frozen-lockfile`, start `npx tsx server.mjs`.
+- **Render service:** `orbitx-platform-api`, free, Oregon, build `npm ci` (repo
+  root), start `node_modules/.bin/tsx web/server.mjs`. The root package.json
+  carries the API runtime deps (tsx, supabase-js, solana web3/spl-token,
+  noble/curves, bs58, @vercel/kv) + package-lock.json; the api/ handlers
+  resolve them from the repo-root node_modules. A dead dep `fal-client`
+  (imported nowhere, 404 on npm) was removed from the root package.json —
+  it broke every root `npm install`/`npm ci`. Render `pnpm install` of web/
+  fails (exit 226) and lockfile-less `npm install` fails (exit 1); `npm ci`
+  with the lockfile is the working path.
   No keep-alive cron — it sleeps after 15 min idle, wakes on demand.
 
 ## Key facts
