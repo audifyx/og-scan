@@ -68,6 +68,13 @@ const SUPABASE_URL =
   "https://ibojtmeqgzabgeiwbvhf.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
+// Widgets OFF (2026-11-19): Telegram rejects every sendWidget with
+// "Bad Request: INPUT_MEDIA_WIDGET_NOT_ALLOWED", so the bot answered
+// nothing at all — /scan, /price, /holders, /bundle, /trending all
+// went silent. Text reports (sendMessage) deliver fine. Flip this
+// back on only after sendWidget is proven accepted by Telegram.
+const WIDGETS_ENABLED = false;
+
 async function logBotUse({ user, chat, kind, detail }) {
   if (!SERVICE_KEY || !user || user.id == null) return;
   try {
@@ -279,7 +286,7 @@ function trendingText(rows) {
  * elsewhere (groups — widgets are private-only in production) or when
  * the widget can't be built. buildFn returns { html, caption }. */
 function replyCmdWidget(res, chatId, chatType, buildFn, result, textFn) {
-  if (chatType === "private") {
+  if (WIDGETS_ENABLED && chatType === "private") {
     try {
       const w = buildFn(result);
       return sendMethod(res, {
@@ -684,7 +691,7 @@ function sendMethod(res, payload) {
  * (groups — widgets are private-only in production) or when the widget
  * can't be built. Same data either way. */
 function replyScan(res, chatId, chatType, result) {
-  if (chatType === "private") {
+  if (WIDGETS_ENABLED && chatType === "private") {
     try {
       const w = buildScanWidget(result);
       return sendMethod(res, {
@@ -881,7 +888,7 @@ export default async function handler(req, res) {
       if (!rows || !rows.length) {
         return reply("Trending didn't answer — the feed is down right now. Try again in a moment.");
       }
-      if (msg.chat.type === "private") {
+      if (WIDGETS_ENABLED && msg.chat.type === "private") {
         try {
           const w = buildTrendingWidget(rows, new Date().toISOString());
           return sendMethod(res, {
