@@ -1,15 +1,17 @@
 # OrbitX Platform API — Render free web service.
-# Created via the Render API (not Blueprint sync). Root dir is web/ because
-# the api/ handlers + package.json + node_modules all live there.
+# Created via the Render API (not Blueprint sync). The service builds at the
+# REPO ROOT (rootDir is not settable via the API) with `npm ci` from the root
+# package.json + package-lock.json, and runs the server from web/ with the
+# root tsx. The api/ handlers resolve their npm deps from the repo-root
+# node_modules (an ancestor of web/api/).
 # NO keep-alive cron: this service sleeps after 15 min idle and wakes on demand.
 services:
   - type: web
     name: orbitx-platform-api
     plan: free
     region: oregon
-    rootDir: web
-    buildCommand: pnpm install --no-frozen-lockfile
-    startCommand: npx tsx server.mjs
+    buildCommand: npm ci
+    startCommand: node_modules/.bin/tsx web/server.mjs
     envVars:
       - key: NODE_ENV
         value: production
