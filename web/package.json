@@ -99,7 +99,8 @@
     "three": "^0.170.0",
     "vaul": "^0.9.9",
     "zod": "^3.25.76",
-    "zustand": "^5.0.15"
+    "zustand": "^5.0.15",
+    "tsx": "^4.23.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",

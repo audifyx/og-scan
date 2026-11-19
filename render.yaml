@@ -1,0 +1,24 @@
+# OrbitX Platform API — Render free web service.
+# Created via the Render API (not Blueprint sync). Root dir is web/ because
+# the api/ handlers + package.json + node_modules all live there.
+# NO keep-alive cron: this service sleeps after 15 min idle and wakes on demand.
+services:
+  - type: web
+    name: orbitx-platform-api
+    plan: free
+    region: oregon
+    rootDir: web
+    buildCommand: pnpm install --no-frozen-lockfile
+    startCommand: npx tsx server.mjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24.22.1"
+      # Secrets (set via the Render API / dashboard, never in git):
+      # SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
+      # HELIUS_API_KEY, SOLANA_RPC_URL, TWITTER_BEARER_TOKEN, CRON_SECRET,
+      # NVIDIA_API_KEY, BIRDEYE_API_KEY, PINATA_JWT, TELEGRAM_*_BOT_TOKEN,
+      # TELEGRAM_ORBITX_WEBHOOK_SECRET, ADMIN_AUTH, OWNER_DESK_CODE,
+      # ADMIN_PASS, X_BEARER_TOKEN, OXW_WORKER_SECRET, EMBEDDED_WALLET_SECRET,
+      # and the remaining Vercel `orbitx` env vars (see docs).
