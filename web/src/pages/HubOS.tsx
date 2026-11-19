@@ -22,6 +22,7 @@ import {
 } from "@/lib/orbitxPlatforms";
 import Desktop, { type TrendingRow } from "@/os/Desktop";
 
+import { apiUrl } from "@/lib/apiBase";
 const ORBITX_CA = OGSCAN_TOKEN_MINT;
 const GATE_KEYS = ["city", "dex", "agent", "shop"] as const;
 
@@ -194,7 +195,7 @@ export default function HubOS() {
       };
     };
     const fetchTrending = () =>
-      fetch(`/api/ogdex/screener?type=${pulseTab}&interval=1h&limit=30&chain=solana`)
+      fetch(apiUrl(`/api/ogdex/screener?type=${pulseTab}&interval=1h&limit=30&chain=solana`))
         .then((r) => r.json())
         .then((d) => {
           if (on && Array.isArray(d?.rows))

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Search, X, Loader2, TrendingUp, Wallet2, ArrowRight } from "lucide-react";
 import { fmtUsd, compact } from "../lib/api";
 
+import { apiUrl } from "../lib/apiBase";
 const isAddr = (v: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v.trim()) || /^0x[0-9a-fA-F]{40}$/.test(v.trim());
 
 interface SearchResult {
@@ -60,7 +61,7 @@ export default function GlobalSearch() {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/ogdex/search?q=${encodeURIComponent(v)}`);
+        const r = await fetch(apiUrl(`/api/ogdex/search?q=${encodeURIComponent(v)}`));
         const d = await r.json();
         setResults((d.rows || []).slice(0, 8));
       } catch {

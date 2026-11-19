@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 
+import { apiUrl } from "@/lib/apiBase";
 interface Settings {
   id: string;
   tradingEnabled: boolean;
@@ -29,7 +30,7 @@ export function AgentSettings({ agentId }: AgentSettingsProps) {
     try {
       setIsLoading(true);
       const apiKey = localStorage.getItem('agent_api_key');
-      const response = await fetch(`/api/agents/${agentId}/settings`, {
+      const response = await fetch(apiUrl(`/api/agents/${agentId}/settings`), {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
 
@@ -49,7 +50,7 @@ export function AgentSettings({ agentId }: AgentSettingsProps) {
     setIsSaving(true);
     try {
       const apiKey = localStorage.getItem('agent_api_key');
-      const response = await fetch(`/api/agents/${agentId}/settings`, {
+      const response = await fetch(apiUrl(`/api/agents/${agentId}/settings`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

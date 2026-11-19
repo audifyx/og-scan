@@ -4,6 +4,7 @@ import { ShieldCheck, Zap, ExternalLink, Loader2 } from "lucide-react";
 import { useWallet } from "../lib/wallet";
 import { fmtUsd, compact } from "../lib/api";
 
+import { apiUrl } from "../lib/apiBase";
 const OG_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 const PRO_THRESHOLD = 10_000; // minimum ORBITX tokens for Pro
 
@@ -19,7 +20,7 @@ export function useProGate(): ProState {
 
   useEffect(() => {
     if (!address) { setState({ checked: true, balance: 0, isPro: false }); return; }
-    fetch(`/api/ogdex/balance?owner=${address}&mint=${OG_MINT}`)
+    fetch(apiUrl(`/api/ogdex/balance?owner=${address}&mint=${OG_MINT}`))
       .then((r) => r.json())
       .then((d) => {
         const bal = d?.token?.uiAmount ?? 0;

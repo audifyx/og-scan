@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/apiBase";
 export type ChainEvent = {
   event_id: string;
   signature: string;
@@ -262,7 +263,7 @@ export function filtersToQuery(f: FilterState): string {
 }
 
 async function getJson<T>(path: string): Promise<T> {
-  const r = await fetch(`/api/on-chain/${path}`, { cache: "no-store" });
+  const r = await fetch(apiUrl(`/api/on-chain/${path}`), { cache: "no-store" });
   const j = await r.json().catch(() => ({ ok: false, error: "Invalid response" }));
   return j as T;
 }
@@ -607,7 +608,7 @@ export function fetchAgents() {
 
 export async function fetchLiveDesk() {
   try {
-    const r = await fetch("/api/live-agents", { cache: "no-store" });
+    const r = await fetch(apiUrl("/api/live-agents"), { cache: "no-store" });
     const j = (await r.json()) as LiveDeskPayload;
     if (j && (j.ok || j.wallet)) return j;
   } catch {

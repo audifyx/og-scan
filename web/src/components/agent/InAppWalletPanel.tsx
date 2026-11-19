@@ -3,6 +3,7 @@ import { KeyRound, Lock, LockOpen, Plus, ShieldCheck, Trash2 } from "lucide-reac
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 
+import { apiUrl } from "@/lib/apiBase";
 type Row = { publicKey?: string; pinSet?: boolean; unlocked?: boolean; unlockUntil?: string | null };
 
 async function token() {
@@ -13,7 +14,7 @@ async function token() {
 async function api(method: "GET" | "POST", body?: Record<string, unknown>) {
   const t = await token();
   if (!t) throw new Error("Sign in at /auth first");
-  const r = await fetch("/api/orbitx/desk-wallet", {
+  const r = await fetch(apiUrl("/api/orbitx/desk-wallet"), {
     method,
     headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
     body: method === "POST" ? JSON.stringify(body || {}) : undefined,

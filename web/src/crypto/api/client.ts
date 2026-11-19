@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/apiBase";
 /**
  * OrbitX Crypto Intelligence — thin clients over existing OG DEX + OrbitX APIs.
  */
@@ -9,7 +10,7 @@ export function isValidMint(mint: string): boolean {
 }
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...init, headers: { Accept: "application/json", ...(init?.headers || {}) } });
+  const res = await fetch(apiUrl(url), { ...init, headers: { Accept: "application/json", ...(init?.headers || {}) } });
   if (!res.ok) throw new Error(`${url} → ${res.status}`);
   return res.json() as Promise<T>;
 }
@@ -567,7 +568,7 @@ export async function fetchWalletIntel(address: string, mint?: string): Promise<
 }
 
 export async function checkAntiVamp(name: string, ticker: string): Promise<AntiVampResult> {
-  const res = await fetch("/api/orbitx/anti-vamp-check", {
+  const res = await fetch(apiUrl("/api/orbitx/anti-vamp-check"), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ name, ticker }),

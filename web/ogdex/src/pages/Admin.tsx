@@ -11,6 +11,7 @@ import {
 
 import { clearDeskUnlock, readDeskSessionToken } from "../../../shared/desk-unlock-client.js";
 
+import { apiUrl } from "../lib/apiBase";
 // ─── Tab type ─────────────────────────────────────────────────────────────────
 type Tab =
   | "overview"
@@ -77,7 +78,7 @@ export default function Admin() {
     const d = await adminGet(pass);
     if (d?.ok) {
       setData(d);
-      fetch("/api/ogdex/health").then((r) => r.json()).then(setHealth).catch(() => {});
+      fetch(apiUrl("/api/ogdex/health")).then((r) => r.json()).then(setHealth).catch(() => {});
     } else {
       setData(null);
       setErr(d?.error === "unauthorized" ? "Unauthorized — unlock the desk and retry." : "Failed to load admin data.");
@@ -910,7 +911,7 @@ function QuickAddFeatured({ pass, onDone }: { pass: string; onDone: () => void }
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr.trim())) return;
     setScanning(true);
     try {
-      const d = await fetch(`/api/ogdex/token?mint=${addr.trim()}`).then(r => r.json());
+      const d = await fetch(apiUrl(`/api/ogdex/token?mint=${addr.trim()}`)).then(r => r.json());
       if (d?.token?.mint) setToken(d.token); else setMsg("Token not found.");
     } catch { setMsg("Scan failed."); } finally { setScanning(false); }
   };

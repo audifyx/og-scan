@@ -19,6 +19,7 @@ import { HuntWatchBar } from "./HuntWatchBar";
 import { CopyMintButton } from "@/components/CopyMintButton";
 import { readDeskSessionToken, hasDeskSession } from "../../../../../shared/desk-unlock-client.js";
 
+import { apiUrl } from "@/lib/apiBase";
 export function AgentsView() {
   const [desk, setDesk] = useState<"paper" | "live">("live");
   return (
@@ -138,7 +139,7 @@ function LiveDeskView() {
     setHuntBusy(true);
     setHuntMsg("Ticking…");
     try {
-      const res = await fetch("/api/live-agents", {
+      const res = await fetch(apiUrl("/api/live-agents"), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${admin}` },
         body: JSON.stringify({ action: "hunt", mint, clipUsd: 1, scaleMcap: 300_000, flattenMcap: 600_000, tick: true }),

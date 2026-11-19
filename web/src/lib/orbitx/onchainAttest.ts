@@ -7,6 +7,7 @@ import {
 import { contentHash, encodeMemo, MEMO_PROGRAM_ID } from "../../../shared/orbitx-onchain.js";
 import { confirmSentTransaction, sendWalletTransaction, type WalletSendCaps } from "./sendWalletTx";
 
+import { apiUrl } from "@/lib/apiBase";
 export { contentHash, encodeMemo, solscanTxUrl, parseMemo } from "../../../shared/orbitx-onchain.js";
 
 export type AttestKind =
@@ -63,7 +64,7 @@ export async function indexAttestation(input: {
   expect_hash?: string;
   ref_id?: string;
 }): Promise<Record<string, unknown>> {
-  const res = await fetch("/api/orbitx-onchain?action=index", {
+  const res = await fetch(apiUrl("/api/orbitx-onchain?action=index"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -88,7 +89,7 @@ export async function indexConfirmedTx(input: {
 }
 
 export async function verifyOnChain(signature: string): Promise<Record<string, unknown>> {
-  const res = await fetch(`/api/orbitx-onchain?action=verify&signature=${encodeURIComponent(signature)}`);
+  const res = await fetch(apiUrl(`/api/orbitx-onchain?action=verify&signature=${encodeURIComponent(signature)}`));
   const json = await res.json().catch(() => ({}));
   if (!res.ok || json.ok === false) throw new Error(json.error || "Verification failed");
   return json;

@@ -15,7 +15,7 @@
   "use strict";
 
   const BASE = "https://ogscan.fun";
-  const API  = `${BASE}/api/ogdex/token`;
+  const API  = "https://orbitx-platform-api.onrender.com/api/ogdex/token"; // Render API (Pages is static-only; BASE stays the site for links)
 
   const SIZES = {
     sm: { width: "260px", fontSize: "12px", padding: "10px 12px" },

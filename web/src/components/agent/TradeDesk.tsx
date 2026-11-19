@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ArrowUpRight, CheckCircle2, Clipboard, Loader2, LockKeyhole, ShieldCheck, Sparkles, WalletCards, XCircle, Zap } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
+import { apiUrl } from "@/lib/apiBase";
 type TradeResult = {
   ok?: boolean;
   status?: string;
@@ -56,7 +57,7 @@ export function TradeDesk({ walletAddress, onOpenWallet }: Props) {
       const { data } = await supabase.auth.getSession();
       const headers: HeadersInit = { "Content-Type": "application/json" };
       if (data.session?.access_token) headers.Authorization = `Bearer ${data.session.access_token}`;
-      const response = await fetch("/api/orbitx-agent/command", {
+      const response = await fetch(apiUrl("/api/orbitx-agent/command"), {
         method: "POST",
         headers,
         body: JSON.stringify({ text: command.trim(), walletAddress }),

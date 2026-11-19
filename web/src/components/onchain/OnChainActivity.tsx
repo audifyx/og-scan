@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { OnChainBadge } from "./OnChainBadge";
 import { SolscanLink } from "./SolscanLink";
 
+import { apiUrl } from "@/lib/apiBase";
 type EventRow = {
   tx_signature: string;
   kind?: string;
@@ -24,7 +25,7 @@ export function OnChainActivity({
 
   useEffect(() => {
     const q = wallet ? `?action=events&wallet=${encodeURIComponent(wallet)}` : "?action=events";
-    fetch(`/api/orbitx-onchain${q}`)
+    fetch(apiUrl(`/api/orbitx-onchain${q}`))
       .then((r) => r.json())
       .then((j) => {
         if (j.ok === false) throw new Error(j.error || "Index unavailable");

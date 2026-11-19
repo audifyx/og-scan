@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { ArrowRight, Check, CheckCircle2, ChevronDown, Clipboard, Code2, Copy, Globe2, KeyRound, Layers3, Network, RefreshCw, ShieldCheck, Sparkles, Terminal, XCircle, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { apiUrl } from "@/lib/apiBase";
 type Decision = "blocked" | "flagged" | "clear" | "degraded";
 
 interface DemoResult {
@@ -100,7 +101,7 @@ export default function VampPortal() {
   const runCheck = async () => {
     setChecking(true);
     try {
-      const response = await fetch("/api/orbitx/anti-vamp-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, ticker, chainId, assetType }) });
+      const response = await fetch(apiUrl("/api/orbitx/anti-vamp-check"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, ticker, chainId, assetType }) });
       if (!response.ok) throw new Error("unavailable");
       const data = await response.json();
       setApiOnline(true);

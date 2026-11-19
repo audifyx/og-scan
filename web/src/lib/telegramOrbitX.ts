@@ -1,6 +1,7 @@
+import { apiUrl } from "@/lib/apiBase";
 /** Official OrbitX Telegram bot companion — /api/telegram-orbitx (not MCP OAuth). */
 
-export const TELEGRAM_ORBITX_API = "/api/telegram-orbitx";
+export const TELEGRAM_ORBITX_API = apiUrl("/api/telegram-orbitx");
 export const TELEGRAM_ORBITX_BOT = "theorbitxmcpbot";
 export const TELEGRAM_ORBITX_TME = `https://t.me/${TELEGRAM_ORBITX_BOT}`;
 

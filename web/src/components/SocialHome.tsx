@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { apiUrl } from "@/lib/apiBase";
 import {
   Heart, MessageCircle, Repeat2, Share, ImageIcon, Sparkles, Radio,
   Users, Search, Loader2, BadgeCheck, TrendingUp, MoreHorizontal, Trash2, Copy, Flag,
@@ -103,7 +104,7 @@ export default function SocialHome({ onSwitchTab, onSelectMint }: { onSwitchTab?
   /* ── Live market ticker (cross-app) ── */
   useEffect(() => {
     let on = true;
-    const fetchTicker = () => fetch("/api/ogdex/screener?type=trending&interval=24h&limit=16")
+    const fetchTicker = () => fetch(apiUrl("/api/ogdex/screener?type=trending&interval=24h&limit=16"))
       .then((r) => r.json()).then((d) => { if (on && d?.rows) setTicker(d.rows.filter((x: any) => x.symbol).slice(0, 16)); }).catch(() => {});
     fetchTicker();
     const id = setInterval(fetchTicker, 30000);

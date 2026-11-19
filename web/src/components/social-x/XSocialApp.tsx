@@ -37,6 +37,7 @@ import { AgentBadge } from "./VerifiedHoldings";
 import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
 import { callSupercomputerTool } from "@/tokenomics/mcpClient";
 import { getBillingAuthCode } from "@/tokenomics/auth";
+import { apiUrl } from "@/lib/apiBase";
 import {
   TradeSheet, TipSheet, SirenCard, extractCallTokens, isSirenContent,
   fetchRugFlaggers, hasFlagged, RUG_SIREN_THRESHOLD, CallPnlBadge,
@@ -146,7 +147,7 @@ function saveBookmarks(s: Set<string>) {
  * response shape is normalised defensively — array of ids, array of objects
  * with post_id/postId/id, or { bookmarks: [...] } / { postIds: [...] }.
  * localStorage stays as the offline fallback when the endpoint is down. ── */
-const BOOKMARKS_API = "/api/social/bookmarks";
+const BOOKMARKS_API = apiUrl("/api/social/bookmarks");
 function normalizeBookmarkIds(d: unknown): string[] | null {
   if (!d) return null;
   const arr = Array.isArray(d) ? d : (d as { bookmarks?: unknown; postIds?: unknown; post_ids?: unknown }).bookmarks
@@ -448,7 +449,7 @@ function ChartCard({ mint }: { mint: string }) {
   useEffect(() => {
     let on = true;
     setImgOk(true);
-    fetch(`/api/ogdex/token?mint=${mint}`)
+    fetch(apiUrl(`/api/ogdex/token?mint=${mint}`))
       .then((r) => r.json())
       .then((d) => {
         if (!on || !d?.token) return;
@@ -470,7 +471,7 @@ function ChartCard({ mint }: { mint: string }) {
   useEffect(() => {
     let on = true;
     setPool(null);
-    fetch(`/api/ogdex/chart?mint=${mint}&interval=1h&limit=1`)
+    fetch(apiUrl(`/api/ogdex/chart?mint=${mint}&interval=1h&limit=1`))
       .then((r) => r.json())
       .then((d) => { if (on && d?.pool) setPool(d.pool); })
       .catch(() => {});
@@ -834,7 +835,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   /* ── Trends (market ticker) ── */
   useEffect(() => {
     let on = true;
-    const fetchTicker = () => fetch("/api/ogdex/screener?type=trending&interval=24h&limit=20")
+    const fetchTicker = () => fetch(apiUrl("/api/ogdex/screener?type=trending&interval=24h&limit=20"))
       .then((r) => r.json()).then((d) => {
         if (on && d?.rows) {
           const rows = (d.rows as Ticker[]).filter((x) => x.symbol).slice(0, 20);
@@ -1105,7 +1106,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     if (user && p.user_id === user.id) return true; // authors always see their own
     // 1) Contracted gate-check endpoint (Track 1): GET /api/social/gate-check?post_id=X
     try {
-      const r = await fetch(`/api/social/gate-check?post_id=${encodeURIComponent(p.id)}${user ? `&viewer_id=${encodeURIComponent(user.id)}` : ""}`);
+      const r = await fetch(apiUrl(`/api/social/gate-check?post_id=${encodeURIComponent(p.id)}${user ? `)&viewer_id=${encodeURIComponent(user.id)}` : ""}`);
       if (r.ok) {
         const d = await r.json();
         if (typeof d?.allowed === "boolean") return d.allowed;
@@ -1114,7 +1115,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     // 2) Live fallback: Track 1's tokengate against the viewer's in-app wallet
     if (deskWallet) {
       try {
-        const r = await fetch(`/api/social/tokengate?wallet=${encodeURIComponent(deskWallet)}&mint=${encodeURIComponent(g.mint)}&min=${encodeURIComponent(String(g.min_amount ?? 0))}`);
+        const r = await fetch(apiUrl(`/api/social/tokengate?wallet=${encodeURIComponent(deskWallet)}&mint=${encodeURIComponent(g.mint)}&min=${encodeURIComponent(String(g.min_amount ?? 0))}`));
         const d = await r.json();
         if (d && typeof d.holds === "boolean") return d.holds;
       } catch { /* fall through to locked */ }
@@ -1190,7 +1191,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   /** AI agent accounts directory (public; no key material). */
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/social/agents")
+    fetch(apiUrl("/api/social/agents"))
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (cancelled || !d?.agents) return;

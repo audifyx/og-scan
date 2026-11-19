@@ -4,7 +4,13 @@
     "twitter-api-v2": "^1.16.0",
     "ai": "^3.3.0",
     "@anthropic-ai/sdk": "^0.28.0",
-    "fal-client": "^0.1.0",
-    "jose": "^5.4.1"
+    "jose": "^5.4.1",
+    "tsx": "^4.23.0",
+    "@supabase/supabase-js": "^2.0.0",
+    "@solana/web3.js": "^1.98.0",
+    "@solana/spl-token": "^0.4.0",
+    "@noble/curves": "^1.0.0",
+    "bs58": "^6.0.0",
+    "@vercel/kv": "^3.0.0"
   }
 }

@@ -45,6 +45,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { Confetti } from "./lpx";
 
+import { apiUrl } from "@/lib/apiBase";
 /* ─── Constants ──────────────────────────────────────────────────────── */
 
 const MAX_IMG_SIZE = 5 * 1024 * 1024;
@@ -801,7 +802,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       setStatusMsg("Uploading image & metadata to IPFS…");
 
       const base64 = await fileToBase64(imageFile);
-      const ipfsRes = await fetch("/api/pump-create", {
+      const ipfsRes = await fetch(apiUrl("/api/pump-create"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -827,14 +828,14 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       } else {
         const suffix = (vanityPrefix.trim() || "obx").toLowerCase().slice(0, 5);
         setStatusMsg(`Generating vanity address (…${suffix})…`);
-        let vanityRes = await fetch("/api/vanity-mint", {
+        let vanityRes = await fetch(apiUrl("/api/vanity-mint"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ suffix, maxIterations: 5000000 }),
         });
         if (!vanityRes.ok && vanityRes.status === 504) {
           setStatusMsg("Still searching for a matching address, retrying…");
-          vanityRes = await fetch("/api/vanity-mint", {
+          vanityRes = await fetch(apiUrl("/api/vanity-mint"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ suffix, maxIterations: 5000000 }),
@@ -854,7 +855,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       /* Step 3 — Get unsigned transaction from PumpPortal */
       setStatusMsg("Building launch transaction…");
       const devBuy = parseFloat(form.devBuySol) || 0;
-      const createRes = await fetch("/api/pump-create", {
+      const createRes = await fetch(apiUrl("/api/pump-create"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

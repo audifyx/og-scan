@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { apiUrl } from "@/lib/apiBase";
 /**
  * rpcFeed — live ORBITX trade + burn data straight from Solana public RPC.
  * (The hardcoded Helius key went 401, so the /token page no longer depends on it.)
@@ -110,7 +111,7 @@ export function useRpcTrades(mint: string, limit = 15, intervalMs = 20000) {
   }, [mint, limit]);
 
   const fetchServer = useCallback(async () => {
-    const r = await fetch(`/api/token-feed?action=trades&mint=${mint}&limit=${limit}`);
+    const r = await fetch(apiUrl(`/api/token-feed?action=trades&mint=${mint}&limit=${limit}`));
     if (!r.ok) throw new Error(`feed ${r.status}`);
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || "feed failed");
@@ -166,7 +167,7 @@ export function useRpcTrades(mint: string, limit = 15, intervalMs = 20000) {
 
 export async function fetchRpcSupply(mint: string): Promise<number | null> {
   try {
-    const r = await fetch(`/api/token-feed?action=supply&mint=${mint}`);
+    const r = await fetch(apiUrl(`/api/token-feed?action=supply&mint=${mint}`));
     if (r.ok) {
       const j = await r.json();
       if (j.ok && typeof j.supply === "number") return j.supply;

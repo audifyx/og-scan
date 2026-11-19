@@ -11,6 +11,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { Heart, MessageCircle, Repeat2, BadgeCheck, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { apiUrl } from "@/lib/apiBase";
 const SITE = "https://orbitx.world";
 
 interface EmbedPost {
@@ -79,7 +80,7 @@ export function SocialPostEmbed() {
   const [post, setPost] = useState<EmbedPost | null>(null);
   const [missing, setMissing] = useState(false);
   useEffect(() => {
-    fetch(`/api/social/post/${id}`)
+    fetch(apiUrl(`/api/social/post/${id}`))
       .then((r) => r.json())
       .then((d) => { if (d?.ok) setPost(d.post); else setMissing(true); })
       .catch(() => setMissing(true));
@@ -98,7 +99,7 @@ export function SocialProfileEmbed() {
   const [data, setData] = useState<any>(null);
   const [missing, setMissing] = useState(false);
   useEffect(() => {
-    fetch(`/api/social/profile/${username}`)
+    fetch(apiUrl(`/api/social/profile/${username}`))
       .then((r) => r.json())
       .then((d) => { if (d?.ok) setData(d); else setMissing(true); })
       .catch(() => setMissing(true));
@@ -147,7 +148,7 @@ export function SocialFeedEmbed() {
       const url = user ? `/api/social/feed/${encodeURIComponent(user)}?limit=${limit}`
         : tag ? `/api/social/feed?tag=${encodeURIComponent(tag)}&limit=${limit}` : null;
       if (!url) return;
-      fetch(url).then((r) => r.json()).then((d) => { if (on && d?.ok) setPosts(d.posts); }).catch(() => {});
+      fetch(apiUrl(url)).then((r) => r.json()).then((d) => { if (on && d?.ok) setPosts(d.posts); }).catch(() => {});
     };
     load();
     const id = setInterval(load, 30000); // realtime-ish polling

@@ -13,6 +13,7 @@ import {
 } from "../../shared/token-gate-exempt.js";
 import { OGSCAN_TOKEN_MINT } from "@/lib/og";
 
+import { apiUrl } from "@/lib/apiBase";
 export const TOKEN_GATE_EXEMPT_WALLETS = TOKEN_GATE_EXEMPT_WALLETS_BASE;
 export const TOKEN_GATE_EXEMPT_EMAILS = TOKEN_GATE_EXEMPT_EMAILS_BASE;
 
@@ -141,7 +142,7 @@ export async function verifyAgentHold(wallet?: string | null): Promise<HoldVerif
     };
   }
 
-  const r = await fetch("/api/orbitx-agent/verify-hold", {
+  const r = await fetch(apiUrl("/api/orbitx-agent/verify-hold"), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,

@@ -8,16 +8,17 @@
 
 import { supabase } from "@/lib/supabase";
 
-export const HUB_THREADS_PATH = "/api/x-mcp?path=hub/threads";
-export const HUB_CHAT_PATH = "/api/x-mcp?path=hub/chat";
-export const HUB_STREAM_PATH = "/api/x-mcp?path=hub/stream";
-export const HUB_CONFIRM_PATH = "/api/x-mcp?path=hub/confirm";
-export const HUB_MODELS_PATH = "/api/x-mcp?path=hub/models";
-export const HUB_EXPORT_TRADES_PATH = "/api/x-mcp?path=hub/export/trades";
-export const HUB_STATS_PATH = "/api/x-mcp?path=hub/stats";
-export const HUB_ALERTS_PATH = "/api/x-mcp?path=hub/alerts";
-export const HUB_PENDING_PATH = "/api/x-mcp?path=hub/pending";
-export const HUB_SEARCH_PATH = "/api/x-mcp?path=hub/search";
+import { apiUrl } from "@/lib/apiBase";
+export const HUB_THREADS_PATH = apiUrl("/api/x-mcp?path=hub/threads");
+export const HUB_CHAT_PATH = apiUrl("/api/x-mcp?path=hub/chat");
+export const HUB_STREAM_PATH = apiUrl("/api/x-mcp?path=hub/stream");
+export const HUB_CONFIRM_PATH = apiUrl("/api/x-mcp?path=hub/confirm");
+export const HUB_MODELS_PATH = apiUrl("/api/x-mcp?path=hub/models");
+export const HUB_EXPORT_TRADES_PATH = apiUrl("/api/x-mcp?path=hub/export/trades");
+export const HUB_STATS_PATH = apiUrl("/api/x-mcp?path=hub/stats");
+export const HUB_ALERTS_PATH = apiUrl("/api/x-mcp?path=hub/alerts");
+export const HUB_PENDING_PATH = apiUrl("/api/x-mcp?path=hub/pending");
+export const HUB_SEARCH_PATH = apiUrl("/api/x-mcp?path=hub/search");
 
 /** Chat personality mode, persisted per-thread client-side. */
 export type HubMode = "analyst" | "degen";

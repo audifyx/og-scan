@@ -54,6 +54,7 @@ import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
 import { confirmSentTransaction } from "@/lib/orbitx/sendWalletTx";
 import ActiveTradingWalletChip from "@/trade/ActiveTradingWalletChip";
+import { apiUrl } from "@/lib/apiBase";
 export type TradeTerminalProps = {
   initialMint?: string | null;
   onMintChange?: (mint: string) => void;
@@ -219,7 +220,7 @@ async function fetchOgdexMarkets(type: Exclude<MarketTab, "positions">): Promise
       const url = type === "listed"
         ? "/api/ogdex/listings"
         : `/api/ogdex/screener?type=${encodeURIComponent(type)}&interval=${SCREEN_INTERVAL}&limit=${SCREEN_LIMIT}&chain=solana`;
-      const r = await fetch(url);
+      const r = await fetch(apiUrl(url));
       const d = await r.json().catch(() => ({}));
       const rows: any[] = Array.isArray(d?.rows) ? d.rows : [];
       const mapped = rows.map(mapScreenerRow).filter(Boolean) as TokenListItem[];
@@ -354,7 +355,7 @@ async function fetchSecurity(mint: string): Promise<TokenSecurity> {
 
 async function fetchXray(mint: string): Promise<XrayReport | null> {
   try {
-    const r = await fetch(`/api/ogdex/xray?mint=${encodeURIComponent(mint)}`);
+    const r = await fetch(apiUrl(`/api/ogdex/xray?mint=${encodeURIComponent(mint)}`));
     if (!r.ok) return null;
     const j = await r.json();
     return j?.ok ? (j as XrayReport) : null;
@@ -585,7 +586,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     setClusterHolderCount(null);
     Promise.all([
       fetchXray(selectedMint),
-      fetch(`/api/ogdex/traders?mint=${encodeURIComponent(selectedMint)}`)
+      fetch(apiUrl(`/api/ogdex/traders?mint=${encodeURIComponent(selectedMint)}`))
         .then((r) => r.json())
         .catch(() => null),
     ]).then(([report, traders]) => {
@@ -810,7 +811,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     }
     let on = true;
     setMyTradesLoading(true);
-    fetch(`/api/ogdex/swaps?address=${encodeURIComponent(tradePk.toBase58())}&limit=50`)
+    fetch(apiUrl(`/api/ogdex/swaps?address=${encodeURIComponent(tradePk.toBase58())}&limit=50`))
       .then((r) => r.json())
       .then((d) => {
         if (!on) return;
@@ -837,7 +838,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     if (bottomTab !== "Top Traders" || !selectedMint) return;
     let on = true;
     setTopTradersLoading(true);
-    fetch(`/api/ogdex/traders?mint=${encodeURIComponent(selectedMint)}`)
+    fetch(apiUrl(`/api/ogdex/traders?mint=${encodeURIComponent(selectedMint)}`))
       .then((r) => r.json())
       .then((d) => {
         if (!on) return;
@@ -2441,7 +2442,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                         setLoadingXray(true);
                         Promise.all([
                           fetchXray(selectedMint),
-                          fetch(`/api/ogdex/traders?mint=${encodeURIComponent(selectedMint)}`).then((r) => r.json()).catch(() => null),
+                          fetch(apiUrl(`/api/ogdex/traders?mint=${encodeURIComponent(selectedMint)}`)).then((r) => r.json()).catch(() => null),
                         ]).then(([report, traders]) => {
                           setXray(report);
                           const rows = Array.isArray(traders?.holders)

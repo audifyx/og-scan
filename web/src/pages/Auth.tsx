@@ -11,6 +11,7 @@ import { SliderCaptcha } from "@/components/SliderCaptcha";
 import { useHumanGate } from "@/components/HumanGate";
 import { toast } from "sonner";
 import { z } from "zod";
+import { apiUrl } from "@/lib/apiBase";
 import {
   canUseReservedUsername,
   getReservedUsernameMessage,
@@ -115,7 +116,7 @@ const Auth = () => {
         }
       } else if (mode === "signup") {
         const clean = username.replace(/^@/, "");
-        const guardResponse = await fetch("/api/signup-check", {
+        const guardResponse = await fetch(apiUrl("/api/signup-check"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

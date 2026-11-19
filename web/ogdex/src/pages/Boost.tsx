@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { fmtUsd, short } from "../lib/api";
 import { Zap, Rocket, CheckCircle, Wallet, AlertTriangle, Clock, Copy, ExternalLink } from "lucide-react";
 
+import { apiUrl } from "../lib/apiBase";
 const PAY_WALLET = "CicbPxARTDrwQ4XcxWsn6SYeG4FMJHirS633cZUJeQDh";
 
 const TIERS = [
@@ -47,7 +48,7 @@ export default function Boost() {
     const v = ca.trim();
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v)) { setTokenInfo(null); return; }
     let on = true;
-    fetch(`/api/ogdex/token?mint=${v}`).then((r) => r.json())
+    fetch(apiUrl(`/api/ogdex/token?mint=${v}`)).then((r) => r.json())
       .then((d) => { if (on) setTokenInfo(d?.token || null); }).catch(() => {});
     return () => { on = false; };
   }, [ca]);
@@ -64,7 +65,7 @@ export default function Boost() {
     if (!ca || !tier || !txHash) { setError("Contract address, tier, and transaction hash are all required."); return; }
     setLoading(true); setError("");
     try {
-      const r = await fetch("/api/ogdex/boosts", {
+      const r = await fetch(apiUrl("/api/ogdex/boosts"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

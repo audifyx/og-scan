@@ -16,6 +16,7 @@ import { CopyMintButton } from "@/components/CopyMintButton";
 import { formatAddress, formatUsd } from "@/pages/onchain-world/lib/orbitx/format";
 import { readDeskSessionToken } from "../../shared/desk-unlock-client.js";
 
+import { apiUrl } from "@/lib/apiBase";
 type CallRow = {
   id?: string;
   mint?: string;
@@ -91,7 +92,7 @@ async function callsApi(method: string, body?: Record<string, unknown>, query = 
   const admin = readDeskSessionToken();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (admin) headers.Authorization = `Bearer ${admin}`;
-  const res = await fetch(`/api/orbitx-calls${query}`, {
+  const res = await fetch(apiUrl(`/api/orbitx-calls${query}`), {
     method,
     headers,
     cache: "no-store",

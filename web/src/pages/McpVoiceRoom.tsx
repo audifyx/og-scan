@@ -7,6 +7,7 @@ import { Headphones, Loader2, Mic, MicOff, PhoneOff, Radio } from "lucide-react"
 import { Room, RoomEvent } from "livekit-client";
 import { cn } from "@/lib/utils";
 
+import { apiUrl } from "@/lib/apiBase";
 type VcRoom = {
   slug: string;
   name: string;
@@ -68,7 +69,7 @@ export default function McpVoiceRoom() {
     setJoining(true);
     setError(null);
     try {
-      const r = await fetch("/api/mcp-vc", {
+      const r = await fetch(apiUrl("/api/mcp-vc"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug, displayName: "Guest" }),

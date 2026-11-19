@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 
+import { apiUrl } from "@/lib/apiBase";
 export type AiGate = {
   ok?: boolean;
   hasAccess: boolean;
@@ -141,7 +142,7 @@ async function request<T>(
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(`/api/orbitx-ai${path}`, {
+    const response = await fetch(apiUrl(`/api/orbitx-ai${path}`), {
       ...init,
       headers: { ...headers, ...(init.headers || {}) },
       signal: init.signal || controller.signal,

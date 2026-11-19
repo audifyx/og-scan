@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { SolscanLink } from "@/components/onchain/SolscanLink";
 import { TARGET_LAMPORTS } from "../../../../shared/orbitx-onchain.js";
 
+import { apiUrl } from "@/lib/apiBase";
 type Costs = {
   ok?: boolean;
   error?: string;
@@ -43,8 +44,8 @@ export function OnChainCostSection() {
       const token = data.session?.access_token;
       if (!token) throw new Error("Sign in as the owner account");
       const [cRes, eRes] = await Promise.all([
-        fetch("/api/orbitx-onchain?action=costs", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/orbitx-onchain?action=events"),
+        fetch(apiUrl("/api/orbitx-onchain?action=costs"), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(apiUrl("/api/orbitx-onchain?action=events")),
       ]);
       const cJson = (await cRes.json().catch(() => ({}))) as Costs;
       const eJson = await eRes.json().catch(() => ({}));

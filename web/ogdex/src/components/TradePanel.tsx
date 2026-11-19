@@ -3,6 +3,7 @@ import { useWallet, getPhantom } from "../lib/wallet";
 import { getBalance, getSafety, SafetyCheck, fmtUsd, compact, mutateAlerts } from "../lib/api";
 import { Wallet2, Loader2, ArrowDownUp, ExternalLink, CheckCircle2, AlertTriangle, ShieldCheck, ShieldAlert, X, RefreshCw, Lock, Info, Bell, BellPlus } from "lucide-react";
 
+import { apiUrl } from "../lib/apiBase";
 const BUY_PRESETS = [0.1, 0.25, 0.5, 1];
 const SELL_PRESETS = [25, 50, 100];
 const SOL_FEE_BUFFER = 0.02; // leave a little SOL for fees
@@ -11,7 +12,7 @@ async function confirmTx(sig: string, ms = 30000): Promise<"ok" | "failed" | "ti
   const start = Date.now();
   while (Date.now() - start < ms) {
     try {
-      const r = await fetch("/api/ogdex/rpc", { method: "POST", headers: { "Content-Type": "application/json" },
+      const r = await fetch(apiUrl("/api/ogdex/rpc"), { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ method: "getSignatureStatuses", params: [[sig], { searchTransactionHistory: true }], id: 1 }) });
       const d = await r.json();
       const st = d?.result?.value?.[0];
@@ -88,7 +89,7 @@ export default function TradePanel({ mint, symbol, price, icon }: { mint: string
     try {
       setStage("Building transaction…");
       const amount = side === "buy" ? Number(buyAmt) : `${sellPct}%`;
-      const r = await fetch("/api/ogdex/trade", { method: "POST", headers: { "Content-Type": "application/json" },
+      const r = await fetch(apiUrl("/api/ogdex/trade"), { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ publicKey: address, action: side, mint, amount, denominatedInSol: side === "buy" ? "true" : "false", slippage, priorityFee: 0.0003, pool: "auto" }) });
       const d = await r.json();
       if (!d.ok || !d.tx) throw new Error(d.error || "Could not build transaction");
@@ -106,7 +107,7 @@ export default function TradePanel({ mint, symbol, price, icon }: { mint: string
         setOk(true);
         setTimeout(loadBal, 2500);
         try {
-          await fetch("/api/orbitx-tx-report", {
+          await fetch(apiUrl("/api/orbitx-tx-report"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

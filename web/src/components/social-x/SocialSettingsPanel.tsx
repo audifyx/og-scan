@@ -17,6 +17,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Ban, Loader2, Settings, VolumeX, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
+import { apiUrl } from "@/lib/apiBase";
 const PREFS_KEY = "orbitx-social-feed-prefs";
 
 export interface SocialFeedPrefs {
@@ -126,8 +127,8 @@ export default function SocialSettingsPanel({ onClose }: { onClose?: () => void 
     setSignedIn(true);
     try {
       const [mRes, bRes] = await Promise.all([
-        fetch("/api/social/mutes", { headers }),
-        fetch("/api/social/blocks", { headers }),
+        fetch(apiUrl("/api/social/mutes"), { headers }),
+        fetch(apiUrl("/api/social/blocks"), { headers }),
       ]);
       const mJson = mRes.ok ? await mRes.json() : null;
       const bJson = bRes.ok ? await bRes.json() : null;
@@ -155,7 +156,7 @@ export default function SocialSettingsPanel({ onClose }: { onClose?: () => void 
     setError(null);
     try {
       const headers = await authHeaders();
-      const r = await fetch(`/api/social/${kind}?userId=${encodeURIComponent(userId)}`, {
+      const r = await fetch(apiUrl(`/api/social/${kind}?userId=${encodeURIComponent(userId)}`), {
         method: "DELETE",
         headers,
       });

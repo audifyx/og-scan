@@ -1,5 +1,6 @@
 import { listTokens, listFeatured, type OrbitxToken } from "@/lib/orbitx/registry";
 
+import { apiUrl } from "@/lib/apiBase";
 export interface ScreenerRow {
   mint?: string;
   address?: string;
@@ -61,7 +62,7 @@ export function normalizeScreenerRows(payload: unknown): ScreenerRow[] {
 
 export async function fetchScreener(limit = 12, type = "trending"): Promise<ScreenerRow[]> {
   try {
-    const res = await fetch(`/api/ogdex/screener?type=${type}&interval=24h&limit=${limit}`);
+    const res = await fetch(apiUrl(`/api/ogdex/screener?type=${type}&interval=24h&limit=${limit}`));
     if (!res.ok) return [];
     const json = await res.json();
     return normalizeScreenerRows(json).slice(0, limit);
@@ -75,7 +76,7 @@ export async function searchAllTokens(q: string): Promise<ScreenerRow[]> {
   const query = q.trim();
   if (!query) return [];
   try {
-    const res = await fetch(`/api/ogdex/search?q=${encodeURIComponent(query)}`);
+    const res = await fetch(apiUrl(`/api/ogdex/search?q=${encodeURIComponent(query)}`));
     if (!res.ok) return [];
     const json = await res.json();
     return normalizeScreenerRows(json).slice(0, 20);
@@ -87,7 +88,7 @@ export async function searchAllTokens(q: string): Promise<ScreenerRow[]> {
 /** Latest pump.fun launches tracked by the OrbitX launches feed. */
 export async function fetchPumpLaunches(limit = 20): Promise<ScreenerRow[]> {
   try {
-    const res = await fetch(`/api/ogdex/launches?limit=${limit}`);
+    const res = await fetch(apiUrl(`/api/ogdex/launches?limit=${limit}`));
     if (!res.ok) return [];
     const json = await res.json();
     return normalizeScreenerRows(json).slice(0, limit);

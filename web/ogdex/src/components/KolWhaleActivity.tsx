@@ -8,6 +8,7 @@ import { getWalletLabel, labelKindClass } from "../lib/labels";
 import { timeAgo } from "../lib/format";
 import { ArrowUpRight, ArrowDownRight, ExternalLink, Crown, Radio, BadgeCheck, Loader2, RefreshCw } from "lucide-react";
 
+import { apiUrl } from "../lib/apiBase";
 export default function KolWhaleActivity({ d, dir, holders: holdersProp }: { d: TokenDetailData; dir: Record<string, KolDirEntry>; holders?: any[] }) {
   const mint = d.mint;
   const intel: any = (d as any).intel || {};
@@ -23,7 +24,7 @@ export default function KolWhaleActivity({ d, dir, holders: holdersProp }: { d: 
   const fetchFeed = () => {
     if (!mint) { setLoadingFeed(false); return; }
     setLoadingFeed(true);
-    fetch(`/api/ogdex/kols?feed=1&token=${mint}&limit=50`)
+    fetch(apiUrl(`/api/ogdex/kols?feed=1&token=${mint}&limit=50`))
       .then((r) => r.json())
       .then((data) => setFeedRows(data.feed || []))
       .catch(() => {})

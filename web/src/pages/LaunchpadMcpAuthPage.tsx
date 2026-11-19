@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { AgentLoading, AgentShell } from "@/components/agent/AgentShell";
 
+import { apiUrl } from "@/lib/apiBase";
 const LAUNCHPAD_MCP_URL = "https://www.orbitx.world/api/mcp-launchpad";
 
 /**
@@ -43,7 +44,7 @@ export default function LaunchpadMcpAuthPage() {
     setSubmitting(true);
     try {
       // Call the launchpad MCP auth endpoint
-      const res = await fetch("/api/orbitx-hub/launchpad-auth", {
+      const res = await fetch(apiUrl("/api/orbitx-hub/launchpad-auth"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

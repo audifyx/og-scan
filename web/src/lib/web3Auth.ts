@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/apiBase";
 /** Native Supabase Web3 (SIWS) helpers. Do not call public GoTrue /token from the browser. */
 
 export const WEB3_STATEMENT =
@@ -73,7 +74,7 @@ export async function exchangeWeb3Session(
   message: string,
   signature: Uint8Array,
 ): Promise<{ access_token: string; refresh_token: string; user: Record<string, unknown> | null }> {
-  const res = await fetch("/api/auth-web3", {
+  const res = await fetch(apiUrl("/api/auth-web3"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

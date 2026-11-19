@@ -15,6 +15,7 @@ import { fetchLiveDesk, type LiveDeskPayload } from "@/pages/onchain-world/api";
 import { supabase } from "@/lib/supabase";
 import { dexPairsForMints, fmtUsd, shortAddr } from "@/lib/og";
 import { LIVE_AGENTS, LIVE_WALLET_PUBKEY } from "../../shared/orbitx-live-desk.js";
+import { apiUrl } from "@/lib/apiBase";
 import "./orbitx-agents-hub.css";
 
 type Tab = "feed" | "desk" | "calls" | "agents" | "ledger" | "chain" | "city";
@@ -66,7 +67,7 @@ export default function OrbitxAgentsHub() {
   const deskQ = useQuery({ queryKey: ["oxh-desk"], queryFn: fetchLiveDesk, refetchInterval: 5000, staleTime: 3000 });
   const lifeQ = useQuery({
     queryKey: ["oxh-life"],
-    queryFn: async () => { try { const r = await fetch("/api/mcp-life?view=world"); const t = await r.text(); return t.startsWith("<") ? null : (JSON.parse(t) as LifeWorld); } catch { return null; } },
+    queryFn: async () => { try { const r = await fetch(apiUrl("/api/mcp-life?view=world")); const t = await r.text(); return t.startsWith("<") ? null : (JSON.parse(t) as LifeWorld); } catch { return null; } },
     refetchInterval: 15000, staleTime: 10000,
   });
   const topQ = useQuery({

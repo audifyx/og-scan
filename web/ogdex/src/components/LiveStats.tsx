@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Users, MessageCircle, Share2, TrendingUp, Zap, Calendar } from "lucide-react";
 
+import { apiUrl } from "../lib/apiBase";
 interface PlatformStats {
   activeUsers: number;
   telegram: number;
@@ -28,7 +29,7 @@ const TTL = 120_000; // 2 min
 export async function fetchPlatformStats(): Promise<PlatformStats> {
   if (_cache && Date.now() - _cacheAt < TTL) return _cache;
   try {
-    const r = await fetch("/api/ogdex/platform-stats");
+    const r = await fetch(apiUrl("/api/ogdex/platform-stats"));
     if (!r.ok) throw new Error(`${r.status}`);
     const d = await r.json();
     if (d.ok) {

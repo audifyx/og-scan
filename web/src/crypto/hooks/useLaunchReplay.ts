@@ -39,6 +39,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchDexPairs, isValidMint, type DexPair } from "../api/client";
 
+import { apiUrl } from "@/lib/apiBase";
 // ── Types ───────────────────────────────────────────────────────────────────
 
 export type ReplayCandle = {
@@ -620,7 +621,7 @@ export async function fetchReplayTradesServer(input: {
     typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
       ? AbortSignal.timeout(30_000)
       : undefined;
-  const res = await fetch(`/api/ogdex/replay-trades?${qs}`, {
+  const res = await fetch(apiUrl(`/api/ogdex/replay-trades?${qs}`), {
     headers: { Accept: "application/json" },
     signal,
   });

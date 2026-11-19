@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { validateUploadFile, safeExtForMime, MEDIA_MIME_ALLOWLIST } from "@/lib/safeUpload";
+import { apiUrl } from "@/lib/apiBase";
 import type {
   BagworkLeaderRow,
   BagworkStats,
@@ -19,7 +20,7 @@ async function authHeader(): Promise<Record<string, string>> {
 
 async function apiGet<T>(action: string): Promise<T> {
   const headers = await authHeader();
-  const r = await fetch(`/api/bagwork?action=${encodeURIComponent(action)}`, { headers });
+  const r = await fetch(apiUrl(`/api/bagwork?action=${encodeURIComponent(action)}`), { headers });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`);
   return j as T;
@@ -27,7 +28,7 @@ async function apiGet<T>(action: string): Promise<T> {
 
 async function apiPost<T>(action: string, body: Record<string, unknown>): Promise<T> {
   const headers = { "Content-Type": "application/json", ...(await authHeader()) };
-  const r = await fetch(`/api/bagwork?action=${encodeURIComponent(action)}`, {
+  const r = await fetch(apiUrl(`/api/bagwork?action=${encodeURIComponent(action)}`), {
     method: "POST",
     headers,
     body: JSON.stringify({ action, ...body }),

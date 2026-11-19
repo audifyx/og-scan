@@ -5,6 +5,7 @@ import { OnChainActivity, OnChainBadge, OnChainProof, SolscanLink, TransactionBu
 import { verifyOnChain } from "@/lib/orbitx/onchainAttest";
 import type { TxUiState } from "@/components/onchain";
 
+import { apiUrl } from "@/lib/apiBase";
 export default function OnChainProofPage() {
   const { publicKey } = useWallet();
   const [sig, setSig] = useState("");
@@ -31,7 +32,7 @@ export default function OnChainProofPage() {
     if (!publicKey) return;
     setRebuild("Scanning last 40 signatures for ox1| memos…");
     try {
-      const res = await fetch(`/api/orbitx-onchain?action=rebuild&wallet=${encodeURIComponent(publicKey.toBase58())}`);
+      const res = await fetch(apiUrl(`/api/orbitx-onchain?action=rebuild&wallet=${encodeURIComponent(publicKey.toBase58())}`));
       const json = await res.json();
       if (!res.ok || json.ok === false) throw new Error(json.error || "Rebuild failed");
       setRebuild(`Rebuilt ${json.rebuilt} of ${json.scanned} scanned. ${json.note || ""}`);

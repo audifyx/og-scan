@@ -7,6 +7,7 @@ import type { LiveDeskPayload } from "@/pages/onchain-world/api";
 import { formatAddress, formatUsd } from "@/pages/onchain-world/lib/orbitx/format";
 import { CopyMintButton } from "@/components/CopyMintButton";
 import { LIVE_AGENTS, LIVE_WALLET_PUBKEY } from "../../shared/orbitx-live-desk.js";
+import { apiUrl } from "@/lib/apiBase";
 import "@/pages/onchain-world/ox-dash.css";
 
 type FeedRow = {
@@ -113,7 +114,7 @@ export default function AgentCalls() {
   useEffect(() => {
     let alive = true;
     const pull = () => {
-      void fetch("/api/agent-calls", { cache: "no-store" })
+      void fetch(apiUrl("/api/agent-calls"), { cache: "no-store" })
         .then((r) => r.json())
         .then((data: Board) => {
           if (alive && data) setBoard(data);

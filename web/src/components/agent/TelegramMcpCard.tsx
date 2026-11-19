@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+import { apiUrl } from "@/lib/apiBase";
 type TgBot = {
   id: string;
   bot_username: string;
@@ -17,7 +18,7 @@ async function mcpApi(body: Record<string, unknown>) {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
   if (!token) throw new Error("Sign in to OrbitX first");
-  const r = await fetch("/api/telegram-mcp", {
+  const r = await fetch(apiUrl("/api/telegram-mcp"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

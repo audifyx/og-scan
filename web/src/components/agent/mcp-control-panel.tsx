@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 
+import { apiUrl } from "@/lib/apiBase";
 interface McpControlPanelProps {
   agentId: string;
 }
@@ -33,7 +34,7 @@ export function McpControlPanel({ agentId }: McpControlPanelProps) {
 
     try {
       const apiKey = localStorage.getItem('agent_api_key');
-      const response = await fetch(`/api/agents/${agentId}/execute`, {
+      const response = await fetch(apiUrl(`/api/agents/${agentId}/execute`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

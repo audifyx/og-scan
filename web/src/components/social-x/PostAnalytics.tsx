@@ -9,6 +9,7 @@
 import React, { useEffect, useState } from "react";
 import { BarChart3, Bookmark, Eye, Heart, Loader2, MessageCircle, Quote, Repeat2, Users } from "lucide-react";
 
+import { apiUrl } from "@/lib/apiBase";
 export function formatCount(v: number): string {
   if (!Number.isFinite(v)) return "0";
   if (v >= 1000000) return (v / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
@@ -68,7 +69,7 @@ export function PostAnalytics({ postId }: { postId: string }) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/social/analytics/post/${encodeURIComponent(postId)}`)
+    fetch(apiUrl(`/api/social/analytics/post/${encodeURIComponent(postId)}`))
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!cancelled) setData(d as PostAnalyticsResp | null);

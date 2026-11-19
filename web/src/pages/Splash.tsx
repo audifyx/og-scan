@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import logo from "@/assets/logo.png";
+import { apiUrl } from "@/lib/apiBase";
 import {
   OGSCAN_DEXSCREENER_URL,
   OGSCAN_JUPITER_URL,
@@ -207,7 +208,7 @@ function useCounter(end: number, duration = 1600) {
 
 async function fetchLiveStats(): Promise<LiveStats> {
   try {
-    const r = await fetch("/api/ogdex/platform-stats");
+    const r = await fetch(apiUrl("/api/ogdex/platform-stats"));
     if (!r.ok) throw new Error(String(r.status));
     const d = await r.json();
     if (!d?.ok) throw new Error("bad payload");

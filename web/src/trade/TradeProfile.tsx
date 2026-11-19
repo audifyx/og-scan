@@ -12,6 +12,7 @@ import { useTradeWalletPicker } from "./TradeWalletPicker";
 import { shortAddr, fmtUsd } from "./tradeFmt";
 import { toast } from "sonner";
 
+import { apiUrl } from "@/lib/apiBase";
 interface Holding {
   mint: string;
   symbol?: string;
@@ -76,7 +77,7 @@ export default function TradeProfile() {
         if (on) setLoadingBal(false);
       });
 
-    fetch(`/api/ogdex/wallet?address=${encodeURIComponent(addr)}`)
+    fetch(apiUrl(`/api/ogdex/wallet?address=${encodeURIComponent(addr)}`))
       .then((r) => r.json())
       .then((d) => {
         if (on) setWalletData(d);

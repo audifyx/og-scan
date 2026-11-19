@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 
+import { apiUrl } from "@/lib/apiBase";
 interface CreateAgentModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -25,7 +26,7 @@ export function CreateAgentModal({ isOpen, onClose, onSuccess }: CreateAgentModa
         throw new Error('No API key found');
       }
 
-      const response = await fetch('/api/agents', {
+      const response = await fetch(apiUrl('/api/agents'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

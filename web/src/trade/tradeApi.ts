@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/apiBase";
 export type MarketCoin = {
   mint: string;
   symbol: string;
@@ -156,7 +157,7 @@ export async function fetchTokenOnly(mint: string) {
 
 export async function askCoinChat(mint: string, messages: { role: string; content: string }[], context: any) {
   try {
-    const r = await fetch("/api/ogdex/chat", {
+    const r = await fetch(apiUrl("/api/ogdex/chat"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mint, messages, context }),

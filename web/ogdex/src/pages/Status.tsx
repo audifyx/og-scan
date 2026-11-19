@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, AlertTriangle, XCircle, Loader2, RefreshCw, Activity, Zap, Globe } from "lucide-react";
 
+import { apiUrl } from "../lib/apiBase";
 interface ServiceStatus {
   name: string;
   ok: boolean;
@@ -44,7 +45,7 @@ export default function Status() {
 
   const load = () => {
     setLoading(true);
-    fetch("/api/ogdex/health")
+    fetch(apiUrl("/api/ogdex/health"))
       .then((r) => r.json())
       .then((d) => {
         setData(d);

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { FileText, RefreshCw, Check, X, ExternalLink, AlertTriangle, ShieldCheck, ShieldX } from "lucide-react";
 import { toast } from "sonner";
 
+import { apiUrl } from "@/lib/apiBase";
 interface TokenMeta {
   name: string;
   symbol: string;
@@ -35,8 +36,8 @@ export const TokenMetadataInspector = () => {
     try {
       // Fetch token detail + safety in parallel from the real backend
       const [tokenRes, safetyRes] = await Promise.all([
-        fetch(`/api/ogdex/token?mint=${encodeURIComponent(mint)}`).then((r) => r.json()).catch(() => null),
-        fetch(`/api/ogdex/safety?mint=${encodeURIComponent(mint)}`).then((r) => r.json()).catch(() => null),
+        fetch(apiUrl(`/api/ogdex/token?mint=${encodeURIComponent(mint)}`)).then((r) => r.json()).catch(() => null),
+        fetch(apiUrl(`/api/ogdex/safety?mint=${encodeURIComponent(mint)}`)).then((r) => r.json()).catch(() => null),
       ]);
 
       const t = tokenRes?.token || tokenRes || {};

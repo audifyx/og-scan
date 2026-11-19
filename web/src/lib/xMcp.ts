@@ -1,7 +1,8 @@
+import { apiUrl } from "@/lib/apiBase";
 /** OrbitX X MCP client helpers — separate from Agent MCP (/api/mcp). */
 
-export const X_MCP_PATH = "/api/x/mcp";
-export const X_AGENT_API = "/api/x/agent";
+export const X_MCP_PATH = apiUrl("/api/x/mcp");
+export const X_AGENT_API = apiUrl("/api/x/agent");
 export const X_MCP_OAUTH_CLIENT_ID = "orbitx-x-mcp";
 export const X_MCP_OAUTH_SCOPE = "x-post";
 

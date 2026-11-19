@@ -8,6 +8,7 @@ import {
 import { short, fmtUsd, compact, fmtPct } from "../lib/api";
 import { useProGate } from "../components/ProGate";
 
+import { apiUrl } from "../lib/apiBase";
 interface KolEntry {
   address: string;
   label?: string;
@@ -128,7 +129,7 @@ export default function CommunityKols() {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await fetch(`/api/ogdex/kols?limit=100&community=1&chain=solana`);
+      const r = await fetch(apiUrl(`/api/ogdex/kols?limit=100&community=1&chain=solana`));
       const d = await r.json();
       // Merge server data with community flags
       const list: KolEntry[] = (d.kols || d.wallets || []).map((k: any) => ({
@@ -162,7 +163,7 @@ export default function CommunityKols() {
     }
     setNominating(true);
     try {
-      const r = await fetch("/api/ogdex/kols/nominate", {
+      const r = await fetch(apiUrl("/api/ogdex/kols/nominate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: nominateAddr.trim(), label: nominateLabel.trim() || undefined }),

@@ -1,6 +1,7 @@
 import type { TokenDetail } from "./types";
 import { num } from "./marketData";
 
+import { apiUrl } from "@/lib/apiBase";
 function pickNum(...vals: unknown[]): number | undefined {
   for (const v of vals) {
     const n = num(v);
@@ -12,7 +13,7 @@ function pickNum(...vals: unknown[]): number | undefined {
 /** Fetch live token detail from OrbitX DEX API. */
 export async function fetchTokenDetail(mint: string): Promise<TokenDetail | null> {
   try {
-    const res = await fetch(`/api/ogdex/token?mint=${encodeURIComponent(mint)}`);
+    const res = await fetch(apiUrl(`/api/ogdex/token?mint=${encodeURIComponent(mint)}`));
     if (!res.ok) return null;
     const json = await res.json();
     if (json?.error && !json?.token) return null;
@@ -55,8 +56,7 @@ export interface ChartCandle {
 
 export async function fetchTokenChart(mint: string, interval = "1h", limit = 48): Promise<ChartCandle[]> {
   try {
-    const res = await fetch(
-      `/api/ogdex/chart?mint=${encodeURIComponent(mint)}&interval=${interval}&limit=${limit}`,
+    const res = await fetch(apiUrl(`/api/ogdex/chart?mint=${encodeURIComponent(mint)}&interval=${interval}&limit=${limit}`),
     );
     if (!res.ok) return [];
     const json = await res.json();

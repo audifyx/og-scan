@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useRef } from "react";
 
+import { apiUrl } from "@/lib/apiBase";
 const UID_KEY = "orbitx_uid";
 const VID_KEY = "orbitx_vid";
 
@@ -73,10 +74,10 @@ export function recordImpression(postId: string): void {
   try {
     const body = JSON.stringify({ postId, vid });
     if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
-      navigator.sendBeacon("/api/social/impression", new Blob([body], { type: "application/json" }));
+      navigator.sendBeacon(apiUrl("/api/social/impression"), new Blob([body], { type: "application/json" }));
       return;
     }
-    void fetch("/api/social/impression", {
+    void fetch(apiUrl("/api/social/impression"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body,

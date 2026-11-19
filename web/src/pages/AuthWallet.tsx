@@ -13,6 +13,7 @@ import { MergeAccountModal } from "@/components/MergeAccountModal";
 import { persistSessionLocally } from "@/lib/authSession";
 import { consumeOAuthHash, consumeOAuthProviderTokens, oauthErrorFromLocation, takeAuthNext } from "@/lib/xOAuth";
 import { useHumanGate } from "@/components/HumanGate";
+import { apiUrl } from "@/lib/apiBase";
 import "./auth.css";
 
 export default function AuthWallet() {
@@ -65,7 +66,7 @@ export default function AuthWallet() {
       void (async () => {
         if (provider?.provider_token) {
           try {
-            await fetch("/api/x-session-sync", {
+            await fetch(apiUrl("/api/x-session-sync"), {
               method: "POST",
               headers: {
                 Authorization: `Bearer ${tokens.access_token}`,

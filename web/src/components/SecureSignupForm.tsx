@@ -22,6 +22,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase-ssr";
 import { getDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
+import { apiUrl } from "@/lib/apiBase";
 import {
   validatePassword,
   getPasswordFeedback,
@@ -90,7 +91,7 @@ export function SecureSignupForm({ onSignupSuccess }: SignupFormProps) {
     setLoading(true);
     try {
       // Call server API route for rate limiting + signup
-      const response = await fetch("/api/auth/signup", {
+      const response = await fetch(apiUrl("/api/auth/signup"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

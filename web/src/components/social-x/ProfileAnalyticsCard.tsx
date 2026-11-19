@@ -10,6 +10,7 @@ import React, { useEffect, useState } from "react";
 import { BarChart3, Eye, Heart, Loader2, MessageCircle, Quote, Repeat2, TrendingUp, UserPlus, Users } from "lucide-react";
 import { formatCount } from "./PostAnalytics";
 
+import { apiUrl } from "@/lib/apiBase";
 interface DailyBucket {
   day: string;
   views: number;
@@ -52,7 +53,7 @@ export function ProfileAnalyticsCard({ userId }: { userId: string }) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/social/analytics/profile/${encodeURIComponent(userId)}`)
+    fetch(apiUrl(`/api/social/analytics/profile/${encodeURIComponent(userId)}`))
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!cancelled) setData(d as ProfileAnalyticsResp | null);

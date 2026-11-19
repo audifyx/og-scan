@@ -9,6 +9,7 @@
 import { supabase } from "@/lib/supabase";
 import { validateUploadFile, safeExtForMime } from "./safeUpload";
 
+import { apiUrl } from "@/lib/apiBase";
 export type TrackerMode = "all_kols" | "specific_wallet" | "custom_list";
 
 export interface TrackedWallet {
@@ -303,7 +304,7 @@ export function setLastSig(wallet: string, sig: string) {
 
 /* ── API helpers ── */
 export async function fetchWalletTrades(wallet: string, limit = 25): Promise<TradeEvent[]> {
-  const r = await fetch(`/api/kol/transactions?wallet=${encodeURIComponent(wallet)}&limit=${limit}`);
+  const r = await fetch(apiUrl(`/api/kol/transactions?wallet=${encodeURIComponent(wallet)}&limit=${limit}`));
   const j = await r.json();
   if (!j?.ok) throw new Error(j?.error || "failed to load trades");
   return (j.events || []) as TradeEvent[];
@@ -311,7 +312,7 @@ export async function fetchWalletTrades(wallet: string, limit = 25): Promise<Tra
 
 export interface KolListEntry { address: string; name: string; twitter?: string | null; avatar?: string | null; tags?: string[]; }
 export async function fetchKolList(): Promise<KolListEntry[]> {
-  const r = await fetch("/api/ogdex/kols");
+  const r = await fetch(apiUrl("/api/ogdex/kols"));
   const j = await r.json();
   const kols = (j?.kols || []) as Array<{ address: string; name: string; twitter?: string | null; avatar?: string | null; tags?: string[] }>;
   return kols.filter((k) => k?.address);

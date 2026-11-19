@@ -6,6 +6,7 @@ import TokenLogo from "./TokenLogo";
 import { imgProxy } from "../lib/img";
 import { PLATFORM_TOKEN_MINT, PLATFORM_TOKEN_NAME, PLATFORM_TOKEN_SYMBOL } from "../lib/constants";
 
+import { apiUrl } from "../lib/apiBase";
 interface Boost {
   id: string; mint: string; symbol?: string; name?: string; icon?: string;
   chain?: string; tier?: string; status?: string; expires_at?: string;
@@ -97,8 +98,8 @@ export default function FeaturedBanner() {
   const nav = useNavigate();
 
   useEffect(() => {
-    fetch("/api/ogdex/boosts").then((r) => r.json()).then((d) => setBoosts(d.boosts || [])).catch(() => {});
-    fetch("/api/ogdex/listings?featured=1")
+    fetch(apiUrl("/api/ogdex/boosts")).then((r) => r.json()).then((d) => setBoosts(d.boosts || [])).catch(() => {});
+    fetch(apiUrl("/api/ogdex/listings?featured=1"))
       .then((r) => r.json())
       .then((d) => setFeatured(pinOfficialFeatured(d.rows || [])))
       .catch(() => setFeatured([OFFICIAL_FEATURED]));

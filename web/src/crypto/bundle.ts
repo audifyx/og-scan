@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/apiBase";
 /**
  * OrbitX bundle detection — client types + fetch helper.
  *
@@ -154,7 +155,7 @@ export interface BundleAnalysis {
  * `state: "unknown"` is NOT an error — render the unknown state.
  */
 export async function fetchBundleAnalysis(mint: string): Promise<BundleAnalysis> {
-  const res = await fetch(`/api/ogdex/bundle?mint=${encodeURIComponent(mint)}`, {
+  const res = await fetch(apiUrl(`/api/ogdex/bundle?mint=${encodeURIComponent(mint)}`), {
     headers: { Accept: "application/json" },
   });
   if (!res.ok) {
@@ -263,7 +264,7 @@ export interface RiskLive {
 }
 
 async function fetchBundleAction<T>(query: string, action: string): Promise<T> {
-  const res = await fetch(`/api/ogdex/bundle?${query}`, {
+  const res = await fetch(apiUrl(`/api/ogdex/bundle?${query}`), {
     headers: { Accept: "application/json" },
   });
   if (!res.ok) {

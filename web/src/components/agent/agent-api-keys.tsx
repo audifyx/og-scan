@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 
+import { apiUrl } from "@/lib/apiBase";
 interface ApiKey {
   id: string;
   name: string;
@@ -29,7 +30,7 @@ export function AgentApiKeys({ agentId }: AgentApiKeysProps) {
     try {
       setIsLoading(true);
       const apiKey = localStorage.getItem('agent_api_key');
-      const response = await fetch(`/api/agents/${agentId}/api-keys`, {
+      const response = await fetch(apiUrl(`/api/agents/${agentId}/api-keys`), {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
 
@@ -49,7 +50,7 @@ export function AgentApiKeys({ agentId }: AgentApiKeysProps) {
     setIsCreating(true);
     try {
       const apiKey = localStorage.getItem('agent_api_key');
-      const response = await fetch(`/api/agents/${agentId}/api-keys`, {
+      const response = await fetch(apiUrl(`/api/agents/${agentId}/api-keys`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

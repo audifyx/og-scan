@@ -3,11 +3,12 @@
 import { supabase } from "@/lib/supabase";
 import type { OrbitxToken } from "./registry";
 
+import { apiUrl } from "@/lib/apiBase";
 async function call<T>(body: Record<string, unknown>): Promise<T> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new Error("Sign in with your owner email to use admin tools");
-  const res = await fetch("/api/admin-tokens", {
+  const res = await fetch(apiUrl("/api/admin-tokens"), {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),

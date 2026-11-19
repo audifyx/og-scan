@@ -5,6 +5,7 @@ import { Connection, Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import { confirmSentTransaction, sendWalletTransaction, type WalletSendCaps } from "@/lib/orbitx/sendWalletTx";
 
+import { apiUrl } from "@/lib/apiBase";
 export interface PumpLaunchInput {
   connection: Connection;
   publicKey: { toBase58: () => string };
@@ -31,7 +32,7 @@ export async function launchPumpCoin(input: PumpLaunchInput): Promise<PumpLaunch
 
   // 1 — IPFS (image + metadata)
   say("Uploading coin image & metadata to IPFS…");
-  const ipfsRes = await fetch("/api/pump-create", {
+  const ipfsRes = await fetch(apiUrl("/api/pump-create"), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       step: "ipfs", imageBase64: input.imageBase64, imageMimeType: input.imageMimeType,
@@ -46,7 +47,7 @@ export async function launchPumpCoin(input: PumpLaunchInput): Promise<PumpLaunch
   say("Generating coin mint address…");
   let mintKeypair: Keypair;
   try {
-    const v = await fetch("/api/vanity-mint", {
+    const v = await fetch(apiUrl("/api/vanity-mint"), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ suffix: "obx", maxIterations: 4000000 }),
     });
@@ -59,7 +60,7 @@ export async function launchPumpCoin(input: PumpLaunchInput): Promise<PumpLaunch
 
   // 3 — build create tx via PumpPortal
   say("Building coin launch transaction…");
-  const createRes = await fetch("/api/pump-create", {
+  const createRes = await fetch(apiUrl("/api/pump-create"), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       step: "create", publicKey: publicKey.toBase58(), metadataUri,

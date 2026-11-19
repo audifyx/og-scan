@@ -23,6 +23,7 @@ import { callSupercomputerTool } from "@/tokenomics/mcpClient";
 import { getBillingAuthCode } from "@/tokenomics/auth";
 import { findWalletPnlToken } from "@/trade/tradeApi";
 
+import { apiUrl } from "@/lib/apiBase";
 /* ═══════════ $cashtag → mint (same localStorage map the feed seeds) ═══════════ */
 const CASHTAG_MINTS_KEY = "orbitx-cashtag-mints";
 
@@ -99,7 +100,7 @@ export interface TokenQuote {
 
 export async function fetchTokenQuote(mint: string): Promise<TokenQuote | null> {
   try {
-    const r = await fetch(`/api/ogdex/token?mint=${encodeURIComponent(mint)}`);
+    const r = await fetch(apiUrl(`/api/ogdex/token?mint=${encodeURIComponent(mint)}`));
     const d = await r.json();
     const t = d?.token;
     if (!t) return null;
@@ -124,7 +125,7 @@ export async function fetchEntryPrice(mint: string, postIso: string): Promise<nu
   try {
     const postMs = new Date(postIso).getTime();
     if (!Number.isFinite(postMs)) return null;
-    const r = await fetch(`/api/ogdex/chart?mint=${encodeURIComponent(mint)}&interval=15m&limit=288`);
+    const r = await fetch(apiUrl(`/api/ogdex/chart?mint=${encodeURIComponent(mint)}&interval=15m&limit=288`));
     const d = await r.json();
     const candles = (d?.candles || []) as any[];
     if (!candles.length) return null;
@@ -152,7 +153,7 @@ export interface PositionInfo {
 /** Read the user's position for one mint from the same /wallet path the trade app uses. */
 export async function fetchPositionInfo(mint: string, address: string): Promise<PositionInfo | null> {
   try {
-    const r = await fetch(`/api/ogdex/wallet?address=${encodeURIComponent(address)}`);
+    const r = await fetch(apiUrl(`/api/ogdex/wallet?address=${encodeURIComponent(address)}`));
     const w = await r.json();
     if (!w?.ok) return null;
     const row = findWalletPnlToken(w, mint);

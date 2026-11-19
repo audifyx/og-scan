@@ -8,6 +8,7 @@ import { AgentApiKeys } from './agent-api-keys';
 import { AgentActivity } from './agent-activity';
 import { McpControlPanel } from './mcp-control-panel';
 
+import { apiUrl } from "@/lib/apiBase";
 interface Agent {
   id: string;
   name: string;
@@ -39,7 +40,7 @@ export function AgentDetail({ agentId }: AgentDetailProps) {
     try {
       setIsLoading(true);
       const apiKey = localStorage.getItem('agent_api_key');
-      const response = await fetch(`/api/agents/${agentId}`, {
+      const response = await fetch(apiUrl(`/api/agents/${agentId}`), {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
 
@@ -55,7 +56,7 @@ export function AgentDetail({ agentId }: AgentDetailProps) {
 
   const fetchXConnection = async () => {
     try {
-      const response = await fetch('/api/x/connection');
+      const response = await fetch(apiUrl('/api/x/connection'));
       if (response.ok) {
         const data = await response.json();
         setXConnection(data.connection);

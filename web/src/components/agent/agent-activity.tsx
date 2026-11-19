@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 
+import { apiUrl } from "@/lib/apiBase";
 interface Activity {
   id: string;
   activityType: string;
@@ -29,7 +30,7 @@ export function AgentActivity({ agentId }: AgentActivityProps) {
     try {
       setIsLoading(true);
       const apiKey = localStorage.getItem('agent_api_key');
-      const response = await fetch(`/api/agents/${agentId}/activity?limit=50`, {
+      const response = await fetch(apiUrl(`/api/agents/${agentId}/activity?limit=50`), {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
 

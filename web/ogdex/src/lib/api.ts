@@ -1,3 +1,5 @@
+import { apiUrl } from "./apiBase";
+
 export interface Row {
  mint: string; name?: string; symbol?: string; icon?: string | null;
  priceUsd?: number | null; mcap?: number | null; fdv?: number | null;
@@ -33,7 +35,7 @@ export interface AppConfig {
 }
 
 async function j(url: string, opts?: RequestInit): Promise {
- const r = await fetch(url, opts);
+ const r = await fetch(apiUrl(url), opts);
  return r.json();
 }
 const postJson = (url: string, body: any) =>
@@ -93,7 +95,7 @@ export const getTrendingSocial = () =>
 
 export const track = (type: string, extra: any = {}) => {
  try { navigator.sendBeacon?.("/api/ogdex/track", JSON.stringify({ type, ...extra })); }
- catch { fetch("/api/ogdex/track", { method: "POST", body: JSON.stringify({ type, ...extra }), keepalive: true }); }
+ catch { fetch(apiUrl("/api/ogdex/track"), { method: "POST", body: JSON.stringify({ type, ...extra }), keepalive: true }); }
 };
 export const adminGet = (pass: string) =>
   j("/api/ogdex/admin", { headers: { Authorization: `Bearer ${pass}`, "x-admin-pass": pass } });
@@ -195,7 +197,7 @@ async function pushWatchlist() {
  if (!_syncWallet) return;
  try {
   const proof = await signWalletProof(_syncWallet);
-  await fetch("/api/ogdex/watchlist", {
+  await fetch(apiUrl("/api/ogdex/watchlist"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ wallet: _syncWallet, items: getWatchlist(), ts: proof.ts, sig: proof.sig }),
@@ -205,7 +207,7 @@ async function pushWatchlist() {
 export async function pullWatchlist(wallet: string): Promise<string[]> {
  try {
   const proof = await signWalletProof(wallet);
-  const r = await fetch(`/api/ogdex/watchlist?wallet=${encodeURIComponent(wallet)}&ts=${proof.ts}&sig=${encodeURIComponent(proof.sig)}`);
+  const r = await fetch(apiUrl(`/api/ogdex/watchlist?wallet=${encodeURIComponent(wallet)}&ts=${proof.ts}&sig=${encodeURIComponent(proof.sig)}`));
   const d = await r.json();
   if (!r.ok || d.ok === false) return getWatchlist();
   const server: string[] = d.items || [];
@@ -221,13 +223,13 @@ export function setWatchlistWallet(wallet: string | null) {
 
 export async function fetchAlerts(wallet: string) {
   const proof = await signWalletProof(wallet);
-  const r = await fetch(`/api/ogdex/alerts?wallet=${encodeURIComponent(wallet)}&ts=${proof.ts}&sig=${encodeURIComponent(proof.sig)}`);
+  const r = await fetch(apiUrl(`/api/ogdex/alerts?wallet=${encodeURIComponent(wallet)}&ts=${proof.ts}&sig=${encodeURIComponent(proof.sig)}`));
   return r.json();
 }
 
 export async function mutateAlerts(wallet: string, body: Record<string, unknown>) {
   const proof = await signWalletProof(wallet);
-  const r = await fetch("/api/ogdex/alerts", {
+  const r = await fetch(apiUrl("/api/ogdex/alerts"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...body, wallet, ts: proof.ts, sig: proof.sig }),

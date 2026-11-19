@@ -539,6 +539,7 @@ function templateSource(spec: ForgeSpec): string {
   return `// ${spec.title} — compiled from the '${spec.type}' core module
 import { defineWidget, sources, mount } from '@orbitx/widgets';
 
+import { apiUrl } from "@/lib/apiBase";
 const widget = defineWidget({
   type: '${spec.type}',
   title: '${spec.title.replace(/'/g, '')}',
@@ -789,7 +790,7 @@ function WalletTrackerWidget({ params }: { params: Record<string, any> }) {
 
 function TrendingWidget({ params }: { params: Record<string, any> }) {
   const [rows, setRows] = useState<any[]>([]);
-  useEffect(() => { let live = true; fetch(`/api/ogdex/screener?type=trending&interval=24h&limit=${params.limit ?? 5}`).then(r => r.json()).then(d => { if (live && d?.rows) setRows(d.rows.slice(0,5)); }).catch(() => {}); return () => { live = false; }; }, []);
+  useEffect(() => { let live = true; fetch(apiUrl(`/api/ogdex/screener?type=trending&interval=24h&limit=${params.limit ?? 5}`)).then(r => r.json()).then(d => { if (live && d?.rows) setRows(d.rows.slice(0,5)); }).catch(() => {}); return () => { live = false; }; }, []);
   return (<div>{rows.length===0?<div style={{ fontSize:11, color:'rgba(255,255,255,.35)' }}>Loading…</div>:rows.map((r,i) => { const up=(r.change24h??0)>=0; return (<a key={r.mint??i} href="/ORBITX_DEX" style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', textDecoration:'none', borderTop:i?'1px solid rgba(255,255,255,.05)':'none' }}><span style={{ width:14, fontSize:10, fontWeight:900, color:'rgba(255,255,255,.3)' }}>{i+1}</span><span style={{ flex:1, fontSize:12, fontWeight:800, color:'#fff' }}>${r.symbol}</span><span style={{ fontSize:11, fontWeight:900, color:up?'#34d399':'#fb7185' }}>{up?'+':''}{(r.change24h??0).toFixed(1)}%</span></a>); })}</div>);
 }
 

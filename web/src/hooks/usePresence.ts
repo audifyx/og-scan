@@ -16,6 +16,7 @@ import { trackActivity } from "@/lib/trackActivity";
 import { useAuth } from "./useAuth";
 import { PRESENCE_HEARTBEAT_MS } from "@/lib/presence";
 
+import { apiUrl } from "@/lib/apiBase";
 /** XP thresholds: level N requires N*N*100 XP */
 function levelFromXp(xp: number): number {
   if (xp <= 0) return 1;
@@ -67,7 +68,7 @@ export function usePresence() {
         if (token) {
           const pageView = pathRef.current !== path;
           pathRef.current = path;
-          void fetch("/api/orbitx-presence", {
+          void fetch(apiUrl("/api/orbitx-presence"), {
             method: "POST",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -103,7 +104,7 @@ export function usePresence() {
           },
           body: JSON.stringify({ is_online: false, last_seen_at: nowIso, last_active_at: nowIso }),
         });
-        void fetch("/api/orbitx-presence", {
+        void fetch(apiUrl("/api/orbitx-presence"), {
           method: "POST",
           keepalive: true,
           headers: {

@@ -23,6 +23,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Twitter, Trash2, Eye, RefreshCw } from 'lucide-react';
 
+import { apiUrl } from "@/lib/apiBase";
 interface XPost {
   id: string;
   x_tweet_id: string;
@@ -65,7 +66,7 @@ export function XIntegration({
   const connectX = async () => {
     try {
       setIsConnecting(true);
-      const response = await fetch('/api/x/auth');
+      const response = await fetch(apiUrl('/api/x/auth'));
       const { authUrl } = await response.json();
       window.location.href = authUrl;
     } catch (error) {
@@ -79,7 +80,7 @@ export function XIntegration({
   const fetchPosts = async () => {
     try {
       setIsLoadingPosts(true);
-      const response = await fetch(`/api/agents/${agentId}/x-post`);
+      const response = await fetch(apiUrl(`/api/agents/${agentId}/x-post`));
       if (!response.ok) throw new Error('Failed to fetch posts');
       const { posts } = await response.json();
       setPosts(posts);
@@ -98,7 +99,7 @@ export function XIntegration({
 
     try {
       setIsGenerating(true);
-      const response = await fetch(`/api/agents/${agentId}/x-post`, {
+      const response = await fetch(apiUrl(`/api/agents/${agentId}/x-post`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

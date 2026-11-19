@@ -5,6 +5,7 @@
  */
 import { supabase } from "@/lib/supabase";
 
+import { apiUrl } from "@/lib/apiBase";
 export type OwnerAction =
   | "overview"
   | "health"
@@ -29,7 +30,7 @@ export async function ownerCommand<T = Record<string, unknown>>(
   action: OwnerAction,
   body: Record<string, unknown> = {},
 ): Promise<T> {
-  const res = await fetch("/api/orbitx-owner", {
+  const res = await fetch(apiUrl("/api/orbitx-owner"), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${await token()}`,
@@ -57,7 +58,7 @@ export async function reportPlatformTx(payload: {
     const { data } = await supabase.auth.getSession();
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (data.session?.access_token) headers.Authorization = `Bearer ${data.session.access_token}`;
-    await fetch("/api/orbitx-tx-report", {
+    await fetch(apiUrl("/api/orbitx-tx-report"), {
       method: "POST",
       headers,
       body: JSON.stringify(payload),

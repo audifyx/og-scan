@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLocalWallets } from "@/lib/localWallets";
 import { usePadNotifications, requestNotifPermission, addNotification } from "@/lib/padNotifications";
 
+import { apiUrl } from "@/lib/apiBase";
 type PadTab = "board" | "launch" | "trade" | "wallet";
 
 interface LaunchToken {
@@ -48,7 +49,7 @@ function ClaimFeeButton({ label, launchpad }: { label: string; launchpad: string
       let claimed = 0;
       for (const t of tokens) {
         try {
-          const res = await fetch("/api/orbitx-hub/mcp-launchpad", {
+          const res = await fetch(apiUrl("/api/orbitx-hub/mcp-launchpad"), {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               jsonrpc: "2.0", id: 1, method: "tools/call",
@@ -133,7 +134,7 @@ function WalletTab({ wallets, walletsReady, walletsLocked, hasPin, needsPinSetup
       if (sendChain === "solana") {
         // Build and sign SOL transfer via backend (which has RPC access)
         // The private key signs locally, backend broadcasts
-        const res = await fetch("/api/orbitx-hub/wallet-send", {
+        const res = await fetch(apiUrl("/api/orbitx-hub/wallet-send"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -456,7 +457,7 @@ function HolderMap({ mint }: { mint: string }) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/orbitx-hub/mcp-launchpad", {
+        const res = await fetch(apiUrl("/api/orbitx-hub/mcp-launchpad"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -605,7 +606,7 @@ export default function LaunchpadPage() {
       } catch {}
       // Fallback: use MCP API (works even if direct Supabase query fails)
       try {
-        const res = await fetch("/api/orbitx-hub/mcp-launchpad", {
+        const res = await fetch(apiUrl("/api/orbitx-hub/mcp-launchpad"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -628,7 +629,7 @@ export default function LaunchpadPage() {
     setLaunching(true);
     setLaunchResult(null);
     try {
-      const res = await fetch("/api/orbitx-hub/mcp-launchpad", {
+      const res = await fetch(apiUrl("/api/orbitx-hub/mcp-launchpad"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -657,11 +658,11 @@ export default function LaunchpadPage() {
     (async () => {
       try {
         const [wRes, pRes] = await Promise.all([
-          fetch("/api/orbitx-hub/mcp-launchpad", {
+          fetch(apiUrl("/api/orbitx-hub/mcp-launchpad"), {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "launchpad_wallets", arguments: {} } }),
           }),
-          fetch("/api/orbitx-hub/mcp-launchpad", {
+          fetch(apiUrl("/api/orbitx-hub/mcp-launchpad"), {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "launchpad_pnl", arguments: {} } }),
           }),
@@ -679,7 +680,7 @@ export default function LaunchpadPage() {
     setTradeLoading(true);
     setTradeResult(null);
     try {
-      const res = await fetch("/api/orbitx-hub/mcp-launchpad", {
+      const res = await fetch(apiUrl("/api/orbitx-hub/mcp-launchpad"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -707,7 +708,7 @@ export default function LaunchpadPage() {
     setSelectedToken(t);
     setDetailData(null);
     try {
-      const res = await fetch("/api/orbitx-hub/mcp-launchpad", {
+      const res = await fetch(apiUrl("/api/orbitx-hub/mcp-launchpad"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

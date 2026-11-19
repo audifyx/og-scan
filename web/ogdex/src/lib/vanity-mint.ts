@@ -1,5 +1,6 @@
 import { Keypair } from "@solana/web3.js";
 
+import { apiUrl } from "../lib/apiBase";
 /**
  * OrbitX Launchpad vanity mint.
  *
@@ -31,7 +32,7 @@ export async function generateVanityMint(
   let lastErr = "";
   for (let i = 0; i < tries; i++) {
     try {
-      const r = await fetch("/api/vanity-mint", {
+      const r = await fetch(apiUrl("/api/vanity-mint"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ suffix }),

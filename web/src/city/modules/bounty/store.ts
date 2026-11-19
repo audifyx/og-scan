@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/apiBase";
 /**
  * OrbitXCity — Bounty module store.
  *
@@ -77,9 +78,9 @@ export interface BountyPorts {
 }
 
 /** Backend route paths (assumption — see MODULE.md). Relative to the app origin. */
-const BACKEND_CLAIM_PATH = "/api/city/bounties/claim";
-const BACKEND_EXPIRE_PATH = "/api/city/bounties/expire";
-const BACKEND_CANCEL_PATH = "/api/city/bounties/cancel";
+const BACKEND_CLAIM_PATH = apiUrl("/api/city/bounties/claim");
+const BACKEND_EXPIRE_PATH = apiUrl("/api/city/bounties/expire");
+const BACKEND_CANCEL_PATH = apiUrl("/api/city/bounties/cancel");
 
 interface StoreShape {
   bounties: Bounty[];

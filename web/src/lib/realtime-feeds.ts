@@ -3,6 +3,7 @@
 
 import { supabase } from '@/lib/supabase';
 
+import { apiUrl } from "@/lib/apiBase";
 export interface RealTimePrice {
   mint: string;
   price: number;
@@ -337,7 +338,7 @@ class RealtimeFeeds {
 
       // Send email notification for critical alerts
       if (anomaly.severity === 'critical') {
-        await fetch('/api/send-alert', {
+        await fetch(apiUrl('/api/send-alert'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(anomaly),

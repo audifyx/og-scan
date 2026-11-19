@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/apiBase";
 /**
  * xAuth — Twitter OAuth 2.0 PKCE helpers for OrbitX.
  *
@@ -65,7 +66,7 @@ export async function xStartLogin(): Promise<void> {
   const timeout = setTimeout(() => controller.abort(), 15000);
   let res: Response;
   try {
-    res = await fetch("/api/x/agent/oauth/start", {
+    res = await fetch(apiUrl("/api/x/agent/oauth/start"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -122,7 +123,7 @@ export async function xExchangeCode(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
 
-  let res = await fetch("/api/x/agent/oauth/callback", {
+  let res = await fetch(apiUrl("/api/x/agent/oauth/callback"), {
     method: "POST",
     headers,
     body: JSON.stringify({ code, verifier, redirectUri }),

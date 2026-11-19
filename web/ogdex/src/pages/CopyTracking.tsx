@@ -4,6 +4,7 @@ import { ArrowLeft, Copy, Eye, Zap, TrendingUp, TrendingDown, Loader2, Plus, Tra
 import { useWallet } from "../lib/wallet";
 import { short, fmtUsd, compact } from "../lib/api";
 
+import { apiUrl } from "../lib/apiBase";
 interface TrackedWallet {
   address: string;
   label?: string;
@@ -68,7 +69,7 @@ export default function CopyTracking() {
     try {
       const results = await Promise.allSettled(
         tracked.slice(0, 5).map((t) =>
-          fetch(`/api/ogdex/wallet?address=${t.address}&trades=1`)
+          fetch(apiUrl(`/api/ogdex/wallet?address=${t.address}&trades=1`))
             .then((r) => r.json())
             .then((d) =>
               (d.trades || []).slice(0, 10).map((tr: any) => ({

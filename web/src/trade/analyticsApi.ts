@@ -15,6 +15,7 @@
  */
 import { fetchScreener, type MarketCoin } from "./tradeApi";
 
+import { apiUrl } from "@/lib/apiBase";
 /* ── Market overview ─────────────────────────────────────────── */
 
 export type Mover = {
@@ -149,7 +150,7 @@ export type SignalsResult = {
 
 export async function fetchLiveSignals(): Promise<SignalsResult | null> {
   try {
-    const r = await fetch("/api/ogdex/signals");
+    const r = await fetch(apiUrl("/api/ogdex/signals"));
     const d = await r.json();
     if (!d || !Array.isArray(d.signals)) return null;
     return {
@@ -178,8 +179,7 @@ export async function fetchLiveSignals(): Promise<SignalsResult | null> {
 
 async function fetchRawScreener(type: string): Promise<Array<{ createdAt?: string | null }>> {
   try {
-    const r = await fetch(
-      `/api/ogdex/screener?type=${encodeURIComponent(type)}&interval=1h&limit=200&chain=solana`,
+    const r = await fetch(apiUrl(`/api/ogdex/screener?type=${encodeURIComponent(type)}&interval=1h&limit=200&chain=solana`),
     );
     const d = await r.json();
     return Array.isArray(d?.rows) ? d.rows : [];

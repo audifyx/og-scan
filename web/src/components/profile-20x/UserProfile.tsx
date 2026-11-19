@@ -61,6 +61,7 @@ import { cn, safeAvatarUrl } from "@/lib/utils";
 import { getMaxCopyUsd, setMaxCopyUsd, COPY_MAX_DEFAULT, COPY_MAX_HARD_CAP } from "@/components/social-x/social-trade";
 import { VerifiedHoldings, AgentPill } from "@/components/social-x/VerifiedHoldings";
 
+import { apiUrl } from "@/lib/apiBase";
 type ProfileTab =
   | "posts"
   | "calls"
@@ -1155,7 +1156,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
         if (isOwnProfile) setEditShowHoldings(v);
       } catch { setShowHoldings(false); }
       try {
-        const r = await fetch("/api/social/agents");
+        const r = await fetch(apiUrl("/api/social/agents"));
         const d = r.ok ? await r.json() : null;
         const a = ((d?.agents || []) as Array<{ user_id: string; vibe?: string | null }>).find((x) => x.user_id === targetUserId);
         setIsAiAgent(Boolean(a));

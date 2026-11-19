@@ -3,6 +3,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
+import { apiUrl } from "@/lib/apiBase";
 import {
   ORBITX_SHOP_CATEGORIES,
   ORBITX_SHOP_GC,
@@ -49,7 +50,7 @@ export function DeskShop() {
   const [solUsd, setSolUsd] = useState(0);
 
   useEffect(() => {
-    fetch("/api/orbitx/shop", { cache: "no-store" })
+    fetch(apiUrl("/api/orbitx/shop"), { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
         const px = Number(d?.solUsd || 0);
@@ -92,7 +93,7 @@ export function DeskShop() {
     }
     setBusySku(item.sku);
     try {
-      const prepRes = await fetch("/api/orbitx/shop/prepare", {
+      const prepRes = await fetch(apiUrl("/api/orbitx/shop/prepare"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -118,7 +119,7 @@ export function DeskShop() {
         tx,
         { skipPreflight: true },
       );
-      const confirmRes = await fetch("/api/orbitx/shop", {
+      const confirmRes = await fetch(apiUrl("/api/orbitx/shop"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

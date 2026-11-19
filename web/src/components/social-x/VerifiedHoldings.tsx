@@ -12,6 +12,7 @@ import React, { useEffect, useState } from "react";
 import { Bot, ShieldCheck, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { apiUrl } from "@/lib/apiBase";
 /* ── Gold robot badge for AI agent accounts ─────────────────────────────── */
 export function AgentBadge({ vibe, label }: { vibe?: string | null; label?: boolean }) {
   return (
@@ -70,7 +71,7 @@ export function VerifiedHoldings({ userId, compact }: { userId: string; compact?
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/social/holdings?user_id=${encodeURIComponent(userId)}`)
+    fetch(apiUrl(`/api/social/holdings?user_id=${encodeURIComponent(userId)}`))
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (!cancelled) setData(d as HoldingsResp | null); })
       .catch(() => { if (!cancelled) setData(null); })

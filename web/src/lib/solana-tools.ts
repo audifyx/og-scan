@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/apiBase";
 /**
  * Solana Tools — direct API implementations replacing the non-existent
  * `solana-tracker` edge function. Each action maps to real Helius / Jupiter /
@@ -83,8 +84,8 @@ export async function analyzeToken(tokenAddress: string) {
   try {
     // Use the real backend APIs which have authority data
     const [tokenRes, safetyRes, priceMap, supply, holders, search] = await Promise.all([
-      fetch(`/api/ogdex/token?mint=${encodeURIComponent(tokenAddress)}`).then((r) => r.json()).catch(() => null),
-      fetch(`/api/ogdex/safety?mint=${encodeURIComponent(tokenAddress)}`).then((r) => r.json()).catch(() => null),
+      fetch(apiUrl(`/api/ogdex/token?mint=${encodeURIComponent(tokenAddress)}`)).then((r) => r.json()).catch(() => null),
+      fetch(apiUrl(`/api/ogdex/safety?mint=${encodeURIComponent(tokenAddress)}`)).then((r) => r.json()).catch(() => null),
       jupPrice([tokenAddress, SOL_MINT]).catch(() => ({})),
       heliusTokenSupply(tokenAddress).catch(() => null),
       heliusLargestAccounts(tokenAddress).catch(() => []),
@@ -255,7 +256,7 @@ export async function getWalletPnL(walletAddress: string) {
   try {
     // Prefer server ogdex wallet (realized/unrealized PnL + holdings).
     try {
-      const r = await fetch(`/api/ogdex/wallet?address=${encodeURIComponent(walletAddress)}`);
+      const r = await fetch(apiUrl(`/api/ogdex/wallet?address=${encodeURIComponent(walletAddress)}`));
       const d = await r.json();
       if (d?.ok) {
         const pnl = d.pnl || {};

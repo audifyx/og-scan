@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
+import { apiUrl } from "@/lib/apiBase";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface TokenMeta {
@@ -56,7 +57,7 @@ interface ResearchResult {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const API_BASE = "/api/ogdex";
+const API_BASE = apiUrl("/api/ogdex");
 
 const fmtNum = (n: number): string => {
   if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;

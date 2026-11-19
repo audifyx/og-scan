@@ -65,7 +65,7 @@
   <script>
     const $ = (id) => document.getElementById(id);
     const money = (n) => "$" + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const api = "/api/ogdex?path=hunter";
+    const api = "https://orbitx-platform-api.onrender.com/api/ogdex?path=hunter"; // Render API (Pages is static-only)
     function cls(n) { return Number(n) >= 0 ? "pos" : "neg"; }
     async function load() {
       const r = await fetch(api, { cache: "no-store" });

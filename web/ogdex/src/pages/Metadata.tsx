@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useWallet } from "../lib/wallet";
 import { launchStep, short } from "../lib/api";
 import { updateTokenMetadata } from "../lib/metadataTx";
+import { apiUrl } from "../lib/apiBase";
 import {
   Wallet2, Loader2, Search, ShieldCheck, AlertTriangle, CheckCircle2, ExternalLink,
   Pencil, Image as ImageIcon, Info, Lock, XCircle,
@@ -44,7 +45,7 @@ export default function Metadata() {
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(m)) { setErr("Enter a valid Solana mint address"); return; }
     setLoading(true);
     try {
-      const r = await fetch(`/api/ogdex/metadata?mint=${m}`);
+      const r = await fetch(apiUrl(`/api/ogdex/metadata?mint=${m}`));
       const d: MetaInfo = await r.json();
       if (!d.ok) { setErr(d.error || "Could not read this token"); setLoading(false); return; }
       setInfo(d);

@@ -26,6 +26,7 @@ import {
   type PlatformApp,
 } from "@/lib/orbitxPlatforms";
 import { islandQuickAccess } from "@/lib/hubIos";
+import { apiUrl } from "@/lib/apiBase";
 import "./hub-deck.css";
 import "./hub-ios-ui.css";
 
@@ -359,7 +360,7 @@ export default function Hub() {
     };
     // Same feed as the DEX app home (TradeHome default tab)
     const fetchTrending = () =>
-      fetch(`/api/ogdex/screener?type=${pulseTab}&interval=1h&limit=30&chain=solana`)
+      fetch(apiUrl(`/api/ogdex/screener?type=${pulseTab}&interval=1h&limit=30&chain=solana`))
         .then((r) => r.json())
         .then((d) => {
           if (on && Array.isArray(d?.rows))

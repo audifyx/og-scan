@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
+import { apiUrl } from "@/lib/apiBase";
 interface Agent {
   id: string;
   name: string;
@@ -38,7 +39,7 @@ export function AgentsList({ refreshTrigger }: AgentsListProps) {
         return;
       }
 
-      const response = await fetch('/api/agents', {
+      const response = await fetch(apiUrl('/api/agents'), {
         headers: {
           Authorization: `Bearer ${apiKey}`,
         },

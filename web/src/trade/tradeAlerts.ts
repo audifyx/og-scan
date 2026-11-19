@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/apiBase";
 /**
  * Wallet-proof price alerts for Limit / Take-profit / Stop-loss.
  * Notify-only via Telegram or webhook — never auto-executes trades.
@@ -84,7 +85,7 @@ export async function createPriceAlert(opts: {
   target: string;
 }) {
   const proof = await signWalletProof(opts.wallet, opts.signMessage);
-  const r = await fetch("/api/ogdex/alerts", {
+  const r = await fetch(apiUrl("/api/ogdex/alerts"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -110,8 +111,7 @@ export async function fetchAlerts(
   signMessage: (message: Uint8Array) => Promise<Uint8Array>,
 ) {
   const proof = await signWalletProof(wallet, signMessage);
-  const r = await fetch(
-    `/api/ogdex/alerts?wallet=${encodeURIComponent(wallet)}&ts=${proof.ts}&sig=${encodeURIComponent(proof.sig)}`,
+  const r = await fetch(apiUrl(`/api/ogdex/alerts?wallet=${encodeURIComponent(wallet)}&ts=${proof.ts}&sig=${encodeURIComponent(proof.sig)}`),
   );
   return r.json();
 }
@@ -122,7 +122,7 @@ export async function removeAlert(
   id: string,
 ) {
   const proof = await signWalletProof(wallet, signMessage);
-  const r = await fetch("/api/ogdex/alerts", {
+  const r = await fetch(apiUrl("/api/ogdex/alerts"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ wallet, ts: proof.ts, sig: proof.sig, remove: id }),

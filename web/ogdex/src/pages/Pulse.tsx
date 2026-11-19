@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { CommandHero, StatDeck, LiveRefresh, SegTabs, ViewToggle, DeckLoader } from "../components/DexAdvanced";
 
+import { apiUrl } from "../lib/apiBase";
 interface Signal {
   mint: string; symbol?: string; name?: string; icon?: string | null; chain?: string;
   type: string; label: string; tone: string; strength?: number; metric?: string;
@@ -98,7 +99,7 @@ export default function Pulse() {
   const load = async (attempt = 0) => {
     if (attempt === 0) setRefreshing(true);
     try {
-      const r = await fetch("/api/ogdex/signals");
+      const r = await fetch(apiUrl("/api/ogdex/signals"));
       const d = await r.json().catch(() => ({} as any));
       const sig = d.signals || [];
       const errored = !r.ok || d.ok === false;

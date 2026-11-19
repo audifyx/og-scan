@@ -17,6 +17,7 @@ import {
 } from "@/lib/mcpBurnAccess";
 import { sendWalletTransaction, confirmSentTransaction } from "@/lib/orbitx/sendWalletTx";
 import { TransactionStatus } from "@/components/onchain";
+import { apiUrl } from "@/lib/apiBase";
 import {
   clearStoredPhantomWallet,
   fetchTimeoutSignal,
@@ -247,7 +248,7 @@ export default function AgentSignPage() {
           const session = (await supabase.auth.getSession()).data.session;
           const headers: Record<string, string> = { "Content-Type": "application/json" };
           if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-          const res = await fetch("/api/orbitx-agent/credits/confirm", {
+          const res = await fetch(apiUrl("/api/orbitx-agent/credits/confirm"), {
             method: "POST",
             headers,
             body: JSON.stringify({ signature: sig, publicKey: pk }),
@@ -273,7 +274,7 @@ export default function AgentSignPage() {
 
       if (kind === "mcp-access") {
         const pkg: McpAccessPackageId = isMcpAccessPackageId(packageId) ? packageId : "hour";
-        const res = await fetch("/api/orbitx-agent/mcp-access/prepare", {
+        const res = await fetch(apiUrl("/api/orbitx-agent/mcp-access/prepare"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ publicKey: pk, packageId: pkg }),
@@ -313,7 +314,7 @@ export default function AgentSignPage() {
       }
 
       if (kind === "shop") {
-        const prepRes = await fetch("/api/orbitx/shop/prepare", {
+        const prepRes = await fetch(apiUrl("/api/orbitx/shop/prepare"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ wallet: pk, publicKey: pk, sku, mint }),
@@ -326,7 +327,7 @@ export default function AgentSignPage() {
         await confirmSentTransaction(connection, sig);
         finish(sig);
         try {
-          await fetch("/api/orbitx/shop", {
+          await fetch(apiUrl("/api/orbitx/shop"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -357,7 +358,7 @@ export default function AgentSignPage() {
         if (typeof amount === "string" && !amount) {
           throw new Error("Invalid amount");
         }
-        const res = await fetch("/api/ogdex/trade", {
+        const res = await fetch(apiUrl("/api/ogdex/trade"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: fetchTimeoutSignal(20_000),
@@ -418,7 +419,7 @@ export default function AgentSignPage() {
         else if (amountRaw) body.amount = amountRaw.endsWith("%") ? amountRaw : Number(amountRaw);
       }
 
-      const res = await fetch("/api/orbitx-agent/ops-prepare", {
+      const res = await fetch(apiUrl("/api/orbitx-agent/ops-prepare"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

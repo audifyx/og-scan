@@ -13,11 +13,12 @@
 
 import { supabase } from "@/lib/supabase";
 
+import { apiUrl } from "@/lib/apiBase";
 export const AGENT_OS_VERSION = "agent-os-v2";
 
-export const FEED_PATH = "/api/x-mcp?path=agentplus/feed";
-export const COMMAND_PATH = "/api/x-mcp?path=agentplus/command";
-export const EXPORT_PATH = "/api/x-mcp?path=agentplus/export";
+export const FEED_PATH = apiUrl("/api/x-mcp?path=agentplus/feed");
+export const COMMAND_PATH = apiUrl("/api/x-mcp?path=agentplus/command");
+export const EXPORT_PATH = apiUrl("/api/x-mcp?path=agentplus/export");
 export const POLL_MS = 2000;
 export const DETAIL_POLL_MS = 10000;
 export const LAST_VISIT_KEY = "agentos-last-visit";

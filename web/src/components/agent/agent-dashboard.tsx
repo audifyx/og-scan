@@ -24,6 +24,7 @@ import { AgentShell, type AgentTabId } from "./AgentShell";
 import { TelegramMcpCard } from "./TelegramMcpCard";
 import { McpShop } from "./McpShop";
 
+import { apiUrl } from "@/lib/apiBase";
 function maskSecret(value: string, kind: "key" | "header" = "key") {
   if (!value) return "—";
   if (kind === "header" && value.startsWith("Bearer ")) {
@@ -145,7 +146,7 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
         const { data } = await supabase.auth.getSession();
         const token = data.session?.access_token;
         if (!token) return;
-        const r = await fetch("/api/orbitx/desk-wallet", {
+        const r = await fetch(apiUrl("/api/orbitx/desk-wallet"), {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!r.ok) return;

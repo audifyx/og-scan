@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
+import { apiUrl } from "@/lib/apiBase";
 interface SnipeToken {
   mint: string;
   name: string;
@@ -36,7 +37,7 @@ const MIN_LIQUIDITY = 1000; // $1k min to filter dust
 const MIN_MCAP = 5000; // $5k min
 
 async function fetchScreener(): Promise<any[]> {
-  const res = await fetch(`/api/ogdex/screener?type=newpairs&limit=30&chain=solana`);
+  const res = await fetch(apiUrl(`/api/ogdex/screener?type=newpairs&limit=30&chain=solana`));
   if (!res.ok) throw new Error("Screener failed");
   const json = await res.json();
   return json.data || json.tokens || [];
@@ -44,7 +45,7 @@ async function fetchScreener(): Promise<any[]> {
 
 async function fetchSafety(mint: string): Promise<SnipeToken["safety"]> {
   try {
-    const res = await fetch(`/api/ogdex/safety?mint=${mint}`);
+    const res = await fetch(apiUrl(`/api/ogdex/safety?mint=${mint}`));
     if (!res.ok) return null;
     const j = await res.json();
     const s = j.safety || j;

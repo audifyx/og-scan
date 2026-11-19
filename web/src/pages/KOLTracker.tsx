@@ -19,6 +19,7 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { EmeraldHeader, SectionCard, SegmentedTabs, EmptyState, LoadingState } from "@/components/ToolPageShell";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { apiUrl } from "@/lib/apiBase";
 import {
   AdvancedSettings, AlertEntry, BotState, ConfluenceHit, KolListEntry, TrackedWallet,
   TrackerMode, TrackerState, TradeEvent, WalletStats,
@@ -156,8 +157,8 @@ export default function KOLTracker() {
       setAlerts(loadAlerts());
       setLoaded(true);
       fetchKolList().then((k) => alive && setKols(k)).catch(() => {});
-      fetch("/api/kol/sync-webhook").then((r) => r.json()).then((j) => alive && j?.ok && setWebhook(j.webhook)).catch(() => {});
-      fetch("/api/kol/new-launches?limit=8").then((r) => r.json()).then((j) => alive && j?.ok && setLaunches(j.launches || [])).catch(() => {});
+      fetch(apiUrl("/api/kol/sync-webhook")).then((r) => r.json()).then((j) => alive && j?.ok && setWebhook(j.webhook)).catch(() => {});
+      fetch(apiUrl("/api/kol/new-launches?limit=8")).then((r) => r.json()).then((j) => alive && j?.ok && setLaunches(j.launches || [])).catch(() => {});
     })();
     return () => { alive = false; };
   }, [userId]);
@@ -214,7 +215,7 @@ export default function KOLTracker() {
     } else if (b.id) {
       body.botConfigId = b.id;
     }
-    const r = await fetch("/api/kol/send-alert", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const r = await fetch(apiUrl("/api/kol/send-alert"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
     return j?.ok === true;
   }, []);
@@ -413,7 +414,7 @@ export default function KOLTracker() {
     }
     setBusy("chatid");
     try {
-      const r = await fetch("/api/kol/chat-id", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ botToken: bot.botToken }) });
+      const r = await fetch(apiUrl("/api/kol/chat-id"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ botToken: bot.botToken }) });
       const j = await r.json();
       if (j?.ok) {
         const next = { ...bot, chatId: String(j.chatId), threadId: j.threadId ? String(j.threadId) : bot.threadId };
@@ -434,7 +435,7 @@ export default function KOLTracker() {
     }
     setBusy("brand");
     try {
-      const r = await fetch("/api/kol/bot-setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ botToken: bot.botToken, name: bot.botName, bio: bot.botBio }) });
+      const r = await fetch(apiUrl("/api/kol/bot-setup"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ botToken: bot.botToken, name: bot.botName, bio: bot.botBio }) });
       const j = await r.json();
       if (j?.ok) {
         await persistBot({ ...bot, botUsername: j.botUsername || bot.botUsername });
@@ -471,7 +472,7 @@ export default function KOLTracker() {
     }
     setBusy("digest");
     try {
-      const r = await fetch("/api/kol/launch-digest", {
+      const r = await fetch(apiUrl("/api/kol/launch-digest"), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ botToken: bot.botToken, chatId: bot.chatId, threadId: bot.threadId || undefined, minAgeHours: bot.digestMinAge, maxAgeHours: bot.digestMaxAge }),
       });
@@ -489,7 +490,7 @@ export default function KOLTracker() {
     }
     setBusy("webhook");
     try {
-      const r = await fetch("/api/kol/sync-webhook", {
+      const r = await fetch(apiUrl("/api/kol/sync-webhook"), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ add: watchTargets.map((w) => w.address) }),
       });

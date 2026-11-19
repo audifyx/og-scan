@@ -3,6 +3,7 @@
 
 import { supabase } from '@/lib/supabase';
 
+import { apiUrl } from "@/lib/apiBase";
 export type AlertChannel = 'email' | 'webhook' | 'discord' | 'telegram' | 'push';
 export type AlertPriority = 'critical' | 'high' | 'medium' | 'low';
 
@@ -100,7 +101,7 @@ class AlertSystem {
   private async sendEmail(alert: Alert) {
     if (!this.config.emailAddress) throw new Error('Email not configured');
 
-    const response = await fetch('/api/send-email', {
+    const response = await fetch(apiUrl('/api/send-email'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

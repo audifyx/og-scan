@@ -5,6 +5,7 @@
 import { supabase } from "@/lib/supabase";
 import { OGSCAN_TOKEN_MINT, OGSCAN_TOKEN_NAME, OGSCAN_TOKEN_SYMBOL } from "@/lib/og";
 
+import { apiUrl } from "@/lib/apiBase";
 export type FeeRoute = "creator" | "orbitx_buyback" | "og";
 
 export interface OrbitxToken {
@@ -157,7 +158,7 @@ export async function isNameTaken(name: string): Promise<boolean> {
 
     // 4. Check OG Scanner API
     try {
-      const ogRes = await fetch(`/api/ogdex/_routes/_search.js?q=${encodeURIComponent(trimmed)}`);
+      const ogRes = await fetch(apiUrl(`/api/ogdex/_routes/_search.js?q=${encodeURIComponent(trimmed)}`));
       if (ogRes.ok) {
         const ogData = await ogRes.json();
         if (Array.isArray(ogData) && ogData.some((t: any) => t.name?.toLowerCase() === trimmed)) {
@@ -212,7 +213,7 @@ export interface AntiVampCheckOptions {
 }
 
 export async function checkAntiVamp(name: string, ticker = "", options: AntiVampCheckOptions = {}): Promise<AntiVampResult> {
-  const res = await fetch("/api/orbitx/anti-vamp-check", {
+  const res = await fetch(apiUrl("/api/orbitx/anti-vamp-check"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, ticker, ...options }),
