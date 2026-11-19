@@ -1,7 +1,0 @@
-# The API + MCP live on the Render server, not on Pages (static hosting only).
-# Proxy /api/* there so orbitx.world/api/mcp and /api/mcp-launchpad answer as
-# real MCP servers (POST initialize) instead of 405 / SPA fallback.
-# Share links are served by the Render API too (it renders the OG unfurl card).
-/api/* https://orbitx-platform-api.onrender.com/api/:splat 200
-/share/* https://orbitx-platform-api.onrender.com/share/:splat 200
-/sharew/* https://orbitx-platform-api.onrender.com/sharew/:splat 200
