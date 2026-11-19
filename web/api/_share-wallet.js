@@ -16,13 +16,20 @@ export default async function handler(req, res) {
   const qs = new URLSearchParams();
   qs.set("address", address);
   for (const k of ["pnl", "win", "trades", "app"]) if (req.query[k] != null) qs.set(k, String(req.query[k]));
-  const dest = `https://www.ogscan.fun/ORBITX_DEX/wallet/${encodeURIComponent(address)}`;
+  const dest = `https://orbitx.world/ORBITX_DEX/wallet/${encodeURIComponent(address)}`;
   try {
     const r = await fetch(`https://ibojtmeqgzabgeiwbvhf.supabase.co/functions/v1/wallet-og?${qs.toString()}`);
     const html = await r.text();
+    // wallet-og edge fn still points at the retired ogscan.fun domain (and a
+    // dead /OGDEX route) until it is redeployed — rewrite its URLs to the live domain.
+    const fixed = html
+      .replaceAll("https://www.ogscan.fun", "https://orbitx.world")
+      .replaceAll("https://ogscan.fun", "https://orbitx.world")
+      .replaceAll("/OGDEX/wallet/", "/ORBITX_DEX/wallet/")
+      .replaceAll("/OGDEX/ogdex-banner.jpg", "/orbitx-banner.jpg");
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "public, max-age=120");
-    return res.status(200).send(html);
+    return res.status(200).send(fixed);
   } catch {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     return res.status(200).send(`<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; url=${dest}"></head><body><a href="${dest}">Opening wallet…</a></body></html>`);

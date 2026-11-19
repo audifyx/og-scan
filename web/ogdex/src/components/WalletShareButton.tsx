@@ -9,7 +9,7 @@ export default function WalletShareButton({ address, pnl, win, trades }: { addre
   if (pnl != null) qs.set("pnl", String(Math.round(pnl)));
   if (win != null) qs.set("win", String(win));
   if (trades != null) qs.set("trades", String(trades));
-  const shareUrl = `https://ogscan.fun/sharew/${address}?${qs.toString()}`;
+  const shareUrl = `https://orbitx.world/sharew/${address}?${qs.toString()}`;
   const pnlStr = pnl != null ? (pnl >= 0 ? "+$" : "-$") + Math.abs(pnl).toLocaleString(undefined, { maximumFractionDigits: 0 }) : null;
   const lines = ["💰 My wallet PnL on OrbitX DEX"];
   if (pnlStr) lines.push(`${pnlStr}${win != null ? ` · ${win}% win rate` : ""}${trades != null ? ` · ${trades} trades` : ""}`);

@@ -15,13 +15,20 @@
 export default async function handler(req, res) {
   const mint = String(req.query.mint || "").trim();
   const app = String(req.query.app || "");
-  const dest = app === "ogdex" ? `https://www.ogscan.fun/ORBITX_DEX/token/${encodeURIComponent(mint)}` : `https://www.ogscan.fun/t/${encodeURIComponent(mint)}`;
+  const dest = app === "ogdex" ? `https://orbitx.world/ORBITX_DEX/token/${encodeURIComponent(mint)}` : `https://orbitx.world/t/${encodeURIComponent(mint)}`;
   try {
     const r = await fetch(`https://ibojtmeqgzabgeiwbvhf.supabase.co/functions/v1/token-og?mint=${encodeURIComponent(mint)}${app ? `&app=${encodeURIComponent(app)}` : ""}`);
     const html = await r.text();
+    // token-og edge fn still points at the retired ogscan.fun domain (and a
+    // dead /OGDEX route) until it is redeployed — rewrite its URLs to the live domain.
+    const fixed = html
+      .replaceAll("https://www.ogscan.fun", "https://orbitx.world")
+      .replaceAll("https://ogscan.fun", "https://orbitx.world")
+      .replaceAll("/OGDEX/token/", "/ORBITX_DEX/token/")
+      .replaceAll("/og-default.png", "/orbitx-banner.jpg");
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "public, max-age=300");
-    return res.status(200).send(html);
+    return res.status(200).send(fixed);
   } catch {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     return res.status(200).send(`<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; url=${dest}"></head><body><a href="${dest}">Opening report…</a></body></html>`);

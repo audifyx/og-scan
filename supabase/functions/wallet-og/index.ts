@@ -1,7 +1,7 @@
 // wallet-og — OG/Twitter meta for a wallet PnL flex card so X/Telegram render a
 // rich preview. Stats are passed in by the share button (the user's own flex);
 // humans are redirected to the live OG DEX wallet page. verify_jwt=false.
-const SITE = "https://ogscan.fun";
+const SITE = "https://orbitx.world";
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const short = (a: string) => (a && a.length > 10 ? a.slice(0, 4) + "…" + a.slice(-4) : a || "wallet");
 
@@ -12,8 +12,8 @@ Deno.serve((req) => {
   const win = u.searchParams.get("win");
   const trades = u.searchParams.get("trades");
   const app = u.searchParams.get("app") || "ogdex";
-  const dest = app === "ogdex" ? `${SITE}/OGDEX/wallet/${encodeURIComponent(address)}` : `${SITE}/wallet/${encodeURIComponent(address)}`;
-  const image = `${SITE}/OGDEX/ogdex-banner.jpg`;
+  const dest = app === "ogdex" ? `${SITE}/ORBITX_DEX/wallet/${encodeURIComponent(address)}` : `${SITE}/wallet/${encodeURIComponent(address)}`;
+  const image = `${SITE}/orbitx-banner.jpg`;
 
   const pnlNum = Number(pnl);
   const pnlStr = pnl != null && isFinite(pnlNum) ? (pnlNum >= 0 ? "+$" : "-$") + Math.abs(pnlNum).toLocaleString(undefined, { maximumFractionDigits: 0 }) : null;

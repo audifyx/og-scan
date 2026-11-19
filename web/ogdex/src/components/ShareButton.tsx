@@ -3,10 +3,10 @@ import { Copy, Check } from "lucide-react";
 import { compact } from "../lib/api";
 
 // Share a token scan to X with a rich unfurl card (/share/<mint> serves the
-// OG/Twitter meta -> summary_large_image; clicking lands on the OrbitX Terminal page).
+// OG/Twitter meta -> summary_large_image; clicking lands on the OrbitX DEX token page).
 export default function ShareButton({ mint, symbol, score, mcap, verdict }: { mint: string; symbol?: string; score?: number | null; mcap?: number | null; verdict?: string | null }) {
   const [copied, setCopied] = useState(false);
-  const shareUrl = `https://ogscan.fun/share/${mint}?app=ogdex`;
+  const shareUrl = `https://orbitx.world/share/${mint}?app=ogdex`;
   const sym = (symbol || "").replace(/^\$/, "");
   const mc = mcap != null ? "$" + compact(mcap) : null;
   const lines = [`🔍 ${sym ? "$" + sym : "Token"} scanned on OrbitX DEX`];

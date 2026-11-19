@@ -1,9 +1,9 @@
 // token-og — public OG/Twitter meta for a scanned coin so Telegram/X/Discord
 // render a rich preview card (banner image + OG score). Humans are redirected
-// to the live page at ogscan.fun/t/<mint>. verify_jwt=false (crawled publicly).
+// to the live page at orbitx.world/t/<mint>. verify_jwt=false (crawled publicly).
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SITE = "https://ogscan.fun";
+const SITE = "https://orbitx.world";
 
 const esc = (s: any) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const fmtUsd = (n: any) => {
@@ -19,10 +19,10 @@ Deno.serve(async (req) => {
   const _u = new URL(req.url);
   const mint = _u.searchParams.get("mint") || "";
   const app = _u.searchParams.get("app") || "";
-  const dest = app === "ogdex" ? `${SITE}/OGDEX/token/${encodeURIComponent(mint)}` : `${SITE}/t/${encodeURIComponent(mint)}`;
+  const dest = app === "ogdex" ? `${SITE}/ORBITX_DEX/token/${encodeURIComponent(mint)}` : `${SITE}/t/${encodeURIComponent(mint)}`;
   let title = "Token Scan — OG Scan";
   let desc = "Live on-chain intelligence: rug score, holders, dev DNA and market data.";
-  let image = `${SITE}/og-default.png`;
+  let image = `${SITE}/orbitx-banner.jpg`;
 
   try {
     const r = await fetch(`${SUPABASE_URL}/functions/v1/og-scan-token`, {
