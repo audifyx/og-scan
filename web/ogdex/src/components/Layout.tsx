@@ -98,8 +98,7 @@ const FOOTER_ECOSYSTEM = [
 
 const PLATFORM_LINKS = [
   { href: "/app", label: "Hub" },
-  { href: "/ORBITX_DEX/", label: "OrbitX DEX", on: true },
-  { href: "/hub-dex/", label: "Hub DEX" },
+  { href: "/ORBITX_DEX/", label: "Terminal", on: true },
   { href: "/nft", label: "NFT" },
   { href: "/orbitx-social", label: "Social" },
   { href: "/agent", label: "Agent" },
@@ -138,7 +137,7 @@ function titleFor(pathname: string): string {
   if (hit) return hit.label;
   if (pathname.startsWith("/token")) return "Token";
   if (pathname.startsWith("/wallet/")) return "Wallet";
-  return "OrbitX DEX";
+  return "Terminal";
 }
 
 export default function Layout() {
@@ -171,7 +170,7 @@ export default function Layout() {
     <div className="dex-shell dex-ios">
       <SharedAtmosphere />
       <div className="dex-ios-frame">
-        <aside className="dex-ios-rail" aria-label="OrbitX DEX">
+        <aside className="dex-ios-rail" aria-label="Terminal">
           <Link to="/" className="dex-ios-rail-brand">
             <Brand />
           </Link>
@@ -236,7 +235,7 @@ export default function Layout() {
                 <div>
                   <Brand />
                   <p className="mt-4 max-w-xs text-[13px] leading-relaxed text-white/65">
-                    OrbitX DEX — metal desk for discovery, pulse, scanner, and wallet intel on Solana.
+                    OrbitX Terminal — metal desk for discovery, pulse, scanner, and wallet intel on Solana.
                   </p>
                   <div className="mt-4 flex gap-2">
                     <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="dex-btn dex-btn--ghost !py-2 !px-3 !text-xs">
@@ -244,12 +243,12 @@ export default function Layout() {
                     </a>
                   </div>
                 </div>
-                <FooterCol title="OrbitX DEX" links={FOOTER_PRODUCT} />
+                <FooterCol title="Terminal" links={FOOTER_PRODUCT} />
                 <FooterCol title="Resources" links={FOOTER_RESOURCES} />
                 <FooterCol title="OrbitX" links={FOOTER_ECOSYSTEM} external />
               </div>
               <div className="mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-white/45 border-t" style={{ borderColor: "rgba(192,198,210,0.08)" }}>
-                <span>© {new Date().getFullYear()} OrbitX DEX</span>
+                <span>© {new Date().getFullYear()} OrbitX Terminal</span>
                 <div className="flex gap-4">
                   <a href="/whitepaper" className="hover:text-[var(--ox-gold-hi)]">Whitepaper</a>
                   <a href="/roadmap" className="hover:text-[var(--ox-gold-hi)]">Roadmap</a>
