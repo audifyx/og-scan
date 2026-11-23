@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { validateUploadFile, safeExtForMime, MEDIA_MIME_ALLOWLIST } from "@/lib/safeUpload";
+import { validateUploadFileBytes, safeExtForMime, MEDIA_MIME_ALLOWLIST } from "@/lib/safeUpload";
 import { isUserOnline, usePresenceTick } from "@/lib/presence";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -626,7 +626,8 @@ const DirectMessages: React.FC = () => {
   /* ─── Media: image + voice notes (dm-media bucket) ─── */
   const uploadDM = async (file: Blob, ext: string, allow?: readonly string[]): Promise<string | null> => {
     if (!user) return null;
-    const vErr = validateUploadFile(file, { maxMB: 5, allow });
+    // Declared-type + size + magic-byte verification (audit B14).
+    const vErr = await validateUploadFileBytes(file, { maxMB: 5, allow });
     if (vErr) { toast.error(vErr); return null; }
     const safeExt = safeExtForMime((file as File).type || "");
     const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${safeExt}`;

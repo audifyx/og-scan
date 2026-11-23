@@ -2,7 +2,7 @@
 // Storage (same public "profile-media" bucket the token launch lanes already
 // use), producing a public HTTPS metadata URI suitable for on-chain `uri`.
 import { supabase } from "@/lib/supabase";
-import { validateUploadFile, safeExtForMime, MEDIA_MIME_ALLOWLIST } from "@/lib/safeUpload";
+import { validateUploadFile, validateUploadFileBytes, safeExtForMime, MEDIA_MIME_ALLOWLIST } from "@/lib/safeUpload";
 import type { NftAttribute } from "@/lib/orbitx/nftMint";
 
 export interface NftMetaInput {
@@ -25,7 +25,10 @@ export function isAcceptedNftMedia(file: File): boolean {
 }
 
 export async function uploadNftAssets(seed: string, mediaFile: File, meta: NftMetaInput): Promise<{ mediaUrl: string; uri: string }> {
-  const fileErr = validateUploadFile(mediaFile, { allow: ACCEPTED_NFT_MIME, maxMB: 50 });
+  // Declared-type + size checks AND magic-byte verification (audit
+  // B14): the stored contentType is user-influenced, so a renamed
+  // HTML/SVG must not reach the public bucket as "media".
+  const fileErr = await validateUploadFileBytes(mediaFile, { allow: ACCEPTED_NFT_MIME, maxMB: 50 });
   if (fileErr) throw new Error(fileErr);
   const mime = mediaFile.type || "image/png";
   const ext = safeExtForMime(mime);
