@@ -1,6 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+/* OrbitX MCP Apps bridge — polyfills window.openai for MCP Apps hosts
+   (Claude, Grok, and other MCP Apps clients) so this widget works in every
+   client, not just ChatGPT. No-op when window.openai already exists. */
+(function () {
+  if (window.openai) return;
+  var seq = 0; var pending = {};
+  var toolOutput = undefined;
+  function post(msg) { window.parent.postMessage(msg, "*"); }
+  function request(method, params) {
+    return new Promise(function (resolve, reject) {
+      var id = ++seq; pending[id] = { resolve: resolve, reject: reject };
+      post({ jsonrpc: "2.0", id: id, method: method, params: params || {} });
+      setTimeout(function () { if (pending[id]) { delete pending[id]; reject(new Error("mcp-apps timeout: " + method)); } }, 30000);
+    });
+  }
+  window.addEventListener("message", function (ev) {
+    var m = ev.data; if (!m || typeof m !== "object") return;
+    if (m.id != null && pending[m.id]) {
+      var p = pending[m.id]; delete pending[m.id];
+      if (m.error) p.reject(new Error(m.error.message || "mcp-apps error")); else p.resolve(m.result);
+      return;
+    }
+    if (m.method === "ui/notifications/tool-result") {
+      toolOutput = (m.params && (m.params.structuredContent || m.params)) || toolOutput;
+      window.dispatchEvent(new CustomEvent("orbitx-tool-result", { detail: toolOutput }));
+    }
+    if (m.method === "ui/notifications/tool-input") {
+      window.dispatchEvent(new CustomEvent("orbitx-tool-input", { detail: m.params || {} }));
+    }
+  });
+  var openai = {
+    callTool: function (name, args) { return request("tools/call", { name: name, arguments: args || {} }); },
+    openExternal: function (opts) {
+      var href = typeof opts === "string" ? opts : (opts && opts.href) || "";
+      if (href) post({ jsonrpc: "2.0", method: "ui/open-link", params: { url: href } });
+      return Promise.resolve();
+    },
+    sendFollowUpMessage: function (opts) {
+      var prompt = (opts && opts.prompt) || "";
+      post({ jsonrpc: "2.0", method: "ui/message", params: { role: "user", content: [{ type: "text", text: prompt }] } });
+      return Promise.resolve();
+    },
+    get toolOutput() { return toolOutput; }
+  };
+  try { Object.defineProperty(window, "openai", { value: openai, configurable: true }); } catch (e) { window.openai = openai; }
+  request("ui/initialize", { protocolVersion: "2026-01-26", capabilities: {}, clientInfo: { name: "orbitx-widget", version: "2.0.0" } })
+    .then(function () { post({ jsonrpc: "2.0", method: "ui/notifications/initialized" }); })
+    .catch(function () {});
+})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>OrbitX Dashboard</title>

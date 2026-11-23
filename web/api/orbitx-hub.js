@@ -7,7 +7,7 @@
  *   /api/orbitx-mcp/*   → /api/orbitx-hub?path=mcp/*
  *   /api/orbitx/*       → /api/orbitx-hub?path=*
  */
-export const MCP_SERVER_VERSION = "1.14.0";
+export const MCP_SERVER_VERSION = "2.0.0";
 export const MCP_SERVER_NAME = "OrbitX Agent MCP";
 
 function mcpRuntime() {
@@ -310,7 +310,18 @@ function publicToolList(list) {
  * returns the entry unchanged when there is nothing to attach. Additive —
  * existing clients see the same fields plus _meta on UI-bound tools.
  */
+const TOOL_TITLE_ACRONYMS = { mcp: "MCP", sol: "SOL", pnl: "PnL", dex: "DEX", nft: "NFT", ai: "AI", x: "X", gc: "Group Chat", vc: "Voice" };
+function toolTitle(name) {
+  const raw = String(name || "");
+  if (raw === "search") return "Search OrbitX";
+  if (raw === "fetch") return "Fetch OrbitX Resource";
+  const words = raw.replace(/^orbitx_/, "").split("_").filter(Boolean);
+  const titled = words.map((w) => TOOL_TITLE_ACRONYMS[w] || (w.charAt(0).toUpperCase() + w.slice(1))).join(" ");
+  return raw.startsWith("orbitx_") ? `OrbitX ${titled}` : titled;
+}
+
 function withUiListingMeta(t, listed) {
+  if (!listed.title) listed.title = toolTitle(t.name);
   const m = toolListingMeta(t);
   if (m) listed._meta = { ...(listed._meta && typeof listed._meta === "object" ? listed._meta : {}), ...m };
   return listed;
@@ -2627,6 +2638,11 @@ const CORE_TOOLS = [
     inputSchema: { type: "object", properties: { mint: { type: "string", description: "Token mint (contract address), 32-44 base58 chars. NOT a wallet address." } }, required: ["mint"] },
   },
   {
+    name: "orbitx_token_dossier",
+    description: "V2 flagship: EVERYTHING about a token in one call — full safety scan + forensics, all-time-high, and OHLCV chart candles, composed server-side from the live scan/ATH/chart engines. Use this when the user asks for a full breakdown, deep dive, or complete report on a mint.",
+    inputSchema: { type: "object", properties: { mint: { type: "string", description: "Token mint (contract address), 32-44 base58 chars." }, interval: { type: "string", enum: ["5m", "15m", "1h", "4h", "1d"], default: "1h" } }, required: ["mint"] },
+  },
+  {
     name: "orbitx_get_ath",
     description: "All-time-high price and market cap for a token.",
     inputSchema: { type: "object", properties: { mint: { type: "string" } }, required: ["mint"] },
@@ -4923,55 +4939,33 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
     }
   }
 
+  // MCP access is FREE FOREVER (owner, 2026-11-23 — MCP V2). The legacy
+  // burn/hold access market is retired: these tools now answer honestly
+  // instead of selling access that is no longer required.
   if (name === "orbitx_mcp_access_status") {
-    try {
-      const status = await getAccessStatus(sb, auth?.userId, {
-        wallets: [wallet, args.publicKey, args.wallet, auth?.walletAddress],
-      });
-      return decorateAccessStatus(status);
-    } catch (e) {
-      return decorateAccessStatus({
-        ok: false,
-        error: "access_failed",
-        message: e?.message || "access unavailable",
-      });
-    }
+    return {
+      ok: true,
+      access: "free",
+      allowed: true,
+      active: true,
+      message: "OrbitX MCP access is free forever — no burn, no hold, no package required. Every tool is open; account actions just need your authCode.",
+    };
   }
 
   if (name === "orbitx_mcp_access_buy") {
-    const askOnly =
-      args.askOnly === true || (args.package == null && args.packageId == null && args.option == null);
-    if (askOnly) {
-      return accessBuyPrompt({ accessUrl: "https://www.orbitx.world/agent?tab=shop" });
-    }
-    return prepareAccessMcpPurchase({
-      base,
-      wallet: wallet || args.publicKey,
-      packageId: args.package || args.packageId || args.option,
-      confirmMode: args.autoConfirm === true || args.auto === true ? "auto" : args.confirmMode || "sign",
-      accessUrl: "https://www.orbitx.world/agent?tab=shop",
-    });
+    return {
+      ok: true,
+      access: "free",
+      message: "Nothing to buy — OrbitX MCP access is free forever. Connect and call any tool.",
+    };
   }
 
   if (name === "orbitx_mcp_access_confirm") {
-    const signature = String(args.signature || args.txSignature || args.tx_signature || args.sig || "").trim();
-    if (!signature) {
-      return { ok: false, error: "signature_required", message: "Pass the Solana transaction signature" };
-    }
-    try {
-      return await confirmAccessBurn(sb, {
-        userId: auth?.userId,
-        signature,
-        packageId: args.package || args.packageId,
-        wallet: wallet || args.publicKey || args.wallet,
-      });
-    } catch (e) {
-      return {
-        ok: false,
-        error: "confirm_failed",
-        message: e?.message || "Could not grant access — apply mcp_burn_access migration",
-      };
-    }
+    return {
+      ok: true,
+      access: "free",
+      message: "Nothing to confirm — OrbitX MCP access is free forever and never needs a burn.",
+    };
   }
 
   if (name === "orbitx_telegram_status") {
@@ -5080,6 +5074,18 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
     return out;
   }
 
+  if (name === "orbitx_token_dossier") {
+    const mint = String(args.mint || args.address || args.ca || "").trim();
+    if (!mint) return { ok: false, error: "mint_required", message: "Pass a token mint (contract address)." };
+    const settle = (p) => Promise.resolve(p).catch((e) => ({ ok: false, error: "section_failed", message: e?.message || "section unavailable" }));
+    const [scan, ath, chart] = await Promise.all([
+      settle(callTool("orbitx_crypto_scan", { mint }, auth, base, req)),
+      settle(callTool("orbitx_get_ath", { mint }, auth, base, req)),
+      settle(callTool("orbitx_get_chart", { mint, interval: args.interval || "1h", limit: 100 }, auth, base, req)),
+    ]);
+    return { ok: true, mint, dossier: true, scan, ath, chart };
+  }
+
   if (name === "orbitx_shop") {
     const pack = String(args.package || args.item || "").toLowerCase();
     if (pack === "hour" || pack === "day" || pack === "week" || pack === "month" || pack === "access") {
@@ -5121,7 +5127,7 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
       shop: true,
       openUrl: `${base}/shop`,
       message:
-        "OrbitX Shop — burn $ORBITX for MCP seats or buy credits with SOL. Linked Telegram: /shop hour · /shop day · /shop week · /shop month · /credits 0.1 sol",
+        "OrbitX Shop — MCP access is free forever (no seats, no burns). Buy credits with SOL here. Linked Telegram: /credits 0.1 sol",
       packages: [
         { id: "hour", title: "1 Hour MCP", cost: "100 $ORBITX", tool: "orbitx_mcp_access_buy", args: { package: "hour" } },
         { id: "day", title: "1 Day MCP", cost: "1,000 $ORBITX", tool: "orbitx_mcp_access_buy", args: { package: "day" } },
@@ -6663,7 +6669,7 @@ async function handleMcp(req, res, parts) {
             capabilities: { tools: {}, resources: {}, extensions: { "io.modelcontextprotocol/skills": {} } },
             serverInfo: { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
             instructions:
-              "OrbitX Agent MCP. Coverage, not a tour: we do not tell users to use every surface. Each door is for a trading group. If they ask why use this MCP, why so many tools, or which app to use, call orbitx_why. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. PAPER DESK: 10 agents × 10,000 mock SOL trading real coin tape every hour — orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. LIVE DESK: 3 books share one hot wallet, $1.50 real-SOL buys every 5 minutes, one open book, take-profit around +$0.30 — orbitx_live_desk / orbitx_live_positions / orbitx_live_feed / orbitx_live_world (read only, never executes). Watch the X-style feed and 3D city at https://www.orbitx.world/on-chain. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create. They get @handle.obx, think with NVIDIA, tweet, converse, marry, raise the next gen, write files/daily logs, and publish HTML desk sites. Watch the live two-pane world at https://www.orbitx.world/orbitxagents. City: orbitx_life_city. Brain: orbitx_life_think. Files: orbitx_life_files. Talk: orbitx_life_converse. 300 life cmds via tools/list cursor life:0. Hourly cron is a free-will hour of life. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP v2.0.0 — FREE FOREVER: no burn, no hold, no package is ever required to use this MCP. Works in Claude, Grok, and ChatGPT; flagship tools render rich OrbitX widgets in-client. If they ask why use this MCP or which app to use, call orbitx_why. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool (account actions need it; all research tools are open). FULL TOKEN BREAKDOWN in one call: orbitx_token_dossier (scan + forensics + ATH + chart). Quick safety: orbitx_crypto_scan. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. PAPER DESK: 10 agents × 10,000 mock SOL trading real coin tape every hour — orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. LIVE DESK (read only, never executes): orbitx_live_desk / orbitx_live_positions / orbitx_live_feed / orbitx_live_world. Watch the feed and 3D city at https://www.orbitx.world/on-chain. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create; city: orbitx_life_city, brain: orbitx_life_think, files: orbitx_life_files, talk: orbitx_life_converse; 300 life cmds via tools/list cursor life:0. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Any tool not visible: orbitx_exec calls all 4,300+ tools by name; search finds them. Setup: https://www.orbitx.world/agent",
           },
         },
         200,

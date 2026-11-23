@@ -1,4 +1,3 @@
-import { McpBurnAccessCard } from "./McpBurnAccessCard";
 import { McpCreditsBuyCard } from "./McpCreditsBuyCard";
 import type { McpBurnAccessStatus } from "@/lib/mcpBurnAccess";
 import type { XCreditsUsage } from "@/lib/xMcp";
@@ -29,15 +28,14 @@ export function McpShop({
       <div className="ox-agent__hero">
         <h1 className="ox-agent__title">{both ? "OrbitX Shop" : "Shop"}</h1>
         <p className="ox-agent__lead">
-          MCP is free for everyone until 7 Nov 2026 during testing and development. Burns still
-          extend seats after that date. Credits stay optional for media/X runs. One grant unlocks
-          every connected channel, including @theorbitxmcpbot.
+          OrbitX MCP is free forever — every tool, in Claude, Grok, and ChatGPT. No burns, no
+          seats, no hold required. Credits stay optional for media/X runs.
         </p>
         {both && (
           <div className="ox-agent__steps">
-            <span className="ox-agent__chip is-ok">Free until 7 Nov 2026</span>
-            <span className="ox-agent__chip is-ok">All-channel shared access</span>
-            <span className="ox-agent__chip">One checkout surface</span>
+            <span className="ox-agent__chip is-ok">Free forever</span>
+            <span className="ox-agent__chip is-ok">4,300+ tools</span>
+            <span className="ox-agent__chip">Claude · Grok · ChatGPT</span>
           </div>
         )}
       </div>
@@ -45,34 +43,10 @@ export function McpShop({
       <section className="ox-agent__panel">
         <div className="ox-agent__panel-h">
           <h2 className="ox-agent__panel-title">Catalog</h2>
-          <span className="ox-agent__panel-hint">access · credits</span>
+          <span className="ox-agent__panel-hint">credits</span>
         </div>
         <div className="ox-agent__panel-b">
           <div className="ox-agent__pkg-grid">
-            <div className="ox-agent__pkg">
-              <span className="ox-agent__pkg-k">Access</span>
-              <strong className="ox-agent__pkg-title">1 Hour</strong>
-              <span className="ox-agent__pkg-cost">100 $ORBITX</span>
-              <span className="ox-agent__pkg-meta">Burn · 1 hour</span>
-            </div>
-            <div className="ox-agent__pkg">
-              <span className="ox-agent__pkg-k">Access</span>
-              <strong className="ox-agent__pkg-title">1 Day</strong>
-              <span className="ox-agent__pkg-cost">1,000 $ORBITX</span>
-              <span className="ox-agent__pkg-meta">Burn · 24 hours</span>
-            </div>
-            <div className="ox-agent__pkg">
-              <span className="ox-agent__pkg-k">Access</span>
-              <strong className="ox-agent__pkg-title">1 Week</strong>
-              <span className="ox-agent__pkg-cost">10,000 $ORBITX</span>
-              <span className="ox-agent__pkg-meta">Burn · 7 days</span>
-            </div>
-            <div className="ox-agent__pkg">
-              <span className="ox-agent__pkg-k">Access</span>
-              <strong className="ox-agent__pkg-title">1 Month</strong>
-              <span className="ox-agent__pkg-cost">1,000,000 $ORBITX</span>
-              <span className="ox-agent__pkg-meta">Burn · 30 days</span>
-            </div>
             <div className="ox-agent__pkg">
               <span className="ox-agent__pkg-k">Credits</span>
               <strong className="ox-agent__pkg-title">Any amount</strong>
@@ -83,7 +57,7 @@ export function McpShop({
           <p className="ox-agent__note">
             {agentTools && (
               <>
-                OrbitX MCP: <code>orbitx_mcp_access_buy</code> · <code>orbitx_credits_buy</code>
+                OrbitX MCP: free forever · credits: <code>orbitx_credits_buy</code>
                 {xTools ? " · " : ""}
               </>
             )}
@@ -97,7 +71,8 @@ export function McpShop({
         </div>
       </section>
 
-      <McpBurnAccessCard walletAddress={walletAddress} onAccessGranted={onAccessGranted} />
+      {/* MCP V2 (2026-11-23): burn-access card removed — MCP access is free forever.
+          McpBurnAccessCard component kept in the codebase, just not rendered. */}
       <McpCreditsBuyCard
         usage={creditsUsage}
         onPurchased={onCreditsPurchased}

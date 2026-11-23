@@ -12,7 +12,10 @@ import {
 } from "@/lib/agentTokenGate";
 import { isOwnerIdentity } from "@/lib/ownerDesk";
 
-/** /agent — MCP hub; non-exempt users must pass ORBITX hold. */
+/** /agent — MCP hub. Hold gate DISABLED 2026-11-23 (MCP V2): OrbitX MCP is
+ * free forever, so the page opens for everyone. Gate code kept intact below
+ * (TokenGatingVerifier / verifyAgentHold) — remove the short-circuit in
+ * check() to bring the gate back. */
 function AgentPage() {
   const { publicKey } = useWallet();
   const { user, profile, loading: authLoading } = useAuth();
@@ -34,6 +37,9 @@ function AgentPage() {
   );
 
   const check = useCallback(async () => {
+    // MCP V2: access is free forever — no ORBITX hold required. (2026-11-23)
+    setGate("open");
+    return;
     if (authLoading) {
       setGate("loading");
       return;

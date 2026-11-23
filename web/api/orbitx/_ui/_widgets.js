@@ -216,6 +216,14 @@ export const UI_TOOL_WIDGET = {
   orbitx_launchpad: "ui://widget/orbitx-media.html",
   // group chat
   orbitx_gc_chat: "ui://widget/orbitx-groupchat.html",
+  // V2 expansion — flagship reads get rich widgets in every client
+  orbitx_token_dossier: "ui://widget/orbitx-token.html",
+  orbitx_call_history: "ui://widget/orbitx-token.html",
+  orbitx_wallet_transactions: "ui://widget/orbitx-wallet.html",
+  orbitx_live_positions: "ui://widget/orbitx-wallet.html",
+  orbitx_paper_desk: "ui://widget/orbitx-dashboard.html",
+  orbitx_menu: "ui://widget/orbitx-dashboard.html",
+  orbitx_tools_help: "ui://widget/orbitx-tools.html",
   // transfers + tipping + DCA
   orbitx_send_sol: "ui://widget/orbitx-wallet.html",
   orbitx_tip: "ui://widget/orbitx-wallet.html",
