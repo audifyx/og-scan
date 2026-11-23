@@ -24,11 +24,11 @@ export function OsDashboardPage() {
           </h1>
           <p className="ox-lead">Launch trading, social, games, and OrbitX City from one metallic neon shell.</p>
         </div>
-        <Link to="/Orbitxcity">
+        <a href="https://orbitxcity.world" target="_blank" rel="noreferrer">
           <OxButton type="button" variant="primary">
             Drop into City
           </OxButton>
-        </Link>
+        </a>
       </div>
 
       <PlayerProfileCard name={profile?.username || "Traveler"} />
@@ -47,13 +47,21 @@ export function OsDashboardPage() {
       />
 
       <div className="ox-grid-apps">
-        {apps.map((app) => (
-          <Link key={app.id} to={app.href} className="ox-app-tile" style={{ ["--tile" as string]: app.accent }}>
-            <div className="ox-app-tile__icon">{app.name.slice(0, 1)}</div>
-            <strong>{app.name}</strong>
-            <span>{app.blurb}</span>
-          </Link>
-        ))}
+        {apps.map((app) =>
+          app.href.startsWith("http") ? (
+            <a key={app.id} href={app.href} target="_blank" rel="noreferrer" className="ox-app-tile" style={{ ["--tile" as string]: app.accent }}>
+              <div className="ox-app-tile__icon">{app.name.slice(0, 1)}</div>
+              <strong>{app.name}</strong>
+              <span>{app.blurb}</span>
+            </a>
+          ) : (
+            <Link key={app.id} to={app.href} className="ox-app-tile" style={{ ["--tile" as string]: app.accent }}>
+              <div className="ox-app-tile__icon">{app.name.slice(0, 1)}</div>
+              <strong>{app.name}</strong>
+              <span>{app.blurb}</span>
+            </Link>
+          ),
+        )}
       </div>
 
       <OxPanel>
