@@ -7,8 +7,8 @@
  * Browser Helius traffic now goes through this route and the keys
  * live only in the server env:
  *
- *   POST /api/web/rpc-proxy            → https://mainnet.helius-rpc.com/?api-key=<redacted>
- *   GET  /api/web/rpc-proxy/v0/<rest>  → https://api.helius.xyz/v0/<rest>?api-key=<redacted>
+ *   POST /api/web/rpc-proxy            → Helius JSON-RPC (server key appended)
+ *   GET  /api/web/rpc-proxy/v0/<rest>  → Helius REST v0 (server key appended)
  *   *    /api/web/rpc-proxy/alchemy    → https://solana-mainnet.g.alchemy.com/v2/<key>
  *
  * Any api-key a client sends is stripped and replaced with the server
@@ -115,7 +115,7 @@ export default async function handler(req, res) {
       if (!body || body.length > 1_000_000) {
         return send(res, 400, JSON.stringify({ error: "bad_body" }), "application/json");
       }
-      const r = await fetch(`https://mainnet.helius-rpc.com/?api-key=<redacted> {
+      const r = await fetch("https://mainnet.helius-rpc.com/?api-key=" + heliusKey, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body,
