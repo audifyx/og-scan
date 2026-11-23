@@ -5167,8 +5167,18 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
   if (name === "orbitx_trader_scan") {
     const settle = (p) => Promise.resolve(p).catch((e) => ({ ok: false, error: "section_failed", message: e?.message || "section unavailable" }));
     const limit = Math.min(Math.max(parseInt(args.limit, 10) || 3, 1), 5);
-    const trending = await settle(callTool("orbitx_screen_trending_1m_solana", {}, auth, base, req));
-    const mints = extractMints(trending, limit);
+    // Source chain: 1m trending → broad screener → newest launchpad tokens
+    // (first-party data, always live). First source with mints wins.
+    let source = "trending_1m";
+    let mints = extractMints(await settle(callTool("orbitx_screen_trending_1m_solana", {}, auth, base, req)), limit);
+    if (!mints.length) {
+      source = "screener";
+      mints = extractMints(await settle(callTool("orbitx_screen_tokens", {}, auth, base, req)), limit);
+    }
+    if (!mints.length) {
+      source = "launchpad_new";
+      mints = extractMints(await settle(callTool("launchpad_tokens", { limit: 10 }, auth, base, req)), limit);
+    }
     const candidates = [];
     for (const mint of mints) {
       const a = await settle(callTool("orbitx_ai_analyze", { mint }, auth, base, req));
@@ -5184,6 +5194,7 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
     candidates.sort((x, y) => (y.score ?? -1) - (x.score ?? -1));
     return {
       ok: true,
+      source,
       scanned: candidates.length,
       candidates,
       note: "Ranked by the deterministic OrbitX score (safety + concentration + momentum from live data). Flags lead — read them before the score. Data, not financial advice.",
