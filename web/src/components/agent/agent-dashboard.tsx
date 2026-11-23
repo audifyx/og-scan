@@ -115,7 +115,18 @@ function FieldRow({
   );
 }
 
-const AGENT_TABS = new Set<AgentTabId>(["setup", "shop", "wallet", "keys", "connect"]);
+const AGENT_TABS = new Set<AgentTabId>(["setup", "shop", "wallet", "keys", "connect", "agent", "tools"]);
+
+/** Live MCP (v3) JSON-RPC call against the one OrbitX MCP endpoint. */
+async function mcpRpc(method: string, params: Record<string, unknown> = {}): Promise<any> {
+  const r = await fetch("https://www.orbitx.world/api/mcp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  const j = await r.json();
+  return j?.result;
+}
 
 function parseAgentTab(raw: string): AgentTabId {
   const t = String(raw || "").toLowerCase();
@@ -148,6 +159,37 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
   const [chatAuth, setChatAuth] = useState<McpChatAuthMint | null>(null);
   const [mintingAuth, setMintingAuth] = useState(false);
   const [inAppWallet, setInAppWallet] = useState<string | null>(null);
+
+  // MCP V3 live data — this dashboard reads the actual MCP (tools + prompts).
+  const [liveTools, setLiveTools] = useState<any[] | null>(null);
+  const [livePrompts, setLivePrompts] = useState<any[] | null>(null);
+  const [toolQuery, setToolQuery] = useState("");
+  const [scanState, setScanState] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [scanResult, setScanResult] = useState<any>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [tl, pl] = await Promise.all([mcpRpc("tools/list"), mcpRpc("prompts/list")]);
+        if (Array.isArray(tl?.tools)) setLiveTools(tl.tools);
+        if (Array.isArray(pl?.prompts)) setLivePrompts(pl.prompts);
+      } catch {
+        /* live panels degrade silently */
+      }
+    })();
+  }, []);
+
+  const runLiveScan = useCallback(async () => {
+    setScanState("running");
+    try {
+      const res = await mcpRpc("tools/call", { name: "orbitx_trader_scan", arguments: { limit: 3 } });
+      const text = res?.content?.[0]?.text;
+      setScanResult(text ? JSON.parse(text) : null);
+      setScanState("done");
+    } catch {
+      setScanState("error");
+    }
+  }, []);
 
   // Fetch in-app wallet address (from /api/orbitx/desk-wallet)
   useEffect(() => {
@@ -356,7 +398,7 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
     : exempt
     ? "Owner exempt"
     : burnActive
-      ? boot?.mcpAccess?.remainingLabel || "Burn access"
+      ? boot?.mcpAccess?.remainingLabel || "Free forever"
       : boot?.hold?.meetsRequirement
         ? "Hold verified"
         : hasKey
@@ -368,9 +410,11 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
       activeTab={tab}
       onTabChange={selectTab}
       tabs={hideTabs.length ? [
-        { id: "setup", label: "Setup", ico: "⌂" },
-        { id: "keys", label: "API keys", ico: "✦" },
+        { id: "setup", label: "Overview", ico: "⌂" },
         { id: "connect", label: "Connect AI", ico: "⬡" },
+        { id: "agent", label: "Trader", ico: "◉" },
+        { id: "tools", label: "Tools", ico: "☰" },
+        { id: "keys", label: "API keys", ico: "✦" },
       ].filter((t) => !(hideTabs as string[]).includes(t.id)) : undefined}
       statusLabel={statusLabel}
       statusWarn={!hasKey || !linkedWallet}
@@ -442,7 +486,7 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
           {exempt && <span className="ox-agent__chip is-accent">Exempt</span>}
           {burnActive && (
             <span className="ox-agent__chip is-ok">
-              {boot?.mcpAccess?.remainingLabel || "Burn access"}
+              {boot?.mcpAccess?.remainingLabel || "Free forever"}
             </span>
           )}
         </div>
@@ -461,6 +505,31 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
 
       {tab === "setup" && (
         <>
+        <div className="ox-agent__hero">
+          <div className="ox-agent__steps" style={{ marginTop: 0 }}>
+            <span className="ox-agent__chip is-ok">● LIVE</span>
+            <span className="ox-agent__chip is-ok">MCP v3.0 — one MCP for everything</span>
+            <span className="ox-agent__chip is-ok">Free forever</span>
+            <span className="ox-agent__chip">Claude · Grok · ChatGPT</span>
+          </div>
+          <h1 className="ox-agent__title" style={{ marginTop: 12 }}>OrbitX MCP</h1>
+          <p className="ox-agent__lead">
+            Research, the Intelligence Pack, your AI Trader Agent, the launchpad, and the desks —{" "}
+            {liveTools ? `${liveTools.length} core tools` : "241 core tools"} in one connection,
+            4,300+ through the universal dispatcher. No burns, no holds, no packages.
+          </p>
+          <div className="ox-agent__btn-row">
+            <button type="button" className="ox-agent__btn ox-agent__btn--primary" onClick={() => selectTab("connect")}>
+              Connect your AI
+            </button>
+            <button type="button" className="ox-agent__btn" onClick={() => selectTab("agent")}>
+              Trader Agent
+            </button>
+            <button type="button" className="ox-agent__btn" onClick={() => selectTab("tools")}>
+              Browse tools
+            </button>
+          </div>
+        </div>
         <div className="ox-agent__grid ox-agent__grid--2">
           <section className="ox-agent__panel">
             <div className="ox-agent__panel-h">
@@ -1008,6 +1077,156 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
             </button>
           </div>
         </div>
+      )}
+
+      {tab === "agent" && (
+        <div className="ox-agent__grid">
+          <section className="ox-agent__panel">
+            <div className="ox-agent__panel-h">
+              <h2 className="ox-agent__panel-title">AI Trader Agent</h2>
+              <span className="ox-agent__panel-hint">runs inside your Claude · Grok · ChatGPT</span>
+            </div>
+            <div className="ox-agent__panel-b">
+              <p className="ox-agent__note" style={{ marginTop: 0 }}>
+                The suite: <code>orbitx_trader_boot</code> checks your link,{" "}
+                <code>orbitx_trader_brief</code> catches you up, <code>orbitx_trader_scan</code>{" "}
+                ranks live candidates by the OrbitX score — flags first, hype never. Set it up once
+                from the Connect tab (Generate chat auth → Trader kickoff), then just talk to your
+                AI: <em>"run my trader scan"</em>.
+              </p>
+              <div className="ox-agent__btn-row">
+                <button type="button" className="ox-agent__btn ox-agent__btn--primary" onClick={() => selectTab("connect")}>
+                  Get the Trader kickoff
+                </button>
+                <button type="button" className="ox-agent__btn" onClick={() => void runLiveScan()} disabled={scanState === "running"}>
+                  {scanState === "running" ? "Scanning the market…" : "Run a live scan here"}
+                </button>
+              </div>
+              {scanState === "done" && scanResult && (
+                <div style={{ marginTop: 12 }}>
+                  <p className="ox-agent__note" style={{ marginTop: 0 }}>
+                    Source: {String(scanResult.source || "—")} · {scanResult.scanned ?? 0} tokens
+                    analyzed · ranked by OrbitX score
+                  </p>
+                  {(scanResult.candidates || []).map((c: any) => (
+                    <div key={c.mint} className="ox-agent__row">
+                      <div className="ox-agent__label">
+                        {c.score ?? "—"} · {c.verdict ?? "unscored"}
+                      </div>
+                      <div className="ox-agent__value">{c.mint}</div>
+                      {!!(c.riskFlags || []).length && (
+                        <div className="ox-agent__label">{c.riskFlags[0]}</div>
+                      )}
+                    </div>
+                  ))}
+                  {!(scanResult.candidates || []).length && (
+                    <p className="ox-agent__note">No candidates right now — the feeds are quiet.</p>
+                  )}
+                </div>
+              )}
+              {scanState === "error" && (
+                <p className="ox-agent__note" style={{ marginTop: 12 }}>
+                  The scan didn't answer — give it a moment and try again.
+                </p>
+              )}
+            </div>
+          </section>
+
+          <section className="ox-agent__panel">
+            <div className="ox-agent__panel-h">
+              <h2 className="ox-agent__panel-title">Intelligence Pack</h2>
+              <span className="ox-agent__panel-hint">what your AI loads before it works</span>
+            </div>
+            <div className="ox-agent__panel-b">
+              <div className="ox-agent__steps" style={{ marginTop: 0 }}>
+                <span className="ox-agent__chip">Winners Playbook</span>
+                <span className="ox-agent__chip">Data-source map</span>
+                <span className="ox-agent__chip">Tool map</span>
+                <span className="ox-agent__chip">orbitx_ai_analyze scoring</span>
+              </div>
+              {(livePrompts || []).map((p: any) => (
+                <div key={p.name} className="ox-agent__row">
+                  <div className="ox-agent__label">{p.title || p.name}</div>
+                  <div className="ox-agent__value" style={{ whiteSpace: "normal" }}>
+                    {p.description}
+                  </div>
+                </div>
+              ))}
+              {!livePrompts && (
+                <p className="ox-agent__note">Loading the live prompt catalog…</p>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {tab === "tools" && (
+        <section className="ox-agent__panel">
+          <div className="ox-agent__panel-h">
+            <h2 className="ox-agent__panel-title">Tool catalog</h2>
+            <span className="ox-agent__panel-hint">
+              {liveTools ? `${liveTools.length} core · 4,300+ via orbitx_exec` : "loading…"}
+            </span>
+          </div>
+          <div className="ox-agent__panel-b">
+            <input
+              value={toolQuery}
+              onChange={(e) => setToolQuery(e.target.value)}
+              placeholder="Search tools — try scan, launchpad, wallet, snipe…"
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: "1px solid var(--border, #26262e)",
+                background: "transparent",
+                color: "inherit",
+                marginBottom: 12,
+                boxSizing: "border-box",
+              }}
+            />
+            <div style={{ maxHeight: 560, overflowY: "auto" }}>
+              {(liveTools || [])
+                .filter((t: any) => {
+                  const q = toolQuery.trim().toLowerCase();
+                  if (!q) return true;
+                  return (
+                    String(t.name).toLowerCase().includes(q) ||
+                    String(t.title || "").toLowerCase().includes(q) ||
+                    String(t.description || "").toLowerCase().includes(q)
+                  );
+                })
+                .slice(0, 150)
+                .map((t: any) => (
+                  <div key={t.name} className="ox-agent__row">
+                    <div>
+                      <div style={{ fontWeight: 600 }}>
+                        {t.title || t.name}{" "}
+                        {t._meta && <span className="ox-agent__chip">Widget</span>}{" "}
+                        {String(t.name).startsWith("launchpad_") && (
+                          <span className="ox-agent__chip">Launchpad</span>
+                        )}
+                      </div>
+                      <div className="ox-agent__label">
+                        <code>{t.name}</code>
+                      </div>
+                      <div className="ox-agent__label" style={{ whiteSpace: "normal" }}>
+                        {String(t.description || "").slice(0, 160)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              {!liveTools && (
+                <p className="ox-agent__note">Loading the live catalog from the MCP…</p>
+              )}
+              {liveTools && toolQuery && !(liveTools || []).some((t: any) => String(t.name).toLowerCase().includes(toolQuery.trim().toLowerCase())) && (
+                <p className="ox-agent__note">
+                  Not in the core list? Your AI can still call it — 4,300+ tools route through{" "}
+                  <code>orbitx_exec</code>.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
       )}
     </AgentShell>
   );
