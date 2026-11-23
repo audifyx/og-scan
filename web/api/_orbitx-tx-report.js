@@ -80,6 +80,11 @@ export default async function handler(req, res) {
     const auth = String(req.headers.authorization || "");
     const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
     const user = await authUser(token);
+    // Identity comes ONLY from the verified session (audit B2). This
+    // handler used to fall back to body.userId / body.wallet for
+    // unauthenticated callers, letting anyone attribute a real
+    // transaction to another user's ledger row and fee events.
+    if (!user?.id) return res.status(401).json({ error: "unauthorized" });
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
     const signature = String(body.signature || body.tx_signature || "").trim();
     if (!/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(signature)) {
@@ -113,12 +118,19 @@ export default async function handler(req, res) {
           ? fee.feeUsd
           : null;
 
+    // Wallet identity is derived from the verified transaction itself
+    // (its fee-paying signer), never from request-body fields.
+    const txKeys = (tx?.transaction?.message?.accountKeys || []).map((k) =>
+      typeof k === "string" ? k : k?.pubkey || k,
+    );
+    const txSigner = txKeys.length ? String(txKeys[0]) : null;
+
     const application = body.application || appFromPath(body.path);
     const row = {
       chain: "solana",
       tx_signature: signature,
-      user_id: user?.id || body.userId || null,
-      wallet_address: body.wallet || body.wallet_address || null,
+      user_id: user.id,
+      wallet_address: txSigner,
       application,
       tx_type: body.txType || body.tx_type || "swap",
       status,

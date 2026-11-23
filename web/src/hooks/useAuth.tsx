@@ -332,6 +332,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return { error: new Error("Not authenticated") };
 
+    // Defense in depth (audit B6): only cosmetic fields may ever be
+    // written through this path. Privileged columns (is_official_account,
+    // verified, badge, mcp_beta_access, affiliate_org_id, og_score, …)
+    // are stripped here AND enforced in the database by the
+    // profiles_guard_privileged trigger — a caller-supplied object must
+    // never reach the table unfiltered again.
+    const PROFILE_EDITABLE_FIELDS = new Set([
+      "username", "display_name", "bio", "avatar_url", "banner_url",
+      "wallet_address", "sol_wallet", "show_verified_holdings",
+      "theme_preset", "custom_wallpaper_url", "bio_links",
+    ]);
+    updates = Object.fromEntries(
+      Object.entries(updates).filter(([k]) => PROFILE_EDITABLE_FIELDS.has(k)),
+    ) as Partial<Profile>;
+
     if (typeof updates.username === "string") {
       const cleanUsername = normalizeUsernameForPolicy(updates.username);
       if (isReservedUsername(cleanUsername) && !canUseReservedUsername(user.email)) {
