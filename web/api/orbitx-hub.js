@@ -7,8 +7,8 @@
  *   /api/orbitx-mcp/*   → /api/orbitx-hub?path=mcp/*
  *   /api/orbitx/*       → /api/orbitx-hub?path=*
  */
-export const MCP_SERVER_VERSION = "2.0.0";
-export const MCP_SERVER_NAME = "OrbitX Agent MCP";
+export const MCP_SERVER_VERSION = "3.0.0";
+export const MCP_SERVER_NAME = "OrbitX MCP";
 
 function mcpRuntime() {
   return {
@@ -155,7 +155,10 @@ import {
   INTELLIGENCE_PROMPTS,
   getIntelligencePrompt,
   analyzeTokenSections,
+  extractMints,
 } from "./orbitx/_handlers/_mcp-intelligence.js";
+/** MCP V3 unification: the Launchpad MCP's own tool defs, listed in the one core catalog. */
+import { LAUNCHPAD_TOOLS as LAUNCHPAD_MCP_TOOLS } from "./orbitx/_handlers/_launchpad-mcp.js";
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
   return import("./orbitx/_handlers/_mcp-ops.js");
@@ -2656,6 +2659,23 @@ const CORE_TOOLS = [
     inputSchema: { type: "object", properties: { mint: { type: "string", description: "Token mint (contract address), 32-44 base58 chars." }, interval: { type: "string", enum: ["5m", "15m", "1h", "4h", "1d"], default: "1h" } }, required: ["mint"] },
   },
   {
+    name: "orbitx_trader_boot",
+    description: "Trader Agent suite — boot check: verifies the user's OrbitX account link (authCode), identity, and wallet readiness, and returns a checklist + exact next steps. Run this first when a user sets up their AI trader agent or asks 'am I connected / is my agent ready'.",
+    inputSchema: { type: "object", properties: { authCode: { type: "string", description: "OrbitX authCode from orbitx.world/agent (chat auth paste message). Optional — pass when the user has one." } } },
+  },
+  {
+    name: "orbitx_trader_scan",
+    description: "Trader Agent suite — the research loop in one call: pulls the live trending screen, runs orbitx_ai_analyze on the top movers, and returns ranked candidates with scores, verdicts, and risk flags. Use for 'find me plays / scan the market / what's worth looking at'.",
+    inputSchema: { type: "object", properties: { limit: { type: "integer", minimum: 1, maximum: 5, default: 3, description: "How many trending tokens to analyze (default 3)." } } },
+  },
+  {
+    name: "orbitx_trader_brief",
+    description: "Trader Agent suite — one-call briefing: trending movers, platform stats, paper desk state, and the user's live positions (when linked). Use for morning briefs and 'catch me up'.",
+    inputSchema: { type: "object", properties: { authCode: { type: "string", description: "OrbitX authCode — needed for the live-positions section." } } },
+  },
+  // MCP V3: the Launchpad MCP's tools are first-class in the one catalog.
+  ...LAUNCHPAD_MCP_TOOLS,
+  {
     name: "orbitx_get_ath",
     description: "All-time-high price and market cap for a token.",
     inputSchema: { type: "object", properties: { mint: { type: "string" } }, required: ["mint"] },
@@ -5112,6 +5132,71 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
     return { mint, analysis: verdict, scanOk: scan?.ok !== false, athOk: ath?.ok !== false, chartOk: chart?.ok !== false };
   }
 
+  // Trader Agent suite (MCP V3) — composed from the live engines.
+  if (name === "orbitx_trader_boot") {
+    const settle = (p) => Promise.resolve(p).catch((e) => ({ ok: false, error: "section_failed", message: e?.message || "section unavailable" }));
+    const [status, whoami] = await Promise.all([
+      settle(callTool("orbitx_auth_status", { ...args }, auth, base, req)),
+      settle(callTool("orbitx_whoami", { ...args }, auth, base, req)),
+    ]);
+    const connected = (status && status.ok === true) || (whoami && whoami.ok === true);
+    return {
+      ok: true,
+      agent: "OrbitX Trader Agent",
+      connected,
+      authStatus: status,
+      identity: whoami,
+      checklist: [
+        { step: "MCP connected", done: true },
+        { step: "Intelligence pack loaded (playbook + data sources + tool map)", done: true, hint: "resources orbitx://intelligence/*" },
+        { step: "OrbitX account linked (authCode)", done: connected, hint: connected ? undefined : "User: orbitx.world/agent → link wallet → Generate chat auth → paste the message here." },
+        { step: "Research loop", done: true, hint: "orbitx_trader_scan" },
+        { step: "Briefing", done: true, hint: "orbitx_trader_brief" },
+        { step: "Trade path (quote → user confirms → execute)", done: connected, hint: "orbitx_trade_quote" },
+      ],
+      nextSteps: connected
+        ? ["Run orbitx_trader_brief for the market + book snapshot.", "Run orbitx_trader_scan for ranked candidates with scores and risk flags."]
+        : ["Link the account: orbitx.world/agent → Generate chat auth → paste the message in chat.", "Research tools (scan, dossier, analyze, trending) already work without an account."],
+    };
+  }
+
+  if (name === "orbitx_trader_scan") {
+    const settle = (p) => Promise.resolve(p).catch((e) => ({ ok: false, error: "section_failed", message: e?.message || "section unavailable" }));
+    const limit = Math.min(Math.max(parseInt(args.limit, 10) || 3, 1), 5);
+    const trending = await settle(callTool("orbitx_screen_trending_1m_solana", {}, auth, base, req));
+    const mints = extractMints(trending, limit);
+    const candidates = [];
+    for (const mint of mints) {
+      const a = await settle(callTool("orbitx_ai_analyze", { mint }, auth, base, req));
+      candidates.push({
+        mint,
+        score: a?.analysis?.score ?? null,
+        verdict: a?.analysis?.verdict ?? null,
+        dimensions: a?.analysis?.dimensions ?? null,
+        riskFlags: a?.analysis?.riskFlags ?? [],
+        analyzed: a?.analysis?.ok === true,
+      });
+    }
+    candidates.sort((x, y) => (y.score ?? -1) - (x.score ?? -1));
+    return {
+      ok: true,
+      scanned: candidates.length,
+      candidates,
+      note: "Ranked by the deterministic OrbitX score (safety + concentration + momentum from live data). Flags lead — read them before the score. Data, not financial advice.",
+    };
+  }
+
+  if (name === "orbitx_trader_brief") {
+    const settle = (p) => Promise.resolve(p).catch((e) => ({ ok: false, error: "section_failed", message: e?.message || "section unavailable" }));
+    const [trending, stats, paper, live] = await Promise.all([
+      settle(callTool("orbitx_screen_trending_1m_solana", {}, auth, base, req)),
+      settle(callTool("orbitx_platform_stats", {}, auth, base, req)),
+      settle(callTool("orbitx_paper_desk", {}, auth, base, req)),
+      settle(callTool("orbitx_live_positions", { ...args }, auth, base, req)),
+    ]);
+    return { ok: true, brief: true, trending, platformStats: stats, paperDesk: paper, livePositions: live };
+  }
+
   if (name === "orbitx_shop") {
     const pack = String(args.package || args.item || "").toLowerCase();
     if (pack === "hour" || pack === "day" || pack === "week" || pack === "month" || pack === "access") {
@@ -6227,6 +6312,14 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
     }
   }
 
+  // MCP V3 unification: Launchpad MCP tools are first-class in the one MCP —
+  // same handler the /api/mcp-launchpad endpoint uses; account actions still
+  // require the user's authCode inside the handler.
+  if (name.startsWith("launchpad_")) {
+    const { handleLaunchpadTool } = await import("./orbitx/_handlers/_launchpad-mcp.js");
+    return handleLaunchpadTool(name, args, { auth });
+  }
+
   if (/launch|create_token|create_coin|pump.*creat/i.test(name)) {
     return {
       ok: false,
@@ -6695,7 +6788,7 @@ async function handleMcp(req, res, parts) {
             capabilities: { tools: {}, resources: {}, prompts: {}, extensions: { "io.modelcontextprotocol/skills": {} } },
             serverInfo: { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
             instructions:
-              "OrbitX Agent MCP v2.0.0 — FREE FOREVER: no burn, no hold, no package is ever required to use this MCP. Works in Claude, Grok, and ChatGPT; flagship tools render rich OrbitX widgets in-client. If they ask why use this MCP or which app to use, call orbitx_why. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool (account actions need it; all research tools are open). FULL TOKEN BREAKDOWN in one call: orbitx_token_dossier (scan + forensics + ATH + chart). Quick safety: orbitx_crypto_scan. SCORED VERDICT: orbitx_ai_analyze. INTELLIGENCE PACK — before analyzing anything, read resources orbitx://intelligence/playbook (recorded strategy win rates + house rules), orbitx://intelligence/data-sources (which source for which figure), orbitx://intelligence/tool-map; prompts/list offers token_deep_dive, pre_trade_risk_check, wallet_autopsy, market_pulse playbooks that sequence the tools for you. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. PAPER DESK: 10 agents × 10,000 mock SOL trading real coin tape every hour — orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. LIVE DESK (read only, never executes): orbitx_live_desk / orbitx_live_positions / orbitx_live_feed / orbitx_live_world. Watch the feed and 3D city at https://www.orbitx.world/on-chain. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create; city: orbitx_life_city, brain: orbitx_life_think, files: orbitx_life_files, talk: orbitx_life_converse; 300 life cmds via tools/list cursor life:0. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Any tool not visible: orbitx_exec calls all 4,300+ tools by name; search finds them. Setup: https://www.orbitx.world/agent",
+              "OrbitX MCP v3.0.0 — ONE MCP for everything OrbitX: research + intelligence + launchpad + trading + desks + life agents, in a single connection. FREE FOREVER: no burn, no hold, no package is ever required. Works in Claude, Grok, and ChatGPT; flagship tools render rich OrbitX widgets in-client. (The separate X and Telegram MCPs are coming soon — everything here is live.) TRADER AGENT: prompt trader_agent_boot boots you as the user's trader agent; orbitx_trader_boot checks the account link, orbitx_trader_brief briefs, orbitx_trader_scan returns ranked scored candidates. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every account tool (all research tools are open without one). INTELLIGENCE PACK — before analyzing anything, read resources orbitx://intelligence/playbook (recorded strategy win rates + house rules), orbitx://intelligence/data-sources, orbitx://intelligence/tool-map; prompts/list offers token_deep_dive, pre_trade_risk_check, wallet_autopsy, market_pulse, trader_agent_boot. FULL TOKEN BREAKDOWN: orbitx_token_dossier. SCORED VERDICT: orbitx_ai_analyze. Quick safety: orbitx_crypto_scan. CHARTS: orbitx_dex_chart. LAUNCHPAD: launchpad_* tools (tokens, pairs, graduations, buy, sell, launch) run through THIS MCP — the old separate launchpad endpoint is now just an alias. TRADE: orbitx_trade_quote then prepare_buy; never execute without the user's explicit confirm. PAPER DESK: orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. LIVE DESK (read only): orbitx_live_desk / orbitx_live_positions / orbitx_live_feed / orbitx_live_world; feed + 3D city at https://www.orbitx.world/on-chain. LIFE CITY: orbitx_life_create / orbitx_life_city / orbitx_life_think / orbitx_life_converse; 300 life cmds via tools/list cursor life:0. If they ask why use this MCP, call orbitx_why. Menu: orbitx_menu. Any tool not visible: orbitx_exec calls all 4,300+ tools by name; search finds them. Setup: https://www.orbitx.world/agent",
           },
         },
         200,
