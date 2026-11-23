@@ -781,6 +781,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
     }
     }
 
+    let feeSignature: string | undefined;
     try {
       /* Step 0 — Platform launch fee ($0.50 in SOL, Solana only) */
       if (LAUNCHPAD_FEE_USD > 0) {
@@ -794,7 +795,12 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         feeTx.feePayer = publicKey;
         feeTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
         const signedFee = await signTransaction(feeTx);
-        await connection.sendRawTransaction(signedFee.serialize());
+        // The server now verifies this payment on-chain (audit B7) —
+        // capture the signature and wait for confirmation before the
+        // create call, instead of fire-and-forget.
+        feeSignature = await connection.sendRawTransaction(signedFee.serialize());
+        setStatusMsg("Confirming launch fee…");
+        await connection.confirmTransaction(feeSignature, "confirmed");
       }
 
       /* Step 1 — Upload to IPFS */
@@ -862,6 +868,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
           step: "create", publicKey: publicKey.toBase58(), metadataUri: uri,
           name: form.name.trim(), symbol: form.symbol.trim().toUpperCase(),
           mintPublicKey: mintKeypair.publicKey.toBase58(), devBuySol: devBuy, slippage: 15,
+          feeSignature,
         }),
       });
       if (!createRes.ok) {

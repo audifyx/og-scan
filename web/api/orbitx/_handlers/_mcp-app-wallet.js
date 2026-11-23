@@ -282,6 +282,45 @@ export function validateSellSize(args = {}) {
   return { ok: true, fraction: 1 };
 }
 
+/* B10 root cause: appWalletBuy resolved its size with
+ * `if (!usd) usd = Number(args.amount) || 1` — a garbage amount
+ * (NaN) silently became a REAL $1 buy, and a garbage usd/amountUsd
+ * cascaded into the same default. Rule: any amount field that is
+ * PRESENT must be a finite number > 0; the $1 default applies only
+ * when no amount field was supplied at all. */
+export function validateBuySizeFields(args = {}) {
+  const raw = {};
+  for (const f of ["usd", "amountUsd", "amountSol", "amountUsdc", "amount"]) {
+    if (args[f] != null && args[f] !== "") {
+      const n = Number(args[f]);
+      if (!Number.isFinite(n) || n <= 0) {
+        return { ok: false, error: "bad_amount", message: `${f} must be a finite number > 0.` };
+      }
+      raw[f] = n;
+    }
+  }
+  return { ok: true, raw };
+}
+
+export function validateBuySize(args = {}, px = 0) {
+  const v = validateBuySizeFields(args);
+  if (!v.ok) return v;
+  const raw = v.raw;
+  let usd;
+  if (raw.usd != null) usd = raw.usd;
+  else if (raw.amountUsd != null) usd = raw.amountUsd;
+  else if (raw.amountSol != null) {
+    if (!(px > 0)) return { ok: false, error: "price_unavailable", message: "SOL price unavailable — retry in a moment." };
+    usd = raw.amountSol * px;
+  } else if (raw.amountUsdc != null) usd = raw.amountUsdc;
+  else if (raw.amount != null) usd = raw.amount;
+  else usd = 1; // documented default — only when NO amount field was supplied
+  if (!Number.isFinite(usd) || usd <= 0 || usd > 100_000) {
+    return { ok: false, error: "bad_amount", message: "Buy size must be > $0 and ≤ $100,000." };
+  }
+  return { ok: true, usd };
+}
+
 export function validateTriggerPct(args = {}) {
   const raw = args.trigger ?? args.percent ?? args.up;
   if (raw == null || String(raw).trim() === "") return { ok: true, pct: 15 };
@@ -311,10 +350,9 @@ export async function appWalletBuy(auth, args = {}) {
   let useUsdc = pay.includes("usdc");
   if (!pay) useUsdc = funds.usdc >= 1 && funds.sol * 110 < 1;
   const px = await solUsd();
-  let usd = Number(args.usd || args.amountUsd || 0);
-  if (!usd && args.amountSol) usd = Number(args.amountSol) * px;
-  if (!usd && args.amountUsdc) usd = Number(args.amountUsdc);
-  if (!usd) usd = Number(args.amount) || 1;
+  const sizeCheck = validateBuySize(args, px);
+  if (!sizeCheck.ok) return sizeCheck;
+  const usd = sizeCheck.usd;
   const info = await tokenInfo(mint);
   let inputMint = SOL_MINT;
   let amount = Math.floor((usd / px) * 1e9);
@@ -392,13 +430,17 @@ export async function appWalletLimit(auth, args = {}) {
       size.amount = String(args.amount);
     } else size.fraction = 1;
   } else {
-    if (args.usd != null && args.usd !== "") size.usd = Number(args.usd);
-    else if (args.amountUsd != null && args.amountUsd !== "") size.usd = Number(args.amountUsd);
-    else if (args.amountSol != null && args.amountSol !== "") size.amountSol = Number(args.amountSol);
-    else if (args.amountUsdc != null && args.amountUsdc !== "") size.amountUsdc = Number(args.amountUsdc);
+    // Same strict rule as the spot buy (audit B10): a present-but-
+    // garbage amount is rejected, never armed as a $1 order. The
+    // persisted shape is unchanged (usd / amountSol / amountUsdc).
+    const vf = validateBuySizeFields(args);
+    if (!vf.ok) return vf;
+    if (vf.raw.usd != null) size.usd = vf.raw.usd;
+    else if (vf.raw.amountUsd != null) size.usd = vf.raw.amountUsd;
+    else if (vf.raw.amountSol != null) size.amountSol = vf.raw.amountSol;
+    else if (vf.raw.amountUsdc != null) size.amountUsdc = vf.raw.amountUsdc;
+    else if (vf.raw.amount != null) size.usd = vf.raw.amount;
     else size.usd = 1;
-    const buySize = Number(size.usd ?? size.amountSol ?? size.amountUsdc);
-    if (!Number.isFinite(buySize) || buySize <= 0) return { ok: false, error: "bad_size", message: "buy size must be > 0." };
     if (args.payWith) size.payWith = String(args.payWith);
   }
   size.slippageBps = slip;

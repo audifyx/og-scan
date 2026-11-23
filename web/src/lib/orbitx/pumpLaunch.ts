@@ -21,6 +21,9 @@ export interface PumpLaunchInput {
   telegram?: string;
   website?: string;
   devBuySol?: number;           // optional creator dev-buy
+  /** Signature of the on-chain launch-fee payment — the server verifies
+   *  it before building the create transaction (audit B7). */
+  feeSignature?: string;
   onStatus?: (msg: string) => void;
 }
 
@@ -65,7 +68,7 @@ export async function launchPumpCoin(input: PumpLaunchInput): Promise<PumpLaunch
     body: JSON.stringify({
       step: "create", publicKey: publicKey.toBase58(), metadataUri,
       name: input.name, symbol: input.symbol, mintPublicKey: mintKeypair.publicKey.toBase58(),
-      devBuySol: input.devBuySol ?? 0, slippage: 15,
+      devBuySol: input.devBuySol ?? 0, slippage: 15, feeSignature: input.feeSignature,
     }),
   });
   if (!createRes.ok) throw new Error((await createRes.json().catch(() => ({}))).error || "Coin transaction build failed");
