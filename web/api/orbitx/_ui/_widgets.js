@@ -218,6 +218,7 @@ export const UI_TOOL_WIDGET = {
   orbitx_gc_chat: "ui://widget/orbitx-groupchat.html",
   // V2 expansion — flagship reads get rich widgets in every client
   orbitx_token_dossier: "ui://widget/orbitx-token.html",
+  orbitx_ai_analyze: "ui://widget/orbitx-token.html",
   orbitx_call_history: "ui://widget/orbitx-token.html",
   orbitx_wallet_transactions: "ui://widget/orbitx-wallet.html",
   orbitx_live_positions: "ui://widget/orbitx-wallet.html",
