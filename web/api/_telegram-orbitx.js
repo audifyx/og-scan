@@ -84,6 +84,7 @@ import {
   ORBITX_MINT,
 } from "./orbitx/_handlers/_orbitx-telegram-knowledge.js";
 import { fetchTelegramTokenSnapshot, hasMarketSnapshot, looksLikeFailedQuoteCard, looksLikeOrbitXCard } from "./orbitx/_handlers/_telegram-token-snapshot.js";
+import { tgEsc } from "./orbitx/_handlers/_telegram-payload.js";
 import { fetchTokenProjectResearch } from "./orbitx/_handlers/_telegram-token-brief.js";
 import { nvidiaChat, postTweetOAuth2, publicNvidiaMessage, resolveNimModel } from "./orbitx/_handlers/_x-agent-lib.js";
 import { memoryRateLimit } from "./orbitx/_handlers/_ai-runtime.js";
@@ -488,8 +489,10 @@ async function handleVerify(chatId, text, { isGroup, from, link, extra }) {
     chatId,
     [
       "<b>✓ OrbitX Verified</b>",
-      name ? `${name} · $${symbol || "TOKEN"}` : "",
-      `<code>${mint}</code>`,
+      // Token name/symbol are creator-controlled metadata — escape
+      // before HTML parse_mode (audit B1).
+      name ? `${tgEsc(name)} · $${tgEsc(symbol || "TOKEN")}` : "",
+      `<code>${tgEsc(mint)}</code>`,
       "This badge now shows whenever the mint is scanned in Telegram (/token, CA drop, /scan, /xray).",
     ]
       .filter(Boolean)
@@ -1472,7 +1475,9 @@ async function handleTelegramUpdate(update, req) {
     }
     await sendLong(
       chatId,
-      `<b>Linked OrbitX</b>\nuser: <code>${link.user_id}</code>\nwallet: <code>${link.wallet_address || "n/a"}</code>\ntelegram: @${link.telegram_username || from.username || "user"}`,
+      // All three values are user-controlled (Telegram username is
+      // free text) — escape before HTML parse_mode (audit B1).
+      `<b>Linked OrbitX</b>\nuser: <code>${tgEsc(link.user_id)}</code>\nwallet: <code>${tgEsc(link.wallet_address || "n/a")}</code>\ntelegram: @${tgEsc(link.telegram_username || from.username || "user")}`,
       { parse_mode: "HTML" },
     );
     return;

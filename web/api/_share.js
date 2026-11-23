@@ -9,6 +9,8 @@
  * share route 500'd in prod ("Cannot find module '/var/task/web/api/_share.ts'").
  */
 
+import { sanitizeOgHtml } from "../shared/share-sanitize.js";
+
 // Serves the OG-meta page for /share/:mint with a guaranteed text/html content-type.
 // (Vercel external rewrites downgrade the upstream content-type to text/plain, which
 // makes browsers show the HTML as code — so we proxy it first-party here.)
@@ -21,11 +23,13 @@ export default async function handler(req, res) {
     const html = await r.text();
     // token-og edge fn still points at the retired ogscan.fun domain (and a
     // dead /OGDEX route) until it is redeployed — rewrite its URLs to the live domain.
-    const fixed = html
-      .replaceAll("https://www.ogscan.fun", "https://orbitx.world")
-      .replaceAll("https://ogscan.fun", "https://orbitx.world")
-      .replaceAll("/OGDEX/token/", "/ORBITX_DEX/token/")
-      .replaceAll("/og-default.png", "/orbitx-banner.jpg");
+    const fixed = sanitizeOgHtml(
+      html
+        .replaceAll("https://www.ogscan.fun", "https://orbitx.world")
+        .replaceAll("https://ogscan.fun", "https://orbitx.world")
+        .replaceAll("/OGDEX/token/", "/ORBITX_DEX/token/")
+        .replaceAll("/og-default.png", "/orbitx-banner.jpg"),
+    );
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "public, max-age=300");
     return res.status(200).send(fixed);
