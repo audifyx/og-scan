@@ -219,6 +219,9 @@ export const UI_TOOL_WIDGET = {
   // V2 expansion — flagship reads get rich widgets in every client
   orbitx_token_dossier: "ui://widget/orbitx-token.html",
   orbitx_ai_analyze: "ui://widget/orbitx-token.html",
+  orbitx_trader_boot: "ui://widget/orbitx-dashboard.html",
+  orbitx_trader_brief: "ui://widget/orbitx-dashboard.html",
+  orbitx_trader_scan: "ui://widget/orbitx-token.html",
   orbitx_call_history: "ui://widget/orbitx-token.html",
   orbitx_wallet_transactions: "ui://widget/orbitx-wallet.html",
   orbitx_live_positions: "ui://widget/orbitx-wallet.html",

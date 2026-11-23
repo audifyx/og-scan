@@ -25,6 +25,17 @@ import { TelegramMcpCard } from "./TelegramMcpCard";
 import { McpShop } from "./McpShop";
 
 import { apiUrl } from "@/lib/apiBase";
+
+/** Appended to a chat-auth paste message to boot the AI as a Trader Agent (MCP V3). */
+const TRADER_KICKOFF_SUFFIX = `
+
+TRADER AGENT MODE — you are now my OrbitX AI trader agent (one MCP: research, intelligence, launchpad, trading).
+1. Read the intelligence resources first: orbitx://intelligence/playbook, orbitx://intelligence/data-sources, orbitx://intelligence/tool-map.
+2. Run orbitx_trader_boot and confirm my account + wallet are connected.
+3. Run orbitx_trader_brief, then orbitx_trader_scan — show me ranked candidates with scores and risk flags, flags first.
+4. Trades: orbitx_trade_quote first, show me the exact quote, and never execute without my explicit "confirm" in this chat.
+House rules: quote the traded mint only; the pump verifies the move, the dip is the research window; if data is unavailable, say so — never invent numbers.`;
+
 function maskSecret(value: string, kind: "key" | "header" = "key") {
   if (!value) return "—";
   if (kind === "header" && value.startsWith("Bearer ")) {
@@ -667,7 +678,7 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
           </div>
           <div className="ox-agent__panel-b">
             <div className="ox-agent__steps" style={{ marginTop: 0, marginBottom: 14 }}>
-              <span className="ox-agent__chip is-ok">MCP v2.0</span>
+              <span className="ox-agent__chip is-ok">MCP v3.0 — one MCP for everything</span>
               <span className="ox-agent__chip is-ok">Free forever — no burn, no hold</span>
               <span className="ox-agent__chip">4,300+ tools</span>
               <span className="ox-agent__chip">Rich widgets in Claude · Grok · ChatGPT</span>
@@ -783,6 +794,58 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
                   authCode <code>{chatAuth.authCode}</code>
                   {chatAuth.expiresAt ? ` · linked until ${chatAuth.expiresAt.slice(0, 10)}` : ""}
                   {copied?.startsWith("chat") ? " · message copied — paste into that chat" : ""}
+                </p>
+              )}
+            </div>
+
+            <div
+              style={{
+                marginTop: "1rem",
+                padding: "1rem",
+                border: "1px solid var(--border, #26262e)",
+                borderRadius: 12,
+              }}
+            >
+              <strong style={{ display: "block", marginBottom: 6 }}>
+                AI Trader Agent — easy setup (new in v3)
+              </strong>
+              <ol className="ox-agent__ol" style={{ marginTop: 0 }}>
+                <li>Add OrbitX to your AI with the buttons above — one MCP, everything included.</li>
+                <li>Generate chat auth above, then copy the Trader kickoff for your client.</li>
+                <li>
+                  Paste it in the chat. Your AI boots as your trader agent: it loads the OrbitX
+                  playbook, checks your wallet, briefs you, and scans for ranked plays. Try:{" "}
+                  <em>"run my trader scan"</em>.
+                </li>
+              </ol>
+              {chatAuth?.messages ? (
+                <div className="ox-agent__btn-row" style={{ marginTop: 0 }}>
+                  <button
+                    type="button"
+                    className="ox-agent__btn ox-agent__btn--primary"
+                    onClick={() => copy("traderClaude", chatAuth.messages.claude + TRADER_KICKOFF_SUFFIX)}
+                  >
+                    {copied === "traderClaude" ? "Copied" : "Trader kickoff for Claude"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ox-agent__btn"
+                    onClick={() => copy("traderGrok", chatAuth.messages.grok + TRADER_KICKOFF_SUFFIX)}
+                  >
+                    {copied === "traderGrok" ? "Copied" : "Trader kickoff for Grok"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ox-agent__btn"
+                    onClick={() => copy("traderGpt", chatAuth.messages.chatgpt + TRADER_KICKOFF_SUFFIX)}
+                  >
+                    {copied === "traderGpt" ? "Copied" : "Trader kickoff for ChatGPT"}
+                  </button>
+                </div>
+              ) : (
+                <p className="ox-agent__note" style={{ marginBottom: 0 }}>
+                  Link your wallet and tap <strong>Generate chat auth</strong> above — the Trader
+                  kickoff buttons appear here.
                 </p>
               )}
             </div>
