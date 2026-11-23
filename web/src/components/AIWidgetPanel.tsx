@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { saveWidgetsToCloud } from '@/lib/widgetSync';
+import { HELIUS_BASE } from "@/lib/og";
 
 /* Catches crashes inside AI-generated widget code so one bad widget can never
    take down the whole hub. */
@@ -729,14 +730,14 @@ function TokenInfoWidget({ params }: { params: Record<string, any> }) {
 
 function WalletWidget({ params }: { params: Record<string, any> }) {
   const [bal, setBal] = useState<number | null>(null), [err, setErr] = useState(''), addr = (params.address as string) ?? '';
-  useEffect(() => { if (!addr || addr.length < 32) return; const key = (import.meta as any).env?.VITE_HELIUS_API_KEY ?? ''; if (!key) { setErr('Helius key not configured'); return; } fetch(`https://api.helius.xyz/v0/addresses/${addr}/balances?api-key=${key}`).then(r => r.json()).then(d => { if (d?.nativeBalance !== undefined) setBal(d.nativeBalance / 1e9); }).catch(() => setErr('Fetch failed')); }, [addr]);
+  useEffect(() => { if (!addr || addr.length < 32) return; fetch(`${HELIUS_BASE}/addresses/${addr}/balances`).then(r => r.json()).then(d => { if (d?.nativeBalance !== undefined) setBal(d.nativeBalance / 1e9); }).catch(() => setErr('Fetch failed')); }, [addr]);
   if (!addr) return <div style={{ fontSize:11, color:'rgba(255,255,255,.4)' }}>No address set — edit widget.</div>;
   return (<div><div style={{ fontSize:10, color:'rgba(255,255,255,.35)', fontFamily:'monospace', marginBottom:4 }}>{addr.slice(0,8)}…{addr.slice(-6)}</div><div style={{ fontSize:24, fontWeight:900, color:'#fff' }}>{bal !== null ? `${bal.toFixed(3)} SOL` : err || 'Loading…'}</div></div>);
 }
 
 function WalletPortfolioWidget({ params }: { params: Record<string, any> }) {
   const [data, setData] = useState<any>(null), [err, setErr] = useState(''), addr = (params.address as string) ?? '';
-  useEffect(() => { if (!addr || addr.length < 32) return; const key = (import.meta as any).env?.VITE_HELIUS_API_KEY ?? ''; if (!key) { setErr('Helius key not configured'); return; } fetch(`https://api.helius.xyz/v0/addresses/${addr}/balances?api-key=${key}`).then(r => r.json()).then(d => { if (d?.nativeBalance !== undefined) setData(d); }).catch(() => setErr('Fetch failed')); }, [addr]);
+  useEffect(() => { if (!addr || addr.length < 32) return; fetch(`${HELIUS_BASE}/addresses/${addr}/balances`).then(r => r.json()).then(d => { if (d?.nativeBalance !== undefined) setData(d); }).catch(() => setErr('Fetch failed')); }, [addr]);
   if (!addr) return <div style={{ fontSize:11, color:'rgba(255,255,255,.4)' }}>No address set.</div>;
   if (err) return <div style={{ fontSize:11, color:'#fb7185' }}>{err}</div>;
   if (!data) return <div style={{ fontSize:11, color:'rgba(255,255,255,.35)' }}>Loading…</div>;
@@ -752,12 +753,10 @@ function WalletTrackerWidget({ params }: { params: Record<string, any> }) {
   const addr = (params.address as string) ?? '';
   useEffect(() => {
     if (!addr || addr.length < 32) return;
-    const key = (import.meta as any).env?.VITE_HELIUS_API_KEY ?? '';
-    if (!key) { setErr('Helius key not configured'); setLoading(false); return; }
     setLoading(true);
     Promise.all([
-      fetch(`https://api.helius.xyz/v0/addresses/${addr}/balances?api-key=${key}`).then(r => r.json()).then(setBalances).catch(() => {}),
-      fetch(`https://api.helius.xyz/v0/addresses/${addr}/transactions?api-key=${key}&limit=30`).then(r => r.json()).then(d => { if (Array.isArray(d)) setTxns(d); }).catch(() => {}),
+      fetch(`${HELIUS_BASE}/addresses/${addr}/balances`).then(r => r.json()).then(setBalances).catch(() => {}),
+      fetch(`${HELIUS_BASE}/addresses/${addr}/transactions?limit=30`).then(r => r.json()).then(d => { if (Array.isArray(d)) setTxns(d); }).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, [addr]);
   if (!addr) return <div style={{ fontSize:11, color:'rgba(255,255,255,.4)' }}>No wallet address. Use /wallet ADDRESS to set one.</div>;

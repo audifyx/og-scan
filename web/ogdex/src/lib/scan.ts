@@ -1,8 +1,8 @@
 // OrbitX tools — self-contained data layer for the OrbitX Terminal Tools page.
-// Uses Jupiter (no key), Helius RPC (VITE_HELIUS_API_KEY), and DexScreener.
-const HELIUS = (import.meta as any).env?.VITE_HELIUS_API_KEY || "";
-const RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS}`;
-const HELIUS_BASE = "https://api.helius.xyz/v0";
+// Uses Jupiter (no key), Helius via the platform server proxy, and DexScreener.
+// Helius via the platform server proxy — no key in the bundle (audit B4).
+const RPC = `${window.location.origin}/api/web/rpc-proxy`;
+const HELIUS_BASE = `${window.location.origin}/api/web/rpc-proxy/v0`;
 const JUP = "https://lite-api.jup.ag";
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 
@@ -116,7 +116,7 @@ export async function walletProfile(addr: string): Promise<WalletProfile> {
   const [bal, assets, txs] = await Promise.all([
     rpc("getBalance", [addr]).catch(() => null),
     rpc("getTokenAccountsByOwner", [addr, { programId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" }, { encoding: "jsonParsed" }]).catch(() => null),
-    fetch(`${HELIUS_BASE}/addresses/${addr}/transactions?api-key=${HELIUS}&limit=50`).then((r) => r.ok ? r.json() : []).catch(() => []),
+    fetch(`${HELIUS_BASE}/addresses/${addr}/transactions?limit=50`).then((r) => r.ok ? r.json() : []).catch(() => []),
   ]);
   const sol = bal?.value != null ? bal.value / 1e9 : null;
   const accts = (assets?.value || []).map((x: any) => {

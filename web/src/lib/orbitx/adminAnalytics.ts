@@ -1,6 +1,6 @@
 // OrbitX Launchpad admin analytics — derived from the token registry + live
 // on-chain wallet balances/inflows. No mock data.
-import { HELIUS_RPC, HELIUS_API_KEY } from "@/lib/og";
+import { HELIUS_RPC, HELIUS_BASE } from "@/lib/og";
 import { PLATFORM_WALLET, TRADE_FEE_PLATFORM_SHARE_PCT } from "@/lib/platformFee";
 import { ROUTED_FEE_WALLET } from "./feeRouting";
 import type { OrbitxToken } from "./registry";
@@ -103,12 +103,11 @@ export async function fetchSolBalance(wallet: string): Promise<number> {
 
 /** Sum of SOL received by `wallet` over the last `sinceDays` via Helius enhanced tx API. */
 export async function fetchInflowSol(wallet: string, sinceDays = 30): Promise<number> {
-  if (!HELIUS_API_KEY) return 0;
   const cutoff = Date.now() / 1000 - sinceDays * 86400;
   let before = "";
   let total = 0;
   for (let page = 0; page < 6; page++) {
-    const url = `https://api.helius.xyz/v0/addresses/${wallet}/transactions?api-key=${HELIUS_API_KEY}&limit=100${before ? `&before=${before}` : ""}`;
+    const url = `${HELIUS_BASE}/addresses/${wallet}/transactions?limit=100${before ? `&before=${before}` : ""}`;
     let txs: any[];
     try {
       const res = await fetch(url);

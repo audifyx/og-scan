@@ -19,7 +19,7 @@ import { fmtCompactUsd } from "./lpx";
 import TokenAnalytics from "./TokenAnalytics";
 import TokenChat from "./TokenChat";
 import { orbitScore } from "./orbitScore";
-import { jupGetTokens, jupQuote, jupSwapTransaction, SOL_MINT, fmtPct, HELIUS_BASE, HELIUS_API_KEY, OGSCAN_TOKEN_MINT } from "@/lib/og";
+import { jupGetTokens, jupQuote, jupSwapTransaction, SOL_MINT, fmtPct, HELIUS_BASE, OGSCAN_TOKEN_MINT } from "@/lib/og";
 import { toast } from "sonner";
 import { IndexOnChainTx, SolscanLink } from "@/components/onchain";
 import { indexConfirmedTx } from "@/lib/orbitx/onchainAttest";
@@ -136,9 +136,9 @@ function useWalletPnl(mint: string) {
   return useQuery({
     queryKey: ["token-pnl", mint, publicKey?.toBase58()],
     queryFn: async () => {
-      if (!publicKey || !HELIUS_API_KEY) return null;
+      if (!publicKey) return null;
       const addr = publicKey.toBase58();
-      const r = await fetch(`${HELIUS_BASE}/addresses/${addr}/transactions?api-key=${HELIUS_API_KEY}&type=SWAP&limit=100`);
+      const r = await fetch(`${HELIUS_BASE}/addresses/${addr}/transactions?type=SWAP&limit=100`);
       if (!r.ok) return null;
       const txs: any[] = await r.json();
       let solOut = 0, solIn = 0;

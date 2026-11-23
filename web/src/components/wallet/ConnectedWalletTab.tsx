@@ -28,7 +28,7 @@ import {
   WalletOverview, TokenAsset, Transaction, ParsedTransaction, TokenPnL, WalletPnLSummary,
   formatAddress, formatUsd
 } from "@/lib/solana-api";
-import { HELIUS_RPC, HELIUS_API_KEY, SOL_MINT, JUPITER_BASE, JUPITER_API_KEY } from "@/lib/og";
+import { HELIUS_RPC, SOL_MINT, JUPITER_BASE, JUPITER_API_KEY } from "@/lib/og";
 import { PLATFORM_FEE_BPS, PLATFORM_FEE_ENABLED, deriveFeeAccount } from "@/lib/platformFee";
 import { formatDistanceToNow } from "date-fns";
 import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
@@ -347,7 +347,7 @@ export function ConnectedWalletTab() {
         if (amountLamports <= 0) return;
         const res = await fetch(
           `${JUPITER_BASE}/swap/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountLamports}&slippageBps=${slippage}${PLATFORM_FEE_ENABLED ? `&platformFeeBps=${PLATFORM_FEE_BPS}` : ""}`,
-          { headers: { "Authorization": `Bearer ${JUPITER_API_KEY}` } }
+          { headers: { ...(JUPITER_API_KEY ? { "Authorization": `Bearer ${JUPITER_API_KEY}` } : {}) } }
         );
         const q = await res.json();
         if (q.outAmount) {

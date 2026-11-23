@@ -18,7 +18,7 @@ import {
   JUPITER_BASE,
   HELIUS_RPC,
   DEXSCREENER_WEB_BASE,
-  ALCHEMY_API_KEY,
+  ALCHEMY_RPC,
   QUICKNODE_WSS,
   OGSCAN_SITE_URL,
   OGSCAN_TECH_POST_URL,
@@ -87,11 +87,11 @@ const PROBES: Probe[] = [
     name: "ALCHEMY",
     role: "RPC · BACKUP",
     desc: "Secondary Solana mainnet RPC for redundancy and rate-limit relief. Failover lane when Helius slows.",
-    endpoint: `https://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+    endpoint: ALCHEMY_RPC,
     Icon: Server,
     color: "lime",
     check: async () => {
-      const r = await fetch(`https://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`, {
+      const r = await fetch(ALCHEMY_RPC, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getHealth" }),

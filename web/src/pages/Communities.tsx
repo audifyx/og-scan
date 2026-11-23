@@ -28,7 +28,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { CoinCommunityFull } from "@/components/CoinCommunityFull";
 import CommunityVoice from "@/components/community/CommunityVoice";
-import { HELIUS_API_KEY, OGSCAN_TOKEN_MINT } from "@/lib/og";
+import { HELIUS_RPC, OGSCAN_TOKEN_MINT } from "@/lib/og";
 import { trackActivity } from "@/lib/trackActivity";
 import { CommunityReputation } from "@/components/communities-20x/CommunityReputation";
 import SpaceLeaderboard from "@/components/spaces/SpaceLeaderboard";
@@ -120,7 +120,7 @@ async function checkTokenGate(
   try {
     // 1. Get token accounts via Helius DAS
     const heliusRes = await fetch(
-      `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`,
+      HELIUS_RPC,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

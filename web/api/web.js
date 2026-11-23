@@ -31,6 +31,7 @@ const LAZY = {
   "stats": () => import("./_stats.js"),
   "xsocial": () => import("./_xsocial.js"),
   "telegram-mcp": () => import("./_telegram-mcp.js"),
+  "rpc-proxy": () => import("./_rpc-proxy.js"),
 };
 
 export default async function handler(req, res) {

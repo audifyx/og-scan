@@ -8,7 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { heliusTxs, type HeliusTx, HELIUS_API_KEY, type JupTokenInfo } from "@/lib/og";
+import { heliusTxs, type HeliusTx, type JupTokenInfo } from "@/lib/og";
 import { CoinDetailDialog } from "@/components/CoinDetailDialog";
 import { chainFromDexSlug, SUPPORTED_CHAINS, type ChainConfig } from "@/lib/chains";
 

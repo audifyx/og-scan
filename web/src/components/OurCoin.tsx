@@ -34,7 +34,7 @@ import {
   fmtPct,
   fmtUsd,
   hasPulledOrDeadLiquidity,
-  HELIUS_API_KEY,
+  HELIUS_RPC,
   jupGetTokens,
   shortAddr,
   shortDate,
@@ -282,7 +282,7 @@ export const OurCoin = memo(() => {
                   <AnalysisRow label="Created" value={shortDate(createdAt)} />
                   <AnalysisRow label="Migrated" value={migrated ? shortDate(migratedAt ?? (pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : undefined)) : "Monitoring"} />
                   <AnalysisRow label="Pair" value={pair?.pairAddress ? shortAddr(pair.pairAddress, 6) : "Waiting"} />
-                  <AnalysisRow label="Helius" value={HELIUS_API_KEY ? "Live tracking on" : "Unavailable"} tone="good" />
+                  <AnalysisRow label="Helius" value={HELIUS_RPC ? "Live tracking on" : "Unavailable"} tone="good" />
                 </div>
                 <div className="flex flex-wrap gap-2 border-t border-og-grid px-4 py-4">
                   {links.map((link) => (

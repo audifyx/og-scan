@@ -17,13 +17,14 @@
  *   • Token prices from DAS price_info + Jupiter Price v3 fallback
  */
 
-import { HELIUS_API_KEY, HELIUS_RPC, JUPITER_BASE, JUPITER_API_KEY, SOL_MINT } from "@/lib/og";
+import { HELIUS_BASE, HELIUS_RPC, JUPITER_BASE, JUPITER_API_KEY, SOL_MINT } from "@/lib/og";
 
 /* ═══════════════════════════════════════════════════════════════
    Constants
    ═══════════════════════════════════════════════════════════════ */
 
-const HELIUS_API_BASE = `https://api.helius.xyz/v0`;
+// Server proxy base — the Helius key never ships in the bundle (audit B4).
+const HELIUS_API_BASE = HELIUS_BASE;
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 // Known DEX/AMM program IDs for swap detection
@@ -182,7 +183,9 @@ export async function fetchJupiterPrices(mints: string[]): Promise<Record<string
       await Promise.all(chunks.map(async (chunk) => {
         const url = `${JUPITER_BASE}/price/v3?ids=${chunk.join(",")}`;
         const res = await fetch(url, {
-          headers: { "Authorization": `Bearer ${JUPITER_API_KEY}` },
+          // Jupiter lite-api works unauthenticated; only send a key if
+          // one is ever configured again (audit B4).
+          headers: { ...(JUPITER_API_KEY ? { "Authorization": `Bearer ${JUPITER_API_KEY}` } : {}) },
         });
         if (!res.ok) return;
         const data = await res.json() as Record<string, JupPriceEntry>;
@@ -218,7 +221,7 @@ export async function fetchSolPrice(): Promise<{ price: number; change24h: numbe
     // Jupiter price v3 — response: { [mint]: { usdPrice: number, priceChange24h: number } }
     const res = await fetch(
       `${JUPITER_BASE}/price/v3?ids=${SOL_MINT}`,
-      { headers: { "Authorization": `Bearer ${JUPITER_API_KEY}` } }
+      { headers: { ...(JUPITER_API_KEY ? { "Authorization": `Bearer ${JUPITER_API_KEY}` } : {}) } }
     );
     if (res.ok) {
       const data = await res.json() as Record<string, JupPriceEntry>;
@@ -734,7 +737,7 @@ export async function getTransactions(
 ): Promise<Transaction[]> {
   try {
     const res = await fetch(
-      `${HELIUS_API_BASE}/addresses/${walletAddress}/transactions?api-key=${HELIUS_API_KEY}&limit=${limit}`
+      `${HELIUS_API_BASE}/addresses/${walletAddress}/transactions?limit=${limit}`
     );
     if (!res.ok) throw new Error(`Helius TX API error: ${res.status}`);
     const txs = await res.json() as Array<Record<string, unknown>>;

@@ -7,12 +7,19 @@ import {
   toOgCompositeScore,
 } from "../../shared/orbitx-token-score.js";
 
-export const JUPITER_API_KEY = import.meta.env.VITE_JUPITER_API_KEY ?? "";
+// Audit B4: paid API keys NO LONGER ship in the browser bundle. These
+// exports stay (empty) so existing imports resolve; browser traffic
+// goes through the server proxy (/api/web/rpc-proxy) which holds the
+// real keys in the server env. Jupiter's lite-api accepts
+// unauthenticated requests, so dropping its key is safe (expect lower
+// rate limits). OWNER ACTION: rotate all four keys in their dashboards
+// — the old values are in every previously shipped bundle.
+export const JUPITER_API_KEY = "";
 // Birdeye fully replaced by Jupiter + GeckoTerminal (free, no compute-unit quota).
 // Kept only so existing imports resolve; no longer used for any request.
-export const BIRDEYE_API_KEY = import.meta.env.VITE_BIRDEYE_API_KEY ?? "";
-export const HELIUS_API_KEY = import.meta.env.VITE_HELIUS_API_KEY ?? "";
-export const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY ?? "";
+export const BIRDEYE_API_KEY = "";
+export const HELIUS_API_KEY = "";
+export const ALCHEMY_API_KEY = "";
 export const QUICKNODE_WSS = import.meta.env.VITE_QUICKNODE_WSS ?? "";
 
 export const OGSCAN_SITE_URL = "https://www.orbitx.world";
@@ -35,8 +42,13 @@ export const OGSCAN_SOLSCAN_URL = `https://solscan.io/token/${OGSCAN_TOKEN_MINT}
 
 export const JUPITER_BASE = "https://lite-api.jup.ag";
 export const BIRDEYE_BASE = "https://public-api.birdeye.so";
-export const HELIUS_BASE = `https://api.helius.xyz/v0`;
-export const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+// Helius traffic routes through the platform's server proxy so the key
+// never reaches the browser (audit B4). Path-form URLs keep appended
+// sub-paths and query strings working exactly like the direct bases.
+const RPC_PROXY_ORIGIN = typeof window !== "undefined" ? window.location.origin : "https://www.orbitx.world";
+export const HELIUS_BASE = `${RPC_PROXY_ORIGIN}/api/web/rpc-proxy/v0`;
+export const HELIUS_RPC = `${RPC_PROXY_ORIGIN}/api/web/rpc-proxy`;
+export const ALCHEMY_RPC = `${RPC_PROXY_ORIGIN}/api/web/rpc-proxy/alchemy`;
 
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -3340,7 +3352,7 @@ export type TokenHolderBundleIntel = {
 };
 
 export async function heliusTxs(address: string, limit = 25): Promise<HeliusTx[]> {
-  const url = `${HELIUS_BASE}/addresses/${address}/transactions?api-key=${HELIUS_API_KEY}&limit=${limit}`;
+  const url = `${HELIUS_BASE}/addresses/${address}/transactions?limit=${limit}`;
   return jget<HeliusTx[]>(url);
 }
 

@@ -6,7 +6,6 @@ import { apiUrl } from "@/lib/apiBase";
  */
 
 import {
-  HELIUS_API_KEY,
   HELIUS_RPC,
   HELIUS_BASE,
   SOL_MINT,
@@ -43,7 +42,9 @@ async function dasSearch(body: any): Promise<any> {
 }
 
 async function heliusGet(path: string, qs: Record<string, string> = {}): Promise<any> {
-  const params = new URLSearchParams({ "api-key": HELIUS_API_KEY, ...qs });
+  // No api-key param: HELIUS_BASE is the server proxy, which adds the
+  // key server-side (audit B4).
+  const params = new URLSearchParams({ ...qs });
   const res = await fetch(`${HELIUS_BASE}${path}?${params}`);
   return res.json();
 }

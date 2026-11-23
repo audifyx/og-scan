@@ -10,7 +10,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { HELIUS_API_KEY } from "@/lib/og";
+import { HELIUS_RPC } from "@/lib/og";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -509,7 +509,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       // Try Helius price first, then CoinGecko fallback
       try {
         const res = await fetch(
-          `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`,
+          HELIUS_RPC,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

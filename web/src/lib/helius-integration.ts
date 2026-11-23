@@ -3,8 +3,11 @@
 
 import { supabase } from '@/lib/supabase';
 
-const HELIUS_API_KEY = process.env.REACT_APP_HELIUS_KEY || '';
-const HELIUS_BASE_URL = 'https://api.helius.xyz/v0';
+import { HELIUS_BASE } from "@/lib/og";
+
+// Helius REST goes through the server proxy — no key in the bundle
+// (audit B4). The proxy adds the key server-side.
+const HELIUS_BASE_URL = HELIUS_BASE;
 
 interface HeliosTokenTransaction {
   signature: string;
@@ -39,7 +42,6 @@ export async function fetchTokenTransactions(mint: string, limit: number = 10000
 
     while (allTransactions.length < limit) {
       const url = new URL(`${HELIUS_BASE_URL}/addresses/${mint}/transactions`);
-      url.searchParams.append('api-key', HELIUS_API_KEY);
       url.searchParams.append('limit', String(pageSize));
       if (before) url.searchParams.append('before', before);
 
@@ -68,7 +70,6 @@ export async function fetchTokenTransactions(mint: string, limit: number = 10000
 export async function fetchTokenHolders(mint: string) {
   try {
     const url = new URL(`${HELIUS_BASE_URL}/token/holders`);
-    url.searchParams.append('api-key', HELIUS_API_KEY);
     url.searchParams.append('mint', mint);
     url.searchParams.append('limit', '10000');
 
@@ -89,7 +90,6 @@ export async function fetchTokenHolders(mint: string) {
 export async function fetchTokenMetadata(mint: string) {
   try {
     const url = new URL(`${HELIUS_BASE_URL}/token/metadata`);
-    url.searchParams.append('api-key', HELIUS_API_KEY);
     url.searchParams.append('mint', mint);
 
     const response = await fetch(url.toString());

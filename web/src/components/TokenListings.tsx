@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { EmeraldHeader } from "@/components/ToolPageShell";
 import { supabase } from "@/lib/supabase";
-import { HELIUS_API_KEY, HELIUS_RPC, HELIUS_BASE, BIRDEYE_API_KEY } from "@/lib/og";
+import { HELIUS_RPC, HELIUS_BASE } from "@/lib/og";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
@@ -227,7 +227,7 @@ async function fetchTokenData(mintAddress: string): Promise<FetchedTokenData> {
     try {
       // Get creator's transaction history from Helius
       const txRes = await fetch(
-        `${HELIUS_BASE}/addresses/${creator}/transactions?api-key=${HELIUS_API_KEY}&limit=100`
+        `${HELIUS_BASE}/addresses/${creator}/transactions?limit=100`
       );
       const txns = await txRes.json();
       if (Array.isArray(txns)) {

@@ -69,8 +69,8 @@ interface TokenMetadataFull {
 type PostConnectStep = "select" | "edit" | "signing" | "success";
 
 /* ─── Helpers ─── */
-const HELIUS_KEY = import.meta.env.VITE_HELIUS_API_KEY ?? "";
-const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`;
+// Helius RPC via the server proxy — no key in the bundle (audit B4).
+import { HELIUS_RPC } from "@/lib/og";
 
 const shortAddr = (addr: string) =>
   addr.length > 10 ? `${addr.slice(0, 4)}…${addr.slice(-4)}` : addr;
