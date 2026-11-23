@@ -409,6 +409,11 @@ export default async function handler(req, res) {
     res.statusCode = 204;
     return res.end();
   }
+  // Telegram MCP is paused — "coming soon" (owner, 2026-11-23).
+  // Set TELEGRAM_MCP_ENABLED=on in the service env to restore it.
+  if (process.env.TELEGRAM_MCP_ENABLED !== "on") {
+    return send(res, { ok: false, status: "coming_soon", error: "coming_soon", message: "OrbitX Telegram MCP is coming soon." }, 200);
+  }
   if (req.method !== "POST") return send(res, { error: "method_not_allowed" }, 405);
 
   try {

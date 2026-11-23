@@ -4682,6 +4682,9 @@ async function handleMcp(req, res, parts) {
   }
 
   if ((!route || route === "") && req.method === "GET") {
+    if (process.env.X_MCP_ENABLED !== "on") {
+      return json(res, { name: "OrbitX X MCP", status: "coming_soon", message: "The OrbitX X MCP is coming soon.", tools: [] });
+    }
     const accept = String(header(req, "accept") || "");
     if (accept.includes("text/event-stream")) {
       cors(res);
@@ -4719,6 +4722,43 @@ async function handleMcp(req, res, parts) {
     const body = await readBody(req);
     const { id, method, params } = body;
     const sessionId = header(req, "mcp-session-id") || opaque("sess").slice(0, 24);
+
+    // X MCP is paused — "coming soon" (owner, 2026-11-23). Set X_MCP_ENABLED=on
+    // in the service env to restore the full X MCP. Only the public JSON-RPC
+    // surface is paused; internal routes (strategy tick, status, keys) run on.
+    if (process.env.X_MCP_ENABLED !== "on") {
+      if (method === "initialize") {
+        return json(
+          res,
+          {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              protocolVersion: "2024-11-05",
+              capabilities: { tools: { listChanged: false } },
+              serverInfo: { name: "OrbitX X MCP — Coming Soon", version: "0.0.0" },
+              instructions: "The OrbitX X MCP is coming soon.",
+            },
+          },
+          200,
+          { "Mcp-Session-Id": sessionId },
+        );
+      }
+      if (method === "notifications/initialized" || method === "ping") {
+        return json(res, { jsonrpc: "2.0", id: id ?? null, result: {} });
+      }
+      if (method === "tools/list") {
+        return json(res, { jsonrpc: "2.0", id, result: { tools: [] } });
+      }
+      if (method === "resources/list") {
+        return json(res, { jsonrpc: "2.0", id, result: { resources: [] } });
+      }
+      return json(res, {
+        jsonrpc: "2.0",
+        id,
+        result: { content: [{ type: "text", text: "OrbitX X MCP is coming soon." }], isError: true },
+      });
+    }
 
     if (method === "initialize") {
       const requested = String(params?.protocolVersion || "2024-11-05");

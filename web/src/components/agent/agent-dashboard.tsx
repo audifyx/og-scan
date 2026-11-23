@@ -889,7 +889,7 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
               </>
             )}
 
-            <TelegramMcpCard kind="agent" />
+            {/* Telegram MCP paused — coming soon (owner, 2026-11-23). Card hidden, code kept. */}
           </div>
         </section>
       )}
