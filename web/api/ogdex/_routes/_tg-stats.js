@@ -15,7 +15,7 @@
 const SUPABASE_URL =
   process.env.SUPABASE_URL ||
   process.env.VITE_SUPABASE_URL ||
-  "https://ibojtmeqgzabgeiwbvhf.supabase.co";
+  "https://fnwrvcrrihkucwomszzk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 function esc(s) {

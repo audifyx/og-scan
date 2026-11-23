@@ -66,7 +66,7 @@ import { timingSafeEqual } from "crypto";
 const SUPABASE_URL =
   process.env.SUPABASE_URL ||
   process.env.VITE_SUPABASE_URL ||
-  "https://ibojtmeqgzabgeiwbvhf.supabase.co";
+  "https://fnwrvcrrihkucwomszzk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 // Widgets OFF (2026-11-19): Telegram rejects every sendWidget with

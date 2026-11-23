@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   const app = String(req.query.app || "");
   const dest = app === "ogdex" ? `https://orbitx.world/ORBITX_DEX/token/${encodeURIComponent(mint)}` : `https://orbitx.world/t/${encodeURIComponent(mint)}`;
   try {
-    const r = await fetch(`https://ibojtmeqgzabgeiwbvhf.supabase.co/functions/v1/token-og?mint=${encodeURIComponent(mint)}${app ? `&app=${encodeURIComponent(app)}` : ""}`);
+    const r = await fetch(`https://fnwrvcrrihkucwomszzk.supabase.co/functions/v1/token-og?mint=${encodeURIComponent(mint)}${app ? `&app=${encodeURIComponent(app)}` : ""}`);
     const html = await r.text();
     // token-og edge fn still points at the retired ogscan.fun domain (and a
     // dead /OGDEX route) until it is redeployed — rewrite its URLs to the live domain.

@@ -174,7 +174,7 @@ async function handleOwnerApi(req, res) {
   // service-role key — full data dump for anyone. Verify or reject.
   {
     const token = auth.replace(/^Bearer\s+/i, "");
-    const sbUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || "https://ibojtmeqgzabgeiwbvhf.supabase.co";
+    const sbUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || "https://fnwrvcrrihkucwomszzk.supabase.co";
     const anon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY || "";
     let email = null;
     try {
@@ -200,7 +200,7 @@ async function handleOwnerApi(req, res) {
     return res.end(JSON.stringify(obj));
   }
 
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || "https://ibojtmeqgzabgeiwbvhf.supabase.co";
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || "https://fnwrvcrrihkucwomszzk.supabase.co";
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
   async function sb(path) {

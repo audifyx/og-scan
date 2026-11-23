@@ -26,7 +26,7 @@ export default async function handler(req, res) {
   if (req.query.app != null) qs.set("app", String(req.query.app));
   const dest = `https://orbitx.world/ORBITX_DEX/wallet/${encodeURIComponent(address)}`;
   try {
-    const r = await fetch(`https://ibojtmeqgzabgeiwbvhf.supabase.co/functions/v1/wallet-og?${qs.toString()}`);
+    const r = await fetch(`https://fnwrvcrrihkucwomszzk.supabase.co/functions/v1/wallet-og?${qs.toString()}`);
     const html = await r.text();
     // wallet-og edge fn still points at the retired ogscan.fun domain (and a
     // dead /OGDEX route) until it is redeployed — rewrite its URLs to the live domain.
