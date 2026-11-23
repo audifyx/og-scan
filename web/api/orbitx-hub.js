@@ -5139,7 +5139,11 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
       settle(callTool("orbitx_auth_status", { ...args }, auth, base, req)),
       settle(callTool("orbitx_whoami", { ...args }, auth, base, req)),
     ]);
-    const connected = (status && status.ok === true) || (whoami && whoami.ok === true);
+    // whoami answers ok:true even for anonymous sessions — "connected" means
+    // an actual account link: auth_status ok, or an identified whoami.
+    const identity =
+      (whoami && (whoami.userId || whoami.walletAddress || (whoami.authSource && whoami.authSource !== "anonymous" ? whoami.authSource : null))) || null;
+    const connected = (status && status.ok === true) || !!identity;
     return {
       ok: true,
       agent: "OrbitX Trader Agent",
