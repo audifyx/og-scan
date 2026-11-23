@@ -117,6 +117,25 @@ function FieldRow({
 
 const AGENT_TABS = new Set<AgentTabId>(["setup", "shop", "wallet", "keys", "connect", "agent", "tools"]);
 
+const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+
+const MCP_CONFIG_JSON = JSON.stringify(
+  { mcpServers: { orbitx: { url: "https://www.orbitx.world/api/mcp", transport: "http" } } },
+  null,
+  2
+);
+
+/** Recursive key finder — dossier/scan payloads nest price/mcap/holders several layers deep. */
+function findKey(obj: any, key: string): any {
+  if (!obj || typeof obj !== "object") return undefined;
+  if (key in obj) return (obj as any)[key];
+  for (const v of Object.values(obj)) {
+    const hit = findKey(v, key);
+    if (hit !== undefined) return hit;
+  }
+  return undefined;
+}
+
 /** Live MCP (v3) JSON-RPC call against the one OrbitX MCP endpoint. */
 async function mcpRpc(method: string, params: Record<string, unknown> = {}): Promise<any> {
   const r = await fetch("https://www.orbitx.world/api/mcp", {
@@ -166,18 +185,49 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
   const [toolQuery, setToolQuery] = useState("");
   const [scanState, setScanState] = useState<"idle" | "running" | "done" | "error">("idle");
   const [scanResult, setScanResult] = useState<any>(null);
+  const [liveResources, setLiveResources] = useState<any[] | null>(null);
+  const [pulse, setPulse] = useState<any>(null);
+  const [analyzeMint, setAnalyzeMint] = useState("");
+  const [analyzeState, setAnalyzeState] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [analyzeResult, setAnalyzeResult] = useState<any>(null);
+
+  const loadPulse = useCallback(async () => {
+    try {
+      const res = await mcpRpc("tools/call", { name: "orbitx_token_dossier", arguments: { mint: ORBITX_MINT } });
+      const text = res?.content?.[0]?.text;
+      if (text) setPulse(JSON.parse(text));
+    } catch {
+      /* pulse degrades silently */
+    }
+  }, []);
+
+  const runAnalyze = useCallback(async () => {
+    const mint = analyzeMint.trim();
+    if (!mint) return;
+    setAnalyzeState("running");
+    try {
+      const res = await mcpRpc("tools/call", { name: "orbitx_ai_analyze", arguments: { mint } });
+      const text = res?.content?.[0]?.text;
+      setAnalyzeResult(text ? JSON.parse(text) : null);
+      setAnalyzeState("done");
+    } catch {
+      setAnalyzeState("error");
+    }
+  }, [analyzeMint]);
 
   useEffect(() => {
     (async () => {
       try {
-        const [tl, pl] = await Promise.all([mcpRpc("tools/list"), mcpRpc("prompts/list")]);
+        const [tl, pl, rl] = await Promise.all([mcpRpc("tools/list"), mcpRpc("prompts/list"), mcpRpc("resources/list")]);
         if (Array.isArray(tl?.tools)) setLiveTools(tl.tools);
         if (Array.isArray(pl?.prompts)) setLivePrompts(pl.prompts);
+        if (Array.isArray(rl?.resources)) setLiveResources(rl.resources);
       } catch {
         /* live panels degrade silently */
       }
     })();
-  }, []);
+    void loadPulse();
+  }, [loadPulse]);
 
   const runLiveScan = useCallback(async () => {
     setScanState("running");
@@ -529,6 +579,79 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
               Browse tools
             </button>
           </div>
+          <div className="ox-agent__steps" style={{ marginTop: 14 }}>
+            <span className="ox-agent__chip">{liveTools ? liveTools.length : 241} core tools</span>
+            <span className="ox-agent__chip">
+              {liveTools ? liveTools.filter((t: any) => String(t.name).startsWith("launchpad_")).length : 13} launchpad tools
+            </span>
+            <span className="ox-agent__chip">{livePrompts ? livePrompts.length : 5} intelligence prompts</span>
+            <span className="ox-agent__chip">{liveResources ? liveResources.length : 11} live resources</span>
+            <span className="ox-agent__chip">4,300+ via orbitx_exec</span>
+          </div>
+        </div>
+        <div className="ox-agent__grid ox-agent__grid--2">
+          <section className="ox-agent__panel">
+            <div className="ox-agent__panel-h">
+              <h2 className="ox-agent__panel-title">ORBITX — live pulse</h2>
+              <span className="ox-agent__panel-hint">via orbitx_token_dossier</span>
+            </div>
+            <div className="ox-agent__panel-b">
+              {pulse ? (
+                <>
+                  <div className="ox-agent__row">
+                    <div className="ox-agent__label">Price</div>
+                    <div className="ox-agent__value">${String(findKey(pulse, "priceUsd") ?? "—")}</div>
+                  </div>
+                  <div className="ox-agent__row">
+                    <div className="ox-agent__label">Market cap</div>
+                    <div className="ox-agent__value">
+                      ${Math.round(Number(findKey(pulse, "marketCap") ?? findKey(pulse, "fdv") ?? 0)).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="ox-agent__row">
+                    <div className="ox-agent__label">Holders</div>
+                    <div className="ox-agent__value">
+                      {Number(findKey(pulse, "holderCount") ?? findKey(pulse, "holders") ?? 0).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="ox-agent__row">
+                    <div className="ox-agent__label">Liquidity</div>
+                    <div className="ox-agent__value">
+                      ${Math.round(Number(findKey(pulse, "liquidity") ?? 0)).toLocaleString()}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="ox-agent__note">Loading the live ORBITX dossier…</p>
+              )}
+              <div className="ox-agent__btn-row">
+                <button type="button" className="ox-agent__btn" onClick={() => void loadPulse()}>
+                  Refresh pulse
+                </button>
+                <button type="button" className="ox-agent__btn" onClick={() => selectTab("agent")}>
+                  Analyze any token →
+                </button>
+              </div>
+            </div>
+          </section>
+          <section className="ox-agent__panel">
+            <div className="ox-agent__panel-h">
+              <h2 className="ox-agent__panel-title">One config, every client</h2>
+              <span className="ox-agent__panel-hint">Claude · Grok · ChatGPT</span>
+            </div>
+            <div className="ox-agent__panel-b">
+              <p className="ox-agent__note" style={{ marginTop: 0 }}>
+                Paste this into your AI's MCP settings and you're in — no key needed to browse,
+                chat auth links your account.
+              </p>
+              <pre className="ox-agent__code" style={{ whiteSpace: "pre-wrap" }}>{MCP_CONFIG_JSON}</pre>
+              <div className="ox-agent__btn-row">
+                <button type="button" className="ox-agent__btn ox-agent__btn--primary" onClick={() => copy("mcpConfig", MCP_CONFIG_JSON)}>
+                  {copied === "mcpConfig" ? "Copied ✓" : "Copy config"}
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
         <div className="ox-agent__grid ox-agent__grid--2">
           <section className="ox-agent__panel">
@@ -1081,6 +1204,75 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
 
       {tab === "agent" && (
         <div className="ox-agent__grid">
+          <section className="ox-agent__panel">
+            <div className="ox-agent__panel-h">
+              <h2 className="ox-agent__panel-title">Try the AI — analyze any token</h2>
+              <span className="ox-agent__panel-hint">orbitx_ai_analyze, live</span>
+            </div>
+            <div className="ox-agent__panel-b">
+              <p className="ox-agent__note" style={{ marginTop: 0 }}>
+                The same scorer your AI runs — safety, concentration, momentum, hard risk flags.
+                Paste a mint and see the verdict before you ever open your AI.
+              </p>
+              <input
+                value={analyzeMint}
+                onChange={(e) => setAnalyzeMint(e.target.value)}
+                placeholder="Paste a Solana mint — try the ORBITX mint below"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "1px solid var(--border, #26262e)",
+                  background: "transparent",
+                  color: "inherit",
+                  marginBottom: 12,
+                  boxSizing: "border-box",
+                }}
+              />
+              <div className="ox-agent__btn-row">
+                <button type="button" className="ox-agent__btn ox-agent__btn--primary" onClick={() => void runAnalyze()} disabled={analyzeState === "running" || !analyzeMint.trim()}>
+                  {analyzeState === "running" ? "Analyzing…" : "Analyze token"}
+                </button>
+                <button type="button" className="ox-agent__btn" onClick={() => setAnalyzeMint(ORBITX_MINT)}>
+                  Use ORBITX mint
+                </button>
+              </div>
+              {analyzeState === "done" && analyzeResult && (
+                <div style={{ marginTop: 12 }}>
+                  <div className="ox-agent__row">
+                    <div className="ox-agent__label">Verdict</div>
+                    <div className="ox-agent__value">
+                      {analyzeResult.score ?? "—"} · {analyzeResult.verdict ?? "unscored"}
+                    </div>
+                  </div>
+                  {analyzeResult.safety !== undefined && (
+                    <div className="ox-agent__row">
+                      <div className="ox-agent__label">Safety</div>
+                      <div className="ox-agent__value">{analyzeResult.safety}</div>
+                    </div>
+                  )}
+                  {(analyzeResult.riskFlags || analyzeResult.flags || []).map((f: any, i: number) => (
+                    <div key={i} className="ox-agent__row">
+                      <div className="ox-agent__label">⚠ Flag</div>
+                      <div className="ox-agent__value" style={{ whiteSpace: "normal" }}>{String(f)}</div>
+                    </div>
+                  ))}
+                  {(analyzeResult.reasons || []).slice(0, 4).map((r: any, i: number) => (
+                    <div key={i} className="ox-agent__row">
+                      <div className="ox-agent__label">Why</div>
+                      <div className="ox-agent__value" style={{ whiteSpace: "normal" }}>{String(r)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {analyzeState === "error" && (
+                <p className="ox-agent__note" style={{ marginTop: 12 }}>
+                  That analyze didn't answer — check the mint and try again.
+                </p>
+              )}
+            </div>
+          </section>
+
           <section className="ox-agent__panel">
             <div className="ox-agent__panel-h">
               <h2 className="ox-agent__panel-title">AI Trader Agent</h2>
