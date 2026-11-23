@@ -2060,6 +2060,12 @@ export default async function handler(req, res) {
       const e = Buffer.from(String(expected || ""));
       return p.length > 0 && p.length === e.length && timingSafeEqual(p, e);
     };
+    if (!strictSecret && !WEBHOOK_SECRET) {
+      // Fail closed: with no webhook secret configured (no env secret and
+      // no bot token to derive one from) an update cannot be authenticated
+      // as really coming from Telegram — refuse to process it.
+      return json(res, { error: "webhook_not_configured" }, 503);
+    }
     if (strictSecret) {
       if (!secretsMatch(secret, strictSecret)) {
         res.statusCode = 403;

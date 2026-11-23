@@ -31,13 +31,17 @@
 // MUST be .js, NOT .ts — Vercel does not bundle .ts files dynamically
 // imported from the .js web.js LAZY map, so a .ts module 500s in prod
 // ("Cannot find module '/var/task/web/api/_stats.ts'").
+import { timingSafeEqual } from "crypto";
+import { requireOwnerUser } from "../shared/owner-identity.js";
+import { cronAuthorized } from "../shared/cron-auth.js";
+
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://ibojtmeqgzabgeiwbvhf.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 const CORS = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET,POST,OPTIONS",
-  "access-control-allow-headers": "content-type",
+  "access-control-allow-headers": "content-type, authorization, x-stats-key",
 };
 
 function sanitizeSite(s) {
@@ -98,6 +102,15 @@ export function computeLikelyBot(input) {
     String(i.device || "") === "desktop" &&
     String(i.screen || "") === "1280x720"
   );
+}
+
+function statsKeyOk(req) {
+  const secret = String(process.env.CRON_SECRET || "").trim();
+  if (!secret) return false;
+  const provided = String(req.headers?.["x-stats-key"] || "");
+  const a = Buffer.from(provided);
+  const b = Buffer.from(secret);
+  return a.length > 0 && a.length === b.length && timingSafeEqual(a, b);
 }
 
 async function sbGet(path) {
@@ -191,6 +204,17 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "GET" && action === "data") {
+      // Operator analytics — owner-only. This used to serve the full
+      // dashboard (per-visitor trails, referrers, countries) to ANY caller
+      // with the service-role key doing the reads. Accept: the owner's
+      // Supabase session JWT (same check as the rest of the admin
+      // surface), a Bearer CRON_SECRET, or the dedicated x-stats-key
+      // header carrying CRON_SECRET (used by the static /stats page when
+      // no SPA session is present in the browser).
+      const owner = await requireOwnerUser(req).catch(() => null);
+      if (!owner && !cronAuthorized(req) && !statsKeyOk(req)) {
+        return json(res, { ok: false, error: "unauthorized" }, 401);
+      }
       const data = await sb("rpc/site_stats_data", { p_site: site });
       return json(res, data);
     }

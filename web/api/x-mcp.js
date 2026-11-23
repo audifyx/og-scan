@@ -11,6 +11,7 @@
  *                   TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET
  */
 import { createHash, createHmac, randomBytes } from "crypto";
+import { cronBearerOk } from "../shared/cron-auth.js";
 import {
   X_OAUTH_SCOPES,
   NIM_MODELS,
@@ -3526,13 +3527,10 @@ async function handleAgent(req, res, parts) {
   // ── X Agent (NVIDIA) + queue + cron ─────────────────────────────────────
   if (route === "cron") {
     if (req.method !== "GET" && req.method !== "POST") return json(res, { error: "method_not_allowed" }, 405);
-    const cronSecret = process.env.CRON_SECRET || "";
-    const authz = String(header(req, "authorization") || "");
-    const vercelCron = String(header(req, "x-vercel-cron") || "");
-    const ok =
-      (cronSecret && authz === `Bearer ${cronSecret}`) ||
-      Boolean(vercelCron) ||
-      (!cronSecret && process.env.VERCEL !== "1");
+    // Bearer CRON_SECRET only, fail closed when unset — the x-vercel-cron
+    // header and the "open when unconfigured off-Vercel" branch were
+    // spoofable by any HTTP client (see shared/cron-auth.js).
+    const ok = cronBearerOk(String(header(req, "authorization") || ""));
     if (!ok) return json(res, { error: "unauthorized" }, 401);
     try {
       const result = await runCronTick(sb, resolveUserAccessToken, uploadImageOAuth1a);
@@ -4256,13 +4254,8 @@ async function handleMcp(req, res, parts) {
   // Route path stays `limits/tick` so the existing scheduler keeps working.
   if (route === "limits/tick") {
     if (req.method !== "GET" && req.method !== "POST") return json(res, { error: "method_not_allowed" }, 405);
-    const cronSecret = process.env.CRON_SECRET || "";
-    const authz = String(header(req, "authorization") || "");
-    const vercelCron = String(header(req, "x-vercel-cron") || "");
-    const ok =
-      (cronSecret && authz === `Bearer ${cronSecret}`) ||
-      Boolean(vercelCron) ||
-      (!cronSecret && process.env.VERCEL !== "1");
+    // Bearer CRON_SECRET only, fail closed when unset — see shared/cron-auth.js.
+    const ok = cronBearerOk(String(header(req, "authorization") || ""));
     if (!ok) return json(res, { error: "unauthorized" }, 401);
     try {
       const proto = header(req, "x-forwarded-proto") || "https";

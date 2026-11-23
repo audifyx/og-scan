@@ -8,6 +8,7 @@
  * vercel.json rewrite /api/mcp-life-tick -> /api/ogdex?path=mcp-life-tick.
  * ogdex.js maxDuration is 90s so the tick keeps its original time budget.
  */
+import { timingSafeEqual } from "crypto";
 import { tickDueLifeAgents } from "../../orbitx/_handlers/_mcp-life-agents.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
@@ -54,17 +55,25 @@ export default async function handler(req, res) {
     res.statusCode = 204;
     return res.end();
   }
-  const secret = process.env.CRON_SECRET || process.env.OXW_WORKER_SECRET || "";
-  const auth = String(req.headers?.authorization || "");
-  if (secret && auth !== `Bearer ${secret}` && req.method !== "GET") {
-    return json(res, { ok: false, error: "unauthorized" }, 401);
+  // Bearer CRON_SECRET (or OXW_WORKER_SECRET) required for EVERY method,
+  // fail closed when neither is configured. The old GET path trusted the
+  // spoofable x-vercel-cron header — and allowed requests with no
+  // Authorization header at all. Vercel Cron sends the Bearer secret
+  // automatically when CRON_SECRET is set, so the hourly job still runs.
+  const secrets = [process.env.CRON_SECRET, process.env.OXW_WORKER_SECRET]
+    .map((s) => String(s || "").trim())
+    .filter(Boolean);
+  if (!secrets.length) {
+    return json(res, { ok: false, error: "cron_not_configured" }, 503);
   }
-  // Vercel Cron is GET with optional Authorization. Allow GET so the hourly job runs.
-  if (secret && req.method === "GET") {
-    const fromVercel = Boolean(req.headers?.["x-vercel-cron"]);
-    if (!fromVercel && auth && auth !== `Bearer ${secret}`) {
-      return json(res, { ok: false, error: "unauthorized" }, 401);
-    }
+  const auth = String(req.headers?.authorization || "");
+  const authorized = secrets.some((s) => {
+    const a = Buffer.from(auth);
+    const b = Buffer.from(`Bearer ${s}`);
+    return a.length === b.length && timingSafeEqual(a, b);
+  });
+  if (!authorized) {
+    return json(res, { ok: false, error: "unauthorized" }, 401);
   }
   try {
     const out = await tickDueLifeAgents(sb, { limit: 8 });

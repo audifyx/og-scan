@@ -61,6 +61,7 @@ import {
   buildTrendingRefreshData,
 } from "./_tg-cmd-widgets.js";
 import { readBody } from "../_lib.js";
+import { timingSafeEqual } from "crypto";
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL ||
@@ -771,6 +772,24 @@ export default async function handler(req, res) {
     return res.end(
       JSON.stringify({ ok: false, error: "Telegram webhook only — POST a Bot API update." }),
     );
+  }
+
+  // Webhook secret (Bot API secret_token). When OGDEX_TG_WEBHOOK_SECRET is
+  // configured, Telegram must present it in the secret-token header — the
+  // webhook registration must be (re)done with the same secret_token.
+  // Unset = legacy behavior (the handler only replies with read-only
+  // scanner output to the chat id inside the update); set it to close the
+  // forged-update hole for good.
+  const webhookSecret = String(process.env.OGDEX_TG_WEBHOOK_SECRET || "").trim();
+  if (webhookSecret) {
+    const provided = String(req.headers?.["x-telegram-bot-api-secret-token"] || "");
+    const a = Buffer.from(provided);
+    const b = Buffer.from(webhookSecret);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+      res.statusCode = 403;
+      res.setHeader("Content-Type", "application/json");
+      return res.end(JSON.stringify({ ok: false, error: "forbidden" }));
+    }
   }
 
   let update = {};

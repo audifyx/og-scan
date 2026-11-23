@@ -5,6 +5,7 @@
  * Solana / Helius is authority. This process indexes, never invents.
  */
 import { createClient } from "@supabase/supabase-js";
+import { cronAuthorized as cronAuthorizedShared } from "../shared/cron-auth.js";
 import {
   ORBITX_MINT,
   SOL_MINT,
@@ -230,9 +231,9 @@ function bodyOf(req) {
 }
 
 function cronAuthorized(req) {
-  const secret = process.env.CRON_SECRET || "";
-  if (!secret) return req.headers?.["user-agent"]?.includes("vercel-cron") || false;
-  return String(req.headers?.authorization || "") === `Bearer ${secret}`;
+  // Bearer CRON_SECRET only, fail closed when unset — the vercel-cron
+  // user-agent fallback was spoofable by any HTTP client (shared/cron-auth.js).
+  return cronAuthorizedShared(req);
 }
 
 async function rpc(method, params) {

@@ -6,6 +6,7 @@
  * POST /api/orbitx-calls?path=hook    Telegram membership webhook (alert-only)
  */
 import { adminCredentialOk } from "../shared/desk-unlock.js";
+import { cronAuthorized as cronAuthorizedShared } from "../shared/cron-auth.js";
 import {
   connectCallsBot,
   disconnectCallsBot,
@@ -54,11 +55,9 @@ function pathOf(req) {
 }
 
 function cronAuthorized(req) {
-  if (req.headers?.["x-vercel-cron"]) return true;
-  if (req.headers?.["user-agent"]?.includes("vercel-cron")) return true;
-  const secret = String(process.env.CRON_SECRET || "").trim();
-  if (!secret) return false;
-  return String(req.headers?.authorization || "") === `Bearer ${secret}`;
+  // Bearer CRON_SECRET only — x-vercel-cron / vercel-cron UA are spoofable
+  // by any HTTP client and are never authorization (see shared/cron-auth.js).
+  return cronAuthorizedShared(req);
 }
 
 function adminFrom(req) {

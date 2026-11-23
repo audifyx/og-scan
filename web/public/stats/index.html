@@ -90,7 +90,9 @@ function ago(t){var s=Math.round((Date.now()-t)/1000);return s<60?s+"s ago":s<36
 function tm(t){return new Date(t).toLocaleTimeString()}
 function dur(s){s=Math.round(s||0);if(s<60)return s+"s";if(s<3600)return Math.floor(s/60)+"m "+(s%60)+"s";return Math.floor(s/3600)+"h "+Math.floor(s%3600/60)+"m"}
 function loc(v){var c=v.city?esc(v.city)+", ":"";return c+flag(v.country)+" "+esc(v.country)+(v.region?" · "+esc(v.region):"")}
-function load(){fetch(W,{cache:"no-store"}).then(function(r){return r.json()}).then(function(d){
+function authHeaders(){var h={};try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf("sb-")===0&&k.indexOf("-auth-token")>0){var v=JSON.parse(localStorage.getItem(k)||"null");var t=v&&(v.access_token||(v.currentSession&&v.currentSession.access_token));if(t){h["Authorization"]="Bearer "+t;return h}}}}catch(e){}try{var sk=sessionStorage.getItem("orbitx_stats_key");if(sk)h["x-stats-key"]=sk}catch(e){}return h}
+var authFailed=false;
+function load(){fetch(W,{cache:"no-store",headers:authHeaders()}).then(function(r){if(r.status===401){authFailed=true;try{var key=prompt("Owner sign-in not detected in this browser. Enter the stats key (CRON_SECRET):");if(key){sessionStorage.setItem("orbitx_stats_key",key);authFailed=false;load()}}catch(e){}throw new Error("unauthorized")}return r.json()}).then(function(d){
 $("err").textContent="";$("as").textContent="Updated "+new Date(d.asOf).toLocaleTimeString()+" · refreshes every 5s";
 var H=hideBots;
 $("live").textContent=f(H?(d.liveNowHuman!=null?d.liveNowHuman:d.liveNow):d.liveNow);
@@ -118,7 +120,7 @@ var tags='<span class="tag">'+unk(v.os)+'</span><span class="tag">'+unk(v.browse
 return '<div class="vi'+(v.likelyBot?" bot":"")+'"><div class="vh"><span>'+loc(v)+'</span><span>'+esc(v.vid)+(v.likelyBot?'<span class="botbadge">LIKELY BOT</span>':"")+'</span></div><div class="vm" style="margin-top:4px">'+tags+'</div><div class="vm">Now on '+nm(v.path)+'</div><div class="vm">First seen '+tm(v.firstSeen)+' · Last seen '+tm(v.lastSeen)+' · '+f(v.pageCount)+' pages today</div>'+(tr?'<ul class="tr">'+tr+'</ul>':"")+'</div>';
 }).join(""):'<div class="li"><span style="color:var(--mu)">Nobody live right now</span><span></span></div>';
 $("rc").innerHTML=(d.recent||[]).length?d.recent.map(function(r){return '<div class="li"><span>'+flag(r.country)+" "+nm(r.path)+" · "+unk(r.os)+" · "+unk(r.browser)+(r.city?" · "+esc(r.city):"")+" · "+esc(r.vid)+(r.likelyBot?' <span class="botbadge">BOT</span>':"")+'</span><span>'+ago(r.ts)+'</span></div>'}).join(""):'<div class="li"><span style="color:var(--mu)">Nothing yet</span><span></span></div>';
-}).catch(function(){$("err").textContent="Can't reach the stats server. Retrying…"})}
+}).catch(function(){if(!authFailed)$("err").textContent="Can't reach the stats server. Retrying…";else $("err").textContent="Stats are owner-only. Sign in as the owner on orbitx.world in this browser, or enter the stats key."})}
 var hideBots=true;try{var _hb=localStorage.getItem("orbitx_stats_hide_bots");if(_hb!==null)hideBots=_hb==="1"}catch(e){}
 $("nb").checked=hideBots;$("nb").addEventListener("change",function(){hideBots=$("nb").checked;try{localStorage.setItem("orbitx_stats_hide_bots",hideBots?"1":"0")}catch(e){}load()});
 load();setInterval(load,5000);

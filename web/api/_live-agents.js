@@ -5,6 +5,7 @@
  * POST /api/live-agents           admin arm | pause | tick
  */
 import { adminCredentialOk } from "../shared/desk-unlock.js";
+import { cronAuthorized as cronAuthorizedShared } from "../shared/cron-auth.js";
 import { LIVE_WALLET_PUBKEY } from "../shared/orbitx-live-desk.js";
 import { runTakeProfitOrders, setLiveArmed, setLiveHunt, snapshotLiveDesk, tickLiveDesk } from "./orbitx/_handlers/_live-agent-engine.js";
 import { pushLiveDeskToTelegram } from "./orbitx/_handlers/_calls-engine.js";
@@ -45,11 +46,9 @@ function pathOf(req) {
 }
 
 function cronAuthorized(req) {
-  if (req.headers?.["x-vercel-cron"]) return true;
-  if (req.headers?.["user-agent"]?.includes("vercel-cron")) return true;
-  const secret = String(process.env.CRON_SECRET || "").trim();
-  if (!secret) return false;
-  return String(req.headers?.authorization || "") === `Bearer ${secret}`;
+  // Bearer CRON_SECRET only — x-vercel-cron / vercel-cron UA are spoofable
+  // by any HTTP client and are never authorization (see shared/cron-auth.js).
+  return cronAuthorizedShared(req);
 }
 
 async function withTelegram(out) {
