@@ -160,6 +160,12 @@ async function xCredits() {
 
 /** Combined MCP gate: exempt OR unexpired burn access OR $ORBITX hold. */
 async function requireMcpAccess({ userId, wallets = [], email, base, tool } = {}) {
+  // OrbitX is forever free (owner, 2026-11-23): the burn/hold access gate is
+  // OFF by default — MCP access is free for everyone. Set MCP_ACCESS_GATE=on
+  // in the service env to restore the legacy burn/hold gate.
+  if (process.env.MCP_ACCESS_GATE !== "on") {
+    return { allowed: true, source: "free", hold: { exempt: true, meetsRequirement: true } };
+  }
   const candidates = (wallets || []).map((w) => normalizeGateWallet(w)).filter(Boolean);
   if (isTokenGateExemptAny({ wallets: candidates, email })) {
     return { allowed: true, source: "exempt", hold: { exempt: true, meetsRequirement: true } };
