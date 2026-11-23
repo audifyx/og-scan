@@ -8,9 +8,14 @@
  */
 import {
   adminCredentialOk,
+  clearDeskUnlockFailures,
   deskUnlockConfigured,
+  deskUnlockLimited,
   isRevokedDeskCode,
   issueDeskSession,
+  maintenanceCodeOk,
+  maintenanceConfigured,
+  recordDeskUnlockFailure,
   verifyDeskUnlockCode,
 } from "../shared/desk-unlock.js";
 import { requireOwnerEmailUser } from "../shared/owner-identity.js";
@@ -27,6 +32,11 @@ function json(res, status, body) {
   res.setHeader("Cache-Control", "no-store");
   for (const [k, v] of Object.entries(CORS)) res.setHeader(k, v);
   res.end(JSON.stringify(body));
+}
+
+function clientIp(req) {
+  const fwd = String(req.headers?.["x-forwarded-for"] || "").split(",")[0].trim();
+  return fwd || req.socket?.remoteAddress || "unknown";
 }
 
 function bodyOf(req) {
@@ -55,11 +65,27 @@ export default async function handler(req, res) {
   const purpose = String(body.purpose || "desk").trim();
   const code = String(body.code || "").trim();
 
+  // Brute-force limit (audit B11): 10 failed code attempts per
+  // IP+purpose per 15 min. This branch had no limiting at all.
+  const limitKey = `${purpose}:${clientIp(req)}`;
+  if (deskUnlockLimited(limitKey)) {
+    return json(res, 429, { ok: false, error: "rate_limited" });
+  }
+
   if (purpose === "maintenance") {
-    if (!deskUnlockConfigured()) return json(res, 503, { ok: false, error: "not_configured" });
+    if (!maintenanceConfigured()) return json(res, 503, { ok: false, error: "not_configured" });
     if (!code) return json(res, 400, { ok: false, error: "denied" });
-    if (isRevokedDeskCode(code)) return json(res, 401, { ok: false, error: "revoked" });
-    if (!verifyDeskUnlockCode(code)) return json(res, 401, { ok: false, error: "denied" });
+    if (isRevokedDeskCode(code)) {
+      recordDeskUnlockFailure(limitKey);
+      return json(res, 401, { ok: false, error: "revoked" });
+    }
+    // Dedicated MAINTENANCE_CODE when set; the desk PIN is only the
+    // legacy fallback until the owner sets one (see desk-unlock.js).
+    if (!maintenanceCodeOk(code)) {
+      recordDeskUnlockFailure(limitKey);
+      return json(res, 401, { ok: false, error: "denied" });
+    }
+    clearDeskUnlockFailures(limitKey);
     return json(res, 200, { ok: true, purpose: "maintenance" });
   }
 
@@ -71,8 +97,15 @@ export default async function handler(req, res) {
   }
 
   if (!code) return json(res, 400, { ok: false, error: "denied" });
-  if (isRevokedDeskCode(code)) return json(res, 401, { ok: false, error: "revoked" });
-  if (!verifyDeskUnlockCode(code)) return json(res, 401, { ok: false, error: "denied" });
+  if (isRevokedDeskCode(code)) {
+    recordDeskUnlockFailure(limitKey);
+    return json(res, 401, { ok: false, error: "revoked" });
+  }
+  if (!verifyDeskUnlockCode(code)) {
+    recordDeskUnlockFailure(limitKey);
+    return json(res, 401, { ok: false, error: "denied" });
+  }
+  clearDeskUnlockFailures(limitKey);
 
   const token = issueDeskSession();
   if (!token || !adminCredentialOk(token)) {

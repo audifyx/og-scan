@@ -83,3 +83,53 @@ export function adminCredentialOk(provided, env = process.env) {
   if (verifyDeskSession(p, Date.now(), env)) return true;
   return false;
 }
+
+/**
+ * Maintenance unlock (audit B11): the maintenance branch historically
+ * accepted the DESK PIN itself with no session at all, so the one
+ * shared secret was both the owner's desk credential and a public-
+ * facing unlock code. When MAINTENANCE_CODE is set in the server env,
+ * maintenance accepts ONLY that dedicated code. When it is unset the
+ * legacy desk-secret behaviour is kept so the live MaintenanceLock
+ * flow doesn't break before the owner sets one — set MAINTENANCE_CODE
+ * to a long random value to close this properly.
+ */
+export function maintenanceConfigured(env = process.env) {
+  return deskUnlockConfigured(env) || Boolean(trim(env.MAINTENANCE_CODE));
+}
+
+export function maintenanceCodeOk(code, env = process.env) {
+  const c = trim(code);
+  if (!c || isRevokedDeskCode(c)) return false;
+  const dedicated = trim(env.MAINTENANCE_CODE);
+  if (dedicated) return safeEqual(c, dedicated);
+  return verifyDeskUnlockCode(c, env);
+}
+
+/* ── Brute-force limiter (audit B11) ─────────────────────────────────
+ * The unlock endpoint had NO attempt limiting: the shared code could
+ * be guessed online forever. In-memory failure counting per key
+ * (ip+purpose), 10 failures per 15 minutes, cleared on success.
+ * In-memory is per-instance (same model as _authLimit) — it removes
+ * unlimited online guessing, which is the audited hole. */
+export const DESK_UNLOCK_MAX_FAILURES = 10;
+export const DESK_UNLOCK_WINDOW_MS = 15 * 60 * 1000;
+const deskUnlockFailures = new Map();
+
+export function deskUnlockLimited(key, now = Date.now()) {
+  const arr = (deskUnlockFailures.get(key) || []).filter((t) => now - t < DESK_UNLOCK_WINDOW_MS);
+  if (arr.length) deskUnlockFailures.set(key, arr);
+  else deskUnlockFailures.delete(key);
+  return arr.length >= DESK_UNLOCK_MAX_FAILURES;
+}
+
+export function recordDeskUnlockFailure(key, now = Date.now()) {
+  const arr = (deskUnlockFailures.get(key) || []).filter((t) => now - t < DESK_UNLOCK_WINDOW_MS);
+  arr.push(now);
+  deskUnlockFailures.set(key, arr);
+  if (deskUnlockFailures.size > 5000) deskUnlockFailures.clear();
+}
+
+export function clearDeskUnlockFailures(key) {
+  deskUnlockFailures.delete(key);
+}
