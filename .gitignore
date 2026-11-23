@@ -36,3 +36,6 @@ supabase/.branches
 
 # local clones (agent / dev)
 .tmp/
+
+# Solana program keypairs — never commit (burned 2026-11-23, see security audit B13)
+*-keypair.json
