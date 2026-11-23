@@ -182,12 +182,6 @@ export const INTELLIGENCE_PROMPTS = [
     description: "What is moving right now across trending, screeners, and the OrbitX desks — and why.",
     arguments: [],
   },
-  {
-    name: "trader_agent_boot",
-    title: "Trader Agent Boot",
-    description: "THE easy setup: boots the user's own AI as their OrbitX trader agent — loads the intelligence pack, verifies the account link, runs the first brief + scan.",
-    arguments: [],
-  },
 ];
 
 const HOUSE_RULES =
@@ -222,17 +216,6 @@ export function getIntelligencePrompt(name, args = {}) {
           `3) orbitx_wallet_transactions and orbitx_adv_wallet_swaps for behavior: what it buys, how fast it exits, whether it is accumulating or distributing.\n` +
           `Report: current book, PnL read, trading style in one line, notable recent moves. ${HOUSE_RULES}`,
       );
-    case "trader_agent_boot":
-      return user(
-        `You are now my OrbitX AI trader agent (MCP v3 — one MCP: research, intelligence, launchpad, and trading in a single connection). Boot sequence:\n` +
-          `1) Load the intelligence pack first: read resources orbitx://intelligence/playbook, orbitx://intelligence/data-sources, and orbitx://intelligence/tool-map. Work by them, not by generic crypto habits.\n` +
-          `2) Call orbitx_trader_boot. If it says I am not connected, ask me to go to https://www.orbitx.world/agent, link my wallet, tap "Generate chat auth", and paste the message for this client — then call orbitx_auth_status with my authCode and pass that authCode on every account tool from then on.\n` +
-          `3) Once connected, run orbitx_trader_brief and summarize my book + the market in five lines or less.\n` +
-          `4) Run orbitx_trader_scan and show me the ranked candidates: score, verdict, and risk flags for each. No hype — flags first.\n` +
-          `5) Trading path: orbitx_trade_quote first, show me the exact quote, and NEVER execute a buy, sell, or launch without my explicit "confirm" in this chat. Launchpad tools (launchpad_*) run through this same MCP.\n` +
-          `6) When I pick a token to watch, offer orbitx_alert_create so I hear about moves without staring at charts.\n` +
-          `${HOUSE_RULES}`,
-      );
     case "market_pulse":
       return user(
         `Give the OrbitX market pulse.\n` +
@@ -244,21 +227,6 @@ export function getIntelligencePrompt(name, args = {}) {
     default:
       return null;
   }
-}
-
-/** Pull up to `cap` unique mint addresses out of any tool payload. */
-export function extractMints(payload, cap = 3) {
-  const out = [];
-  const seen = new Set();
-  const re = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-  walk(payload, (k, v) => {
-    if (out.length >= cap) return;
-    if (typeof v === "string" && /^(mint|address|ca|token_?address|contract)$/.test(k) && re.test(v) && !seen.has(v)) {
-      seen.add(v);
-      out.push(v);
-    }
-  });
-  return out;
 }
 
 /* ------------------------------------------------------------------ */
@@ -280,60 +248,38 @@ function walk(node, visit, depth = 0) {
 }
 
 function num(v) {
-  if (v == null || v === "") return null; // Number(null) is 0 — nulls are "unknown", never zero.
   const n = typeof v === "string" ? Number(v.replace(/[$,%]/g, "")) : Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-const SYSTEM_PROGRAM = "11111111111111111111111111111111";
-function authorityState(v) {
-  if (v == null || v === "" || v === false) return "renounced";
-  if (typeof v === "string") return v === SYSTEM_PROGRAM ? "renounced" : "active";
-  return undefined; // objects/blobs are evidence, not an authority value
-}
-
 export function analyzeTokenSections({ scan, ath, chart } = {}) {
   const signals = {};
-  const tok = scan?.token?.token || scan?.token || {};
-  const audit = tok?.audit || {};
-  const sflags = scan?.forensics?.safetyFlags || {};
-  const conc = scan?.forensics?.concentration || {};
-
-  // Targeted extraction from the scan payload's real fields (verified live).
-  if (audit.mintAuthorityDisabled === true) signals.mintAuthority = "renounced";
-  else if (audit.mintAuthorityDisabled === false) signals.mintAuthority = "active";
-  if (audit.freezeAuthorityDisabled === true) signals.freezeAuthority = "renounced";
-  else if (audit.freezeAuthorityDisabled === false) signals.freezeAuthority = "active";
-  if (num(audit.topHoldersPercentage) != null) signals.top10Pct = num(audit.topHoldersPercentage);
-  if (num(sflags.lpLockedPct) != null) signals.lpLockedPct = num(sflags.lpLockedPct);
-  if (num(sflags.lpBurnedPct) != null) signals.lpBurnedPct = num(sflags.lpBurnedPct);
-  if (sflags.rugged === true) signals.rugged = true;
-  if (num(conc.topHolderPct) != null) signals.topHolderPct = num(conc.topHolderPct);
-  if (num(conc.totalHolders) != null) signals.holders = num(conc.totalHolders);
-  if (num(tok.holderCount) != null) signals.holders = num(tok.holderCount);
-  if (num(tok.liquidity) != null) signals.liquidityUsd = num(tok.liquidity);
-  if (scan?.safety?.canBuy === true || scan?.safety?.canBuy === false) signals.canBuy = scan.safety.canBuy;
-  if (scan?.safety?.canSell === true || scan?.safety?.canSell === false) signals.canSell = scan.safety.canSell;
-
-  // Generic fallback for fields the targeted pass did not find. Strict:
-  // authority objects are skipped, LP percentages of exactly 0 are ignored
-  // (a stray 0 field once produced a bogus "0% locked" flag), nulls skipped.
   const grab = (root) => {
     if (!root || typeof root !== "object") return;
     walk(root, (k, v) => {
-      if (signals.mintAuthority === undefined && /^mint_?authority$/.test(k)) { const s = authorityState(v); if (s) signals.mintAuthority = s; }
-      if (signals.freezeAuthority === undefined && /^freeze_?authority$/.test(k)) { const s = authorityState(v); if (s) signals.freezeAuthority = s; }
-      if (signals.lpLockedPct === undefined && k === "lplockedpct" && num(v) != null && num(v) > 0) signals.lpLockedPct = num(v);
-      if (signals.lpBurnedPct === undefined && k === "lpburnedpct" && num(v) != null && num(v) > 0) signals.lpBurnedPct = num(v);
+      if (signals.mintAuthority === undefined && /mint_?authority/.test(k)) {
+        signals.mintAuthority = v == null || v === "" || v === false ? "renounced" : "active";
+      }
+      if (signals.freezeAuthority === undefined && /freeze_?authority/.test(k)) {
+        signals.freezeAuthority = v == null || v === "" || v === false ? "renounced" : "active";
+      }
+      if (signals.lpLockedPct === undefined && /(lp|liquidity).*(lock|burn)/.test(k) && num(v) != null) signals.lpLockedPct = num(v);
+      if (signals.lpBurnedPct === undefined && /burn(ed)?_?(pct|percent|%)/.test(k) && num(v) != null) signals.lpBurnedPct = num(v);
+      if (signals.topHolderPct === undefined && /(top_?1|top_?holder|largest_?holder)/.test(k) && /pct|percent|share/.test(k) && num(v) != null) signals.topHolderPct = num(v);
+      if (signals.top10Pct === undefined && /top_?10/.test(k) && num(v) != null) signals.top10Pct = num(v);
       if (signals.bundlePct === undefined && /bundle/.test(k) && /pct|percent|share/.test(k) && num(v) != null) signals.bundlePct = num(v);
       if (signals.rugScore === undefined && /rug_?(score|risk)/.test(k) && num(v) != null) signals.rugScore = num(v);
+      if (signals.canBuy === undefined && k === "canbuy") signals.canBuy = v === true;
+      if (signals.canSell === undefined && k === "cansell") signals.canSell = v === true;
+      if (signals.holders === undefined && /^(holder_?count|holders|total_?holders)$/.test(k) && num(v) != null) signals.holders = num(v);
+      if (signals.liquidityUsd === undefined && /liquidity_?(usd)?$/.test(k) && num(v) != null) signals.liquidityUsd = num(v);
       if (signals.priceUsd === undefined && /^(price_?(usd)?|priceusd)$/.test(k) && num(v) != null) signals.priceUsd = num(v);
     });
   };
   grab(scan);
   grab(ath);
   walk(ath || {}, (k, v) => {
-    if (signals.athPriceUsd === undefined && /ath/.test(k) && /price/.test(k) && num(v) != null && num(v) > 0) signals.athPriceUsd = num(v);
+    if (signals.athPriceUsd === undefined && /ath/.test(k) && /price/.test(k) && num(v) != null) signals.athPriceUsd = num(v);
   });
 
   // Chart momentum from candle closes, wherever they live.
@@ -370,7 +316,6 @@ export function analyzeTokenSections({ scan, ath, chart } = {}) {
     const lp = Math.max(signals.lpLockedPct ?? 0, signals.lpBurnedPct ?? 0);
     if (signals.lpLockedPct !== undefined || signals.lpBurnedPct !== undefined) { parts.push(lp); if (lp >= 95) reasons.push(`Liquidity ${lp}% locked/burned.`); else if (lp < 50) riskFlags.push(`Only ${lp}% of liquidity locked/burned.`); }
     if (signals.canSell === false) riskFlags.push("Scan reports the token may NOT be sellable (honeypot signal).");
-    if (signals.rugged === true) riskFlags.push("Forensics flag this token as rugged.");
     if (signals.rugScore != null) { parts.push(Math.max(0, 100 - signals.rugScore)); if (signals.rugScore > 60) riskFlags.push(`RugCheck-style risk score is high (${signals.rugScore}).`); }
     if (parts.length) score = Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
     dims.safety = score;
@@ -379,7 +324,7 @@ export function analyzeTokenSections({ scan, ath, chart } = {}) {
   {
     const parts = [];
     if (signals.topHolderPct != null) { parts.push(Math.max(0, 100 - signals.topHolderPct * 3)); if (signals.topHolderPct > 25) riskFlags.push(`Top holder controls ${signals.topHolderPct}% — one wallet can move the market.`); else reasons.push(`Top holder at ${signals.topHolderPct}%.`); }
-    if (signals.top10Pct != null) { parts.push(Math.max(0, Math.min(100, 100 - Math.max(0, signals.top10Pct - 15) * 1.5))); if (signals.top10Pct > 60) riskFlags.push(`Top 10 holders control ${signals.top10Pct}%.`); else reasons.push(`Top 10 holders at ${Number(signals.top10Pct).toFixed(1)}%.`); }
+    if (signals.top10Pct != null) { parts.push(Math.max(0, 120 - signals.top10Pct)); if (signals.top10Pct > 60) riskFlags.push(`Top 10 holders control ${signals.top10Pct}%.`); }
     if (signals.bundlePct != null) { parts.push(Math.max(0, 100 - signals.bundlePct * 2.5)); if (signals.bundlePct > 20) riskFlags.push(`Bundled supply is ${signals.bundlePct}% — launch was heavily bundled.`); }
     dims.concentration = parts.length ? Math.round(parts.reduce((a, b) => a + b, 0) / parts.length) : null;
   }
@@ -392,7 +337,6 @@ export function analyzeTokenSections({ scan, ath, chart } = {}) {
     dims.momentum = parts.length ? Math.round(parts.reduce((a, b) => a + b, 0) / parts.length) : null;
   }
 
-  for (const k of Object.keys(dims)) if (dims[k] != null) dims[k] = Math.max(0, Math.min(100, dims[k]));
   const present = Object.entries(dims).filter(([, v]) => v != null);
   const coverage = Object.keys(signals).length + (candles ? 1 : 0);
   if (!present.length) {
