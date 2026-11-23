@@ -666,16 +666,6 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
             <span className="ox-agent__panel-hint">Claude · ChatGPT · Grok</span>
           </div>
           <div className="ox-agent__panel-b">
-            <div className="ox-agent__steps" style={{ marginTop: 0, marginBottom: 14 }}>
-              <span className="ox-agent__chip is-ok">MCP v2.0</span>
-              <span className="ox-agent__chip is-ok">Free forever — no burn, no hold</span>
-              <span className="ox-agent__chip">4,300+ tools</span>
-              <span className="ox-agent__chip">Rich widgets in Claude · Grok · ChatGPT</span>
-            </div>
-            <p className="ox-agent__note" style={{ marginTop: 0 }}>
-              New in v2: <code>orbitx_token_dossier</code> — the full token breakdown (scan,
-              forensics, ATH, chart) in one call, rendered as a live widget in your AI client.
-            </p>
             <div className="ox-agent__btn-row" style={{ marginTop: 0 }}>
               <button
                 type="button"
