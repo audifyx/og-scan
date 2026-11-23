@@ -148,14 +148,6 @@ import {
   getSkill,
   readSkillResource,
 } from "./orbitx/_skills/index.js";
-/** Trader Intelligence Pack (MCP V2) — resources + prompts + deterministic scorer. */
-import {
-  INTELLIGENCE_RESOURCES,
-  readIntelligenceResource,
-  INTELLIGENCE_PROMPTS,
-  getIntelligencePrompt,
-  analyzeTokenSections,
-} from "./orbitx/_handlers/_mcp-intelligence.js";
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
   return import("./orbitx/_handlers/_mcp-ops.js");
@@ -2651,11 +2643,6 @@ const CORE_TOOLS = [
     inputSchema: { type: "object", properties: { mint: { type: "string", description: "Token mint (contract address), 32-44 base58 chars." }, interval: { type: "string", enum: ["5m", "15m", "1h", "4h", "1d"], default: "1h" } }, required: ["mint"] },
   },
   {
-    name: "orbitx_ai_analyze",
-    description: "OrbitX Intelligence: a deterministic scored verdict on a token (0-100 + tier) computed from the LIVE scan, ATH, and chart payload — safety, concentration, and momentum dimensions, hard risk flags, and the exact signals used (with a coverage count). No invented numbers: only signals actually present are scored. Use for 'should I look at this / how risky is this / analyze this token'.",
-    inputSchema: { type: "object", properties: { mint: { type: "string", description: "Token mint (contract address), 32-44 base58 chars." }, interval: { type: "string", enum: ["5m", "15m", "1h", "4h", "1d"], default: "1h" } }, required: ["mint"] },
-  },
-  {
     name: "orbitx_get_ath",
     description: "All-time-high price and market cap for a token.",
     inputSchema: { type: "object", properties: { mint: { type: "string" } }, required: ["mint"] },
@@ -5099,19 +5086,6 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
     return { ok: true, mint, dossier: true, scan, ath, chart };
   }
 
-  if (name === "orbitx_ai_analyze") {
-    const mint = String(args.mint || args.address || args.ca || "").trim();
-    if (!mint) return { ok: false, error: "mint_required", message: "Pass a token mint (contract address)." };
-    const settle = (p) => Promise.resolve(p).catch((e) => ({ ok: false, error: "section_failed", message: e?.message || "section unavailable" }));
-    const [scan, ath, chart] = await Promise.all([
-      settle(callTool("orbitx_crypto_scan", { mint }, auth, base, req)),
-      settle(callTool("orbitx_get_ath", { mint }, auth, base, req)),
-      settle(callTool("orbitx_get_chart", { mint, interval: args.interval || "1h", limit: 100 }, auth, base, req)),
-    ]);
-    const verdict = analyzeTokenSections({ scan, ath, chart });
-    return { mint, analysis: verdict, scanOk: scan?.ok !== false, athOk: ath?.ok !== false, chartOk: chart?.ok !== false };
-  }
-
   if (name === "orbitx_shop") {
     const pack = String(args.package || args.item || "").toLowerCase();
     if (pack === "hour" || pack === "day" || pack === "week" || pack === "month" || pack === "access") {
@@ -6692,10 +6666,10 @@ async function handleMcp(req, res, parts) {
             protocolVersion: negotiatedVersion,
             // TEMP-DIAG 2026-10-12: resources capability stripped to isolate ChatGPT discovery failure.
             // extensions advertises the MCP Skills (SEP-2640 subset) OpenAI imports at submission.
-            capabilities: { tools: {}, resources: {}, prompts: {}, extensions: { "io.modelcontextprotocol/skills": {} } },
+            capabilities: { tools: {}, resources: {}, extensions: { "io.modelcontextprotocol/skills": {} } },
             serverInfo: { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
             instructions:
-              "OrbitX Agent MCP v2.0.0 — FREE FOREVER: no burn, no hold, no package is ever required to use this MCP. Works in Claude, Grok, and ChatGPT; flagship tools render rich OrbitX widgets in-client. If they ask why use this MCP or which app to use, call orbitx_why. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool (account actions need it; all research tools are open). FULL TOKEN BREAKDOWN in one call: orbitx_token_dossier (scan + forensics + ATH + chart). Quick safety: orbitx_crypto_scan. SCORED VERDICT: orbitx_ai_analyze. INTELLIGENCE PACK — before analyzing anything, read resources orbitx://intelligence/playbook (recorded strategy win rates + house rules), orbitx://intelligence/data-sources (which source for which figure), orbitx://intelligence/tool-map; prompts/list offers token_deep_dive, pre_trade_risk_check, wallet_autopsy, market_pulse playbooks that sequence the tools for you. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. PAPER DESK: 10 agents × 10,000 mock SOL trading real coin tape every hour — orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. LIVE DESK (read only, never executes): orbitx_live_desk / orbitx_live_positions / orbitx_live_feed / orbitx_live_world. Watch the feed and 3D city at https://www.orbitx.world/on-chain. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create; city: orbitx_life_city, brain: orbitx_life_think, files: orbitx_life_files, talk: orbitx_life_converse; 300 life cmds via tools/list cursor life:0. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Any tool not visible: orbitx_exec calls all 4,300+ tools by name; search finds them. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP v2.0.0 — FREE FOREVER: no burn, no hold, no package is ever required to use this MCP. Works in Claude, Grok, and ChatGPT; flagship tools render rich OrbitX widgets in-client. If they ask why use this MCP or which app to use, call orbitx_why. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool (account actions need it; all research tools are open). FULL TOKEN BREAKDOWN in one call: orbitx_token_dossier (scan + forensics + ATH + chart). Quick safety: orbitx_crypto_scan. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. PAPER DESK: 10 agents × 10,000 mock SOL trading real coin tape every hour — orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. LIVE DESK (read only, never executes): orbitx_live_desk / orbitx_live_positions / orbitx_live_feed / orbitx_live_world. Watch the feed and 3D city at https://www.orbitx.world/on-chain. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create; city: orbitx_life_city, brain: orbitx_life_think, files: orbitx_life_files, talk: orbitx_life_converse; 300 life cmds via tools/list cursor life:0. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Any tool not visible: orbitx_exec calls all 4,300+ tools by name; search finds them. Setup: https://www.orbitx.world/agent",
           },
         },
         200,
@@ -6750,29 +6724,16 @@ async function handleMcp(req, res, parts) {
     }
 
     // ChatGPT Mini App (Apps SDK) widget resources — served from web/api/orbitx/_ui/.
-    // Plus the Trader Intelligence Pack resources (orbitx://intelligence/*).
     if (method === "resources/list") {
       return json(res, {
         jsonrpc: "2.0",
         id,
-        result: { resources: [...listUiWidgets(), ...INTELLIGENCE_RESOURCES] },
+        result: { resources: listUiWidgets() },
       });
     }
 
     if (method === "resources/read") {
       const uri = String(params?.uri || "");
-      // Trader Intelligence Pack resources (orbitx://intelligence/*).
-      if (uri.startsWith("orbitx://intelligence/")) {
-        const payload = readIntelligenceResource(uri);
-        if (!payload) {
-          return json(res, {
-            jsonrpc: "2.0",
-            id,
-            error: { code: -32602, message: `Unknown intelligence resource: ${uri || "(empty)"}` },
-          });
-        }
-        return json(res, { jsonrpc: "2.0", id, result: { contents: [payload] } });
-      }
       // Skill playbooks (skill://) — same handler shape as widgets.
       if (uri.startsWith("skill://")) {
         const payload = readSkillResource(uri);
@@ -6791,23 +6752,6 @@ async function handleMcp(req, res, parts) {
           jsonrpc: "2.0",
           id,
           error: { code: -32602, message: `Unknown widget resource: ${uri || "(empty)"}` },
-        });
-      }
-      return json(res, { jsonrpc: "2.0", id, result: payload });
-    }
-
-    // Trader Intelligence Pack prompts — analyst playbooks (MCP prompts).
-    if (method === "prompts/list") {
-      return json(res, { jsonrpc: "2.0", id, result: { prompts: INTELLIGENCE_PROMPTS } });
-    }
-
-    if (method === "prompts/get") {
-      const payload = getIntelligencePrompt(params?.name, params?.arguments || {});
-      if (!payload) {
-        return json(res, {
-          jsonrpc: "2.0",
-          id,
-          error: { code: -32602, message: `Unknown prompt: ${String(params?.name || "(empty)")}` },
         });
       }
       return json(res, { jsonrpc: "2.0", id, result: payload });
