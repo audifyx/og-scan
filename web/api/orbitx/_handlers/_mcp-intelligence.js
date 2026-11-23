@@ -182,6 +182,12 @@ export const INTELLIGENCE_PROMPTS = [
     description: "What is moving right now across trending, screeners, and the OrbitX desks — and why.",
     arguments: [],
   },
+  {
+    name: "trader_agent_boot",
+    title: "Trader Agent Boot",
+    description: "THE easy setup: boots the user's own AI as their OrbitX trader agent — loads the intelligence pack, verifies the account link, runs the first brief + scan.",
+    arguments: [],
+  },
 ];
 
 const HOUSE_RULES =
@@ -216,6 +222,17 @@ export function getIntelligencePrompt(name, args = {}) {
           `3) orbitx_wallet_transactions and orbitx_adv_wallet_swaps for behavior: what it buys, how fast it exits, whether it is accumulating or distributing.\n` +
           `Report: current book, PnL read, trading style in one line, notable recent moves. ${HOUSE_RULES}`,
       );
+    case "trader_agent_boot":
+      return user(
+        `You are now my OrbitX AI trader agent (MCP v3 — one MCP: research, intelligence, launchpad, and trading in a single connection). Boot sequence:\n` +
+          `1) Load the intelligence pack first: read resources orbitx://intelligence/playbook, orbitx://intelligence/data-sources, and orbitx://intelligence/tool-map. Work by them, not by generic crypto habits.\n` +
+          `2) Call orbitx_trader_boot. If it says I am not connected, ask me to go to https://www.orbitx.world/agent, link my wallet, tap "Generate chat auth", and paste the message for this client — then call orbitx_auth_status with my authCode and pass that authCode on every account tool from then on.\n` +
+          `3) Once connected, run orbitx_trader_brief and summarize my book + the market in five lines or less.\n` +
+          `4) Run orbitx_trader_scan and show me the ranked candidates: score, verdict, and risk flags for each. No hype — flags first.\n` +
+          `5) Trading path: orbitx_trade_quote first, show me the exact quote, and NEVER execute a buy, sell, or launch without my explicit "confirm" in this chat. Launchpad tools (launchpad_*) run through this same MCP.\n` +
+          `6) When I pick a token to watch, offer orbitx_alert_create so I hear about moves without staring at charts.\n` +
+          `${HOUSE_RULES}`,
+      );
     case "market_pulse":
       return user(
         `Give the OrbitX market pulse.\n` +
@@ -227,6 +244,21 @@ export function getIntelligencePrompt(name, args = {}) {
     default:
       return null;
   }
+}
+
+/** Pull up to `cap` unique mint addresses out of any tool payload. */
+export function extractMints(payload, cap = 3) {
+  const out = [];
+  const seen = new Set();
+  const re = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+  walk(payload, (k, v) => {
+    if (out.length >= cap) return;
+    if (typeof v === "string" && /^(mint|address|ca|token_?address|contract)$/.test(k) && re.test(v) && !seen.has(v)) {
+      seen.add(v);
+      out.push(v);
+    }
+  });
+  return out;
 }
 
 /* ------------------------------------------------------------------ */
