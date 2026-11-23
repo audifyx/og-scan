@@ -90,7 +90,6 @@ export function WalletConnectButton() {
                 </button>
               )}
               {[
-                { icon: Image, label: "NFT Market", path: "/nft" },
                 { icon: Wallet, label: "Wallets", path: "/wallets" },
                 { icon: Settings, label: "Settings", path: "/settings" },
               ].map(({ icon: Icon, label, path }) => (

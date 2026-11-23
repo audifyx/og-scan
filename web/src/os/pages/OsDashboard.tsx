@@ -9,7 +9,7 @@ export function OsDashboardPage() {
   const { profile } = useAuth();
   const [cat, setCat] = useState("all");
   const apps = useMemo(
-    () => (cat === "all" ? OS_APPS : OS_APPS.filter((a) => a.category === cat)),
+    () => OS_APPS.filter((a) => !a.hidden && (cat === "all" || a.category === cat)),
     [cat],
   );
 

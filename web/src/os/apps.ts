@@ -28,6 +28,7 @@ export interface OsAppDef {
   blurb: string;
   href: string;
   external?: boolean;
+  hidden?: boolean;
   accent: string;
   category: "world" | "trade" | "social" | "play" | "profile" | "system";
 }
@@ -37,7 +38,7 @@ export const OS_APPS: OsAppDef[] = [
   { id: "dex", name: "OrbitX Terminal", blurb: "OrbitX Terminal · live market data", href: "/intel/trade", accent: "#e8b84a", category: "trade" },
   { id: "scanner", name: "ORBITX SCANNER", blurb: "Forensic OG score & risk", href: "/scanner", accent: "#f5c542", category: "trade" },
   { id: "launchpad", name: "Launchpad", blurb: "Fair launch console", href: "/intel/launch", accent: "#ff6b35", category: "trade" },
-  { id: "nft", name: "NFT Market", blurb: "Create, trade, collect", href: "/nft", accent: "#a78bfa", category: "trade" },
+  { id: "nft", name: "NFT Market", blurb: "Create, trade, collect", href: "/nft", accent: "#a78bfa", category: "trade", hidden: true },
   { id: "games", name: "Games Hub", blurb: "Play Studio · classes & missions", href: "/play", accent: "#17ff4d", category: "play" },
   { id: "predictions", name: "Prediction Markets", blurb: "Markets & 1v1 games", href: "/predictions", accent: "#f5c542", category: "play" },
   { id: "lobbies", name: "Game Lobbies", blurb: "Matchmaking & rooms", href: "/play/multiplayer", accent: "#3de7ff", category: "play" },
