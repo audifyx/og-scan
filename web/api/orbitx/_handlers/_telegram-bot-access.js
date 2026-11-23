@@ -207,10 +207,45 @@ export async function redeemEarlyAccessCode(sb, { telegramUserId, userId, wallet
       }
       durationSeconds = Number(row.duration_seconds) || durationSeconds;
       if (!alreadyThisCode) {
-        await sb(`telegram_early_access_codes?code=eq.${encodeURIComponent(normalized)}`, {
-          method: "PATCH",
-          body: JSON.stringify({ uses: uses + 1 }),
-        }).catch(() => null);
+        // Atomic claim (audit B9): the increment is a conditional
+        // UPDATE gated on the exact `uses` value just read
+        // (uses=eq.N). A concurrent redemption bumps `uses` first,
+        // this PATCH then matches zero rows, and we re-read, re-check
+        // the cap, and retry — two racers can no longer both redeem
+        // against the same count. The old read-then-PATCH also
+        // swallowed increment failures entirely (.catch(() => null)),
+        // granting access without consuming a use.
+        let claimed = false;
+        let curUses = uses;
+        for (let attempt = 0; attempt < 3 && !claimed; attempt++) {
+          let patched = null;
+          try {
+            patched = await sb(
+              `telegram_early_access_codes?code=eq.${encodeURIComponent(normalized)}&uses=eq.${curUses}`,
+              { method: "PATCH", body: JSON.stringify({ uses: curUses + 1 }) },
+            );
+          } catch {
+            patched = null; // transient — re-read below and retry
+          }
+          // PostgREST with return=representation answers an array;
+          // a non-empty array means OUR conditional update landed.
+          if (Array.isArray(patched) ? patched.length > 0 : patched != null) {
+            claimed = true;
+            break;
+          }
+          const fresh = await sb(
+            `telegram_early_access_codes?code=eq.${encodeURIComponent(normalized)}&select=*&limit=1`,
+          ).catch(() => null);
+          const freshRow = Array.isArray(fresh) ? fresh[0] : null;
+          if (!freshRow) break;
+          curUses = Number(freshRow.uses || 0);
+          if (max != null && Number.isFinite(max) && curUses >= max) {
+            return { ok: false, error: "code_exhausted", message: codeExhaustedMessage(normalized) };
+          }
+        }
+        if (!claimed) {
+          return { ok: false, error: "code_exhausted", message: codeExhaustedMessage(normalized) };
+        }
       }
     }
   } catch {
