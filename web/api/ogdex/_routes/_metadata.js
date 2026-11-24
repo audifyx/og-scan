@@ -5,15 +5,15 @@
  * authority before letting them edit. The actual update tx is built & signed
  * client-side in Phantom — this route only READS.
  */
-import { callFn, send, cache } from "../_lib.js";
+import { resilientRpc, send, cache } from "../_lib.js";
 
 const SPL = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const T22 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 
 async function rpc(method, params) {
-  const r = await callFn("rpc-proxy", { method, params, id: 1, provider: "helius" });
-  if (r && r.success && r.data) return r.data.result ?? null;
-  return null;
+  // Was callFn("rpc-proxy") — retired 2026-11-24. Direct Helius; getAsset
+  // is a Helius DAS method served by their RPC endpoint.
+  return await resilientRpc(method, params);
 }
 
 export default async function handler(req, res) {

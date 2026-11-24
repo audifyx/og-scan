@@ -52,6 +52,23 @@ export async function callFn(name, body) {
   try { return JSON.parse(txt); } catch { return { ok: false, raw: txt }; }
 }
 
+// Server-side memo for token intel: the same mints get re-scanned constantly
+// (DEX auto-refresh, trending, repeated token views) and Birdeye holder/trade
+// data barely moves in 60s, so share one in-flight/live result per mint.
+// This is what stops the intel-v2 invocation spam — without it every poll
+// re-invokes the edge function. Cap the map so it can't grow forever.
+const _intelMemo = new Map();
+export async function intelCached(mint) {
+  const now = Date.now();
+  const hit = _intelMemo.get(mint);
+  if (hit && now - hit.at < 60_000) return hit.promise;
+  if (_intelMemo.size > 500) _intelMemo.delete(_intelMemo.keys().next().value);
+  const promise = callFn(INTEL_FN, { mint });
+  _intelMemo.set(mint, { at: now, promise });
+  promise.catch(() => { if (_intelMemo.get(mint)?.promise === promise) _intelMemo.delete(mint); });
+  return promise;
+}
+
 const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Helius key: HELIUS_API_KEY is the server name; REACT_APP_HELIUS_KEY is
@@ -86,39 +103,46 @@ async function heliusDirectRpc(method, params, timeout = 9000) {
   } finally { clearTimeout(id); }
 }
 
+// Raw Helius JSON-RPC returning the full envelope (for the generic /rpc
+// route). Same key as heliusDirectRpc, but preserves {jsonrpc,id,result}
+// instead of unwrapping — the route forwards the envelope to the browser.
+export async function heliusEnvelopeRpc(method, params, id = 1, timeout = 9000) {
+  const key = heliusKey();
+  if (!key) return { jsonrpc: "2.0", id, error: { code: -32603, message: "no helius key configured" } };
+  const ctl = new AbortController();
+  const tid = setTimeout(() => ctl.abort(), timeout);
+  try {
+    const res = await fetch(`https://mainnet.helius-rpc.com/?api-key=${key}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+      signal: ctl.signal,
+    });
+    const j = await res.json().catch(() => null);
+    if (!res.ok) return { jsonrpc: "2.0", id, error: { code: -32603, message: `helius HTTP ${res.status}${j?.error?.message ? `: ${j.error.message}` : ""}` } };
+    if (j && typeof j === "object") return { jsonrpc: "2.0", id: j.id ?? id, ...(j.result !== undefined ? { result: j.result } : {}), ...(j.error ? { error: j.error } : {}) };
+    return { jsonrpc: "2.0", id, error: { code: -32603, message: "bad helius response" } };
+  } catch (e) {
+    return { jsonrpc: "2.0", id, error: { code: -32603, message: String(e?.message || e) } };
+  } finally { clearTimeout(tid); }
+}
+
 /**
- * Resilient Solana JSON-RPC: Helius via Supabase rpc-proxy first (8s cap),
- * then DIRECT Helius (same live key, no middleman), then public RPCs via
- * jsonRpcWithFallback. Returns the unwrapped result, or null when every
- * path fails.
+ * Resilient Solana JSON-RPC: DIRECT Helius first (same live key), then
+ * public RPCs via jsonRpcWithFallback. Returns the unwrapped result, or
+ * null when every path fails. The Supabase rpc-proxy used to sit in front
+ * of Helius — retired 2026-11-24, it burned ~107K invocations/day.
  *
- * Use this for ALL wallet/holder/PnL RPC — direct callFn("rpc-proxy") calls
- * silently return empty wallets (sol 0, holdings [], trades []) when the
- * proxy is down, because callers treat null as "empty". Public RPCs serve
- * getBalance / getSignaturesForAddress / getTransaction / getMultipleAccounts;
- * only indexed getTokenAccountsByOwner still needs Helius (public RPCs block
- * it) — and the rpc-proxy itself rejects that method ("Method not
- * allowed"), so callers must fall back to the tx-derived holdings scan
- * in _txscan.js and flag the list as degraded, never as "0 tokens".
- * Direct Helius now covers getTokenAccountsByOwner too.
+ * Use this for ALL wallet/holder/PnL RPC. Public RPCs serve getBalance /
+ * getSignaturesForAddress / getTransaction / getMultipleAccounts; only
+ * indexed getTokenAccountsByOwner still needs Helius (public RPCs block
+ * it) — callers must fall back to the tx-derived holdings scan in
+ * _txscan.js and flag the list as degraded, never as "0 tokens".
  */
 export async function resilientRpcDetailed(method, params) {
-  try {
-    const TIMEOUT = Symbol("timeout");
-    const r = await Promise.race([
-      callFn("rpc-proxy", { jsonrpc: "2.0", id: 1, method, params, provider: "helius" }),
-      _sleep(8000).then(() => TIMEOUT),
-    ]);
-    // success === false means the proxy itself failed — discard its payload.
-    if (r !== TIMEOUT && !(r && r.success === false)) {
-      const data = r?.data ?? r ?? null;
-      if (data && !data.error && data.result !== undefined) {
-        return { result: data.result, source: "helius-proxy" };
-      }
-    }
-  } catch {
-    /* fall through to direct Helius */
-  }
+  // Supabase rpc-proxy RETIRED 2026-11-24: it was ~90% of all edge-function
+  // invocations (~107K/day) — every RPC op burned a Supabase call for a
+  // middleman that forwards to the same Helius key. Direct Helius first.
   try {
     const direct = await heliusDirectRpc(method, params);
     if (direct !== null && direct !== undefined) {

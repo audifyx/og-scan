@@ -86,26 +86,11 @@ async function heliusDirect(method, params, timeout = 9000) {
   } finally { clearTimeout(id); }
 }
 
-// Single JSON-RPC call: Helius via Supabase rpc-proxy first, direct Helius
-// second (proxy's Helius provider is unconfigured — see above).
+// Single JSON-RPC call: direct Helius only. The Supabase rpc-proxy was
+// RETIRED 2026-11-24 — it burned ~107K invocations/day as a middleman to
+// the same Helius key, and getTokenLargestAccounts isn't even in its
+// allowlist, so holder lookups paid for a proxy call AND a direct call.
 async function rpc(method, params, timeout = 9000) {
-  const ctl = new AbortController();
-  const id = setTimeout(() => ctl.abort(), timeout);
-  try {
-    const res = await fetch(`${SUPA_FN}/rpc-proxy`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}`, apikey: ANON },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params, provider: "helius" }),
-      signal: ctl.signal,
-    });
-    const j = await res.json().catch(() => null);
-    if (!j?.data?.error && !j?.error && (j?.data?.result !== undefined || j?.result !== undefined)) {
-      return { result: j?.data?.result ?? j?.result ?? null, error: null };
-    }
-    // Proxy failed (incl. "helius not configured") — fall through to direct.
-  } catch {
-    /* proxy unreachable — fall through to direct Helius */
-  } finally { clearTimeout(id); }
   const direct = await heliusDirect(method, params, timeout);
   if (direct.error) lastRpcError = direct.error;
   return direct;
@@ -123,7 +108,10 @@ async function largestAccounts(mint, attempts = 3) {
     // Mega tokens (millions of accounts) get a persistent "index overloaded" /
     // "too many accounts" error that won't clear within this request — give it
     // one quick retry then bail so we don't burn the whole function timeout.
+    // A 429 never clears on retry inside one request either — bail at once.
     const overloaded = error && /overload|too many accounts/i.test(error);
+    const rateLimited = error && /429|too many requests/i.test(error);
+    if (rateLimited) return null;
     if (overloaded && i >= 1) return null;
     if (i < attempts - 1) await sleep(400 * (i + 1));
   }

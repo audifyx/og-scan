@@ -10,7 +10,7 @@
  *   1) SystemProgram.transfer prepended into the swap tx when possible
  *   2) Jupiter platformFeeBps + feeAccount (output-token ATA) as backup (bps only)
  */
-import { send, readBody, callFn, jup, PLATFORM_FEE_WALLET } from "../_lib.js";
+import { send, readBody, resilientRpc, jup, PLATFORM_FEE_WALLET } from "../_lib.js";
 import {
   applyPlatformFeeToSolAmount,
   PLATFORM_TX_FEE_BPS,
@@ -55,8 +55,8 @@ async function computeBuyFee(amountSol) {
 }
 
 async function rpc(method, params) {
-  const r = await callFn("rpc-proxy", { method, params, id: 1, provider: "helius" });
-  return r?.data?.result ?? r?.result ?? null;
+  // Was callFn("rpc-proxy") — retired 2026-11-24.
+  return await resilientRpc(method, params);
 }
 
 /** Prepend SOL → PLATFORM_FEE_WALLET transfer into a base64 VersionedTransaction. */

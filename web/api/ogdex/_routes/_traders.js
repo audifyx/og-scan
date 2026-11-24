@@ -3,7 +3,7 @@
 // labels + last-known-good cache) via _holders.js. Traders: GeckoTerminal
 // recent trades on the DEEPEST pool(s), with DexScreener pool fallback + retries.
 // Also returns the raw trade tape so Live Trades UI works even when INTEL_FN is down.
-import { send, cache, kvGet, kvPut, callFn, INTEL_FN } from "../_lib.js";
+import { send, cache, kvGet, kvPut, callFn, intelCached } from "../_lib.js";
 import { getLabeledHolders } from "../_holders.js";
 
 const JUP = "https://lite-api.jup.ag";
@@ -215,7 +215,7 @@ function normalizeIntelTrade(tr) {
 async function fetchIntelTape(mint) {
   try {
     const intel = await Promise.race([
-      callFn(INTEL_FN, { mint }),
+      intelCached(mint),
       new Promise((r) => setTimeout(() => r(null), 8000)),
     ]);
     const raw = Array.isArray(intel?.trades) ? intel.trades : [];

@@ -1,4 +1,4 @@
-import { callFn, send, cache, dbSelect, dbInsert, dbUpdate, readBody, adminAuthorized, hasAdminPass } from "../_lib.js";
+import { resilientRpc, send, cache, dbSelect, dbInsert, dbUpdate, readBody, adminAuthorized, hasAdminPass } from "../_lib.js";
 import { eqFilter } from "../_walletProof.js";
 import { parseSwap } from "../_swap.js";
 import { enrichTokens } from "../_market.js";
@@ -19,8 +19,8 @@ const pub = (p) => ({
 const seedDirectory = () => { const m = {}; for (const k of SEED.kols) m[k.address] = { name: k.name, twitter: k.twitter, tags: k.tags, status: k.status, notes: k.notes, address: k.address }; return m; };
 
 async function rpc(method, params) {
-  const r = await callFn("rpc-proxy", { jsonrpc: "2.0", id: 1, method, params });
-  return r?.data?.result ?? r?.result ?? null;
+  // Was callFn("rpc-proxy") — retired 2026-11-24.
+  return await resilientRpc(method, params);
 }
 
 export default async function handler(req, res) {

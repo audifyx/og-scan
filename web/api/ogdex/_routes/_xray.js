@@ -1,7 +1,7 @@
 // OG DEX — Risk X-ray. Merges early-buyer forensics (snipers / same-block
 // bundlers from the ogdex-xray edge fn) with holder + safety intel
 // (ogdex-intel-v2) into a single green / yellow / red verdict.
-import { callFn, send, cache, INTEL_FN } from "../_lib.js";
+import { callFn, send, cache, kvGet, intelCached } from "../_lib.js";
 
 const num  = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 const pct1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
@@ -53,9 +53,11 @@ export default async function handler(req, res) {
   cache(res, 60, 300);
 
   try {
+    // xray results are immutable — KV first, function only on miss.
+    const cachedXr = await kvGet(`xray/${mint}.json`).catch(() => null);
     const [xr, intel] = await Promise.all([
-      callFn("ogdex-xray", { mint }).catch(() => null),
-      callFn(INTEL_FN,    { mint }).catch(() => null),
+      cachedXr ? { xray: cachedXr.xray } : callFn("ogdex-xray", { mint }).catch(() => null),
+      intelCached(mint).catch(() => null),
     ]);
 
     const xray    = xr?.xray    || null;

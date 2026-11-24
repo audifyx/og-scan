@@ -4,7 +4,7 @@
  * checks current price, and POSTs a payload to the alert's webhook when hit.
  * Price targets are one-shot (disabled after firing); % alerts cooldown 6h.
  */
-import { send, kvGet, kvPut, kvList, jup, callFn } from "../_lib.js";
+import { send, kvGet, kvPut, kvList, jup, resilientRpc } from "../_lib.js";
 import { parseSwap } from "../_swap.js";
 import { isSafeWebhookUrl } from "../_walletProof.js";
 
@@ -24,8 +24,9 @@ async function priceOf(mint) {
   try { const d = await jup(`/price/v3?ids=${mint}`); return Number(d?.[mint]?.usdPrice) || null; } catch { return null; }
 }
 async function rpc(method, params) {
-  const r = await callFn("rpc-proxy", { jsonrpc: "2.0", id: 1, method, params });
-  return r?.data?.result ?? r?.result ?? null;
+  // Was callFn("rpc-proxy") — retired 2026-11-24 (the proxy burned ~107K
+  // invocations/day). Direct Helius via resilientRpc, same result shape.
+  return await resilientRpc(method, params);
 }
 // Recent buy/sell swaps for a wallet (newest first), cached per run.
 async function recentSwaps(address, cache) {

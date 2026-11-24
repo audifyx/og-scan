@@ -1,4 +1,4 @@
-import { jup, callFn, send, cache, INTEL_FN } from "../_lib.js";
+import { jup, callFn, send, cache, intelCached } from "../_lib.js";
 import { getLabeledHolders } from "../_holders.js";
 import { normToken, num } from "../_normalize.js";
 import { evmTrades, evmSecurity } from "../_evm.js";
@@ -223,7 +223,7 @@ export default async function handler(req, res) {
       fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { headers: { Accept: "application/json" } })
         .then((r) => (r.ok ? r.json() : null)).catch(() => null),
       headerOnly ? Promise.resolve(null) : callFn("og-scan-token", { query: mint }).catch(() => null),
-      headerOnly ? Promise.resolve(null) : callFn(INTEL_FN, { mint }).catch(() => null),
+      headerOnly ? Promise.resolve(null) : intelCached(mint).catch(() => null),
     ]);
 
     const jupRaw = Array.isArray(jupArr) ? (jupArr.find((t) => (t.id || t.mint) === mint) || null) : null;

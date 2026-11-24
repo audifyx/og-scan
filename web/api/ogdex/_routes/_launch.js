@@ -1,4 +1,4 @@
-import { send, callFn, dbInsert, dbSelect, readBody, PLATFORM_FEE_WALLET } from "../_lib.js";
+import { send, resilientRpc, dbInsert, dbSelect, readBody, PLATFORM_FEE_WALLET } from "../_lib.js";
 
 /**
  * OG DEX Token Launcher backend.
@@ -120,8 +120,8 @@ function dupError(dup) {
 }
 
 async function rpc(method, params) {
-  const r = await callFn("rpc-proxy", { jsonrpc: "2.0", id: 1, method, params });
-  return r?.data?.result ?? r?.result ?? null;
+  // Was callFn("rpc-proxy") — retired 2026-11-24.
+  return await resilientRpc(method, params);
 }
 
 async function solPriceUsd() {

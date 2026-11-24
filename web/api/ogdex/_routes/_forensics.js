@@ -1,4 +1,4 @@
-import { callFn, send, cache, resilientRpc, INTEL_FN } from "../_lib.js";
+import { callFn, send, cache, resilientRpc, kvGet, intelCached } from "../_lib.js";
 import { getLabeledHolders, classifyHolderOwners, poolKindFor } from "../_holders.js";
 
 const SOL = "So11111111111111111111111111111111111111112";
@@ -119,7 +119,7 @@ export default async function handler(req, res) {
     const [paid, pump, intel, dexPairs] = await Promise.all([
       dexPaid(mint),
       pumpCoin(mint),
-      callFn(INTEL_FN, { mint }).catch(() => null),
+      intelCached(mint).catch(() => null),
       // DexScreener pairs: a migrated pump token has an AMM pair (PumpSwap /
       // Raydium / Meteora / Orca). A bonding-curve token has none. This is
       // the deterministic migration proof — the holder-sample pool check
@@ -175,7 +175,9 @@ export default async function handler(req, res) {
     // launch fallback). Pass the known creator so big tokens still get an answer.
     let first = null;
     if (wantFirst) {
-      const fr = await callFn("ogdex-firstbuyer", { mint, creator: dev }).catch(() => null);
+      // firstbuyer results are immutable — KV first, function only on miss.
+      const cachedFb = await kvGet(`firstbuyer/${mint}.json`).catch(() => null);
+      const fr = cachedFb ? { firstBuyer: cachedFb.firstBuyer } : await callFn("ogdex-firstbuyer", { mint, creator: dev }).catch(() => null);
       first = fr?.firstBuyer || null;
       if (first?.traced && dev && first.wallet) first.isDev = first.wallet === dev || !!first.isDev;
       if (!first) first = await firstBuyer(mint); // last-resort local trace
