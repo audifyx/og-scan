@@ -46,7 +46,7 @@ const mainTabs: { id: MainTab; label: string; short: string; icon: React.ReactNo
 ];
 
 const TAB_ALIASES: Record<string, MainTab> = {
-  workspace: "connect", agent: "connect", setup: "connect",
+  workspace: "connect", agent: "connect", setup: "connect", dashboard: "home",
   inapp: "wallet", channels: "connect", access: "shop", shop: "shop",
 };
 
@@ -127,44 +127,12 @@ export default function McpSuperComputer() {
             </>}
           />
           <main className="supercomputer-body">
-            {/* ── HOME ── */}
+            {/* ── HOME: the new MCP dashboard IS the Super Computer home ── */}
             {tab === "home" && (
-              <div className="sc-home">
-                <div className="sc-hero">
-                  <div>
-                    <p className="sc-eyebrow"><span className="sc-live-dot" /> ORBITX SUPERCOMPUTER</p>
-                    <h1>Everything in <em>one place.</em></h1>
-                    <p className="sc-sub">Connect your account, manage your wallet, trade, and shop — no tab-hopping.</p>
-                  </div>
-                  <div className="sc-hero-orb"><Cpu size={28} /><span>ORBITX</span></div>
-                </div>
-                <div className="sc-steps">
-                  <p className="sc-steps__def">
-                    <strong>MCP lets your AI use OrbitX.</strong> Connect once, then Claude, ChatGPT, or Grok can trade, check your wallet, and shop for you.{" "}
-                    <Link to="/mcp/guide" className="sc-steps__guide">Read the guide <ChevronRight size={14} /></Link>
-                  </p>
-                  <ol className="sc-steps__list">
-                    <li><button type="button" onClick={() => go("connect")}><span className="sc-steps__num">1</span><strong>Connect account</strong><small>Sign in to OrbitX</small></button></li>
-                    <li><button type="button" onClick={() => go("wallet")}><span className="sc-steps__num">2</span><strong>Create wallet</strong><small>Your in-app wallet</small></button></li>
-                    <li><button type="button" onClick={() => go("connect")}><span className="sc-steps__num">3</span><strong>Connect Claude / ChatGPT / Grok</strong><small>Plug in your AI client</small></button></li>
-                  </ol>
-                </div>
-                <div className="sc-grid">
-                  {[
-                    { id: "connect" as MainTab, icon: <KeyRound size={20} />, title: "Connect", desc: "Account, API keys, X, AI — all auth in one place", cta: accountReady ? "Manage connections" : "Connect account" },
-                    { id: "wallet" as MainTab, icon: <WalletCards size={20} />, title: "Wallet", desc: "Your in-app wallet. Create, view, export.", cta: walletReady ? "Open wallet" : "Set up wallet" },
-                    { id: "trade" as MainTab, icon: <Zap size={20} />, title: "Trade", desc: "Natural-language trade commands with exact amounts.", cta: "Open trade desk" },
-                    { id: "shop" as MainTab, icon: <ShoppingBag size={20} />, title: "Shop", desc: "Access passes, credits, and upgrades.", cta: "Browse shop" },
-                    { id: "launchpad" as MainTab, icon: <Rocket size={20} />, title: "Launchpad", desc: "Launch tokens from AI — separate MCP, desk-wallet signing.", cta: "Open launchpad" },
-                  ].map((c) => (
-                    <button key={c.id} type="button" className="sc-card" onClick={() => go(c.id)}>
-                      <div className="sc-card-icon">{c.icon}</div>
-                      <strong>{c.title}</strong>
-                      <p>{c.desc}</p>
-                      <span className="sc-card-cta">{c.cta} <ChevronRight size={14} /></span>
-                    </button>
-                  ))}
-                </div>
+              <div className="sc-dashboard">
+                <Suspense fallback={PanelFallback}>
+                  <AgentDashboard embedded initialTab="setup" />
+                </Suspense>
               </div>
             )}
 

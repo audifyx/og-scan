@@ -13,8 +13,11 @@ import {
   visiblePlatformSections,
 } from "./orbitxPlatforms";
 
-// Current intended layout (2026-10-25 overhaul):
-// - City is admin-only (owner email); everyone else gets the app 404.
+// Current intended layout (2026-10-25 overhaul, updated 2026-11-23):
+// - City went PUBLIC 2026-11-23 (was admin-only): live at orbitxcity.world,
+//   on the /app home grid and dock for everyone.
+// - NFT Market is HIDDEN 2026-11-23 (visibility "hidden"): no tile anywhere
+//   for anyone, route /nft stays live.
 // - Bagwork is hidden from every menu (menu: false); its route stays live.
 // - HQ was removed outright (it was just a copy of the Social app).
 // - ORBITX SCANNER went public 2026-11-08 (was admin-only): it is a live
@@ -22,16 +25,18 @@ import {
 // - OrbitX DEX went on the /app home grid 2026-11-10 (was missing from
 //   the desktop entirely): it is a live product as "OrbitX DEX" at
 //   /ORBITX_DEX, first in the Trade & Launch section.
-const PUBLIC_LIVE = ["dex", "orbitxdex", "trade", "shop", "supercomputer", "social", "nft", "education", "support", "scanner"];
-const OWNER_ONLY = ["city", "vamp", "koltracker", "pnltracker", "gaming"];
+const PUBLIC_LIVE = ["dex", "orbitxdex", "trade", "shop", "supercomputer", "social", "city", "education", "support", "scanner"];
+const OWNER_ONLY = ["vamp", "koltracker", "pnltracker", "gaming"];
 
 describe("OrbitX platform catalog", () => {
   it("lists the live platforms on /app", () => {
     const keys = PLATFORM_APPS.map((a) => a.key);
     for (const key of PUBLIC_LIVE) expect(keys).toContain(key);
     expect(PLATFORM_APPS.find((a) => a.key === "shop")?.href).toBe("/shop");
-    expect(PLATFORM_APPS.find((a) => a.key === "city")?.href).toBe("/Orbitxcity");
-    expect(PLATFORM_APPS.find((a) => a.key === "city")?.visibility).toBe("admin");
+    expect(PLATFORM_APPS.find((a) => a.key === "city")?.href).toBe("https://orbitxcity.world");
+    expect(PLATFORM_APPS.find((a) => a.key === "city")?.visibility).toBeUndefined();
+    expect(PLATFORM_APPS.find((a) => a.key === "nft")?.href).toBe("/nft");
+    expect(PLATFORM_APPS.find((a) => a.key === "nft")?.visibility).toBe("hidden");
     expect(PLATFORM_APPS.find((a) => a.key === "education")?.href).toBe("/education");
     expect(PLATFORM_APPS.find((a) => a.key === "support")?.href).toBe("/support");
     expect(PLATFORM_APPS.find((a) => a.key === "scanner")?.name).toBe("ORBITX SCANNER");
@@ -45,6 +50,16 @@ describe("OrbitX platform catalog", () => {
   it("has no HQ entry (removed — it was a copy of Social)", () => {
     expect(PLATFORM_APPS.some((a) => a.key === "hq")).toBe(false);
     expect(PLATFORM_SECTIONS.flatMap((s) => s.keys)).not.toContain("hq");
+  });
+
+  it("hides NFT from everyone while keeping its route", () => {
+    const nft = PLATFORM_APPS.find((a) => a.key === "nft");
+    expect(nft?.href).toBe("/nft");
+    expect(nft?.visibility).toBe("hidden");
+    expect(publicPlatformApps().some((a) => a.key === "nft")).toBe(false);
+    expect(visiblePlatformApps(true).some((a) => a.key === "nft")).toBe(false);
+    expect(HOME_GRID_KEYS).not.toContain("nft");
+    expect(PLATFORM_MENU.some((a) => a.key === "nft")).toBe(false);
   });
 
   it("hides Bagwork from every menu while keeping its route", () => {

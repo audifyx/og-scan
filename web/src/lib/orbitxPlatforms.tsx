@@ -16,8 +16,8 @@ export type PlatformApp = {
   menu?: boolean;
   /** Pin as a command-deck gate on /app. */
   dock?: boolean;
-  /** Hidden from everyone except the signed-in owner email. */
-  visibility?: "public" | "admin";
+  /** "admin" = owner only. "hidden" = nobody (route stays live, tile gone). */
+  visibility?: "public" | "admin" | "hidden";
 };
 
 function Svg({ children }: { children: ReactNode }) {
@@ -212,8 +212,8 @@ export const PLATFORM_APPS: PlatformApp[] = [
   { key: "shop", name: "Shop", caption: "Credits + burn access", href: "/shop", tone: "#2DD4BF", iconBg: "linear-gradient(145deg, #5EEAD4 0%, #14B8A6 48%, #115E59 100%)", glyph: PlatformGlyph.shop, iconSrc: "/icons/shop.png", dock: true },
   { key: "supercomputer", name: "Super Computer", caption: "One MCP · every channel", href: "/supercomputer", tone: "#5EEAD4", iconBg: "linear-gradient(145deg, #99F6E4 0%, #2DD4BF 48%, #0F766E 100%)", glyph: PlatformGlyph.ai, iconSrc: "/icons/supercomputer.png", dock: true },
   { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#A78BFA", iconBg: "linear-gradient(145deg, #C4B5FD 0%, #8B5CF6 48%, #5B21B6 100%)", glyph: PlatformGlyph.social, iconSrc: "/icons/social.png" },
-  { key: "city", name: "City", caption: "3D OrbitX city", href: "/Orbitxcity", tone: "#34D399", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #10B981 48%, #065F46 100%)", glyph: PlatformGlyph.city, iconSrc: "/icons/city.png", dock: true, visibility: "admin" },
-  { key: "nft", name: "NFT Market", caption: "Mint & trade", href: "/nft", tone: "#00FFA3", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #00C776 48%, #047857 100%)", glyph: PlatformGlyph.nft, iconSrc: "/icons/nft.png" },
+  { key: "city", name: "City", caption: "3D OrbitX city", href: "https://orbitxcity.world", external: true, tone: "#34D399", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #10B981 48%, #065F46 100%)", glyph: PlatformGlyph.city, iconSrc: "/icons/city.png", dock: true },
+  { key: "nft", name: "NFT Market", caption: "Mint & trade", href: "/nft", tone: "#00FFA3", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #00C776 48%, #047857 100%)", glyph: PlatformGlyph.nft, iconSrc: "/icons/nft.png", visibility: "hidden" },
   { key: "bagwork", name: "Bagwork", caption: "Earn USDC", href: "/bagwork", tone: "#F0C75E", iconBg: "linear-gradient(145deg, #FDE68A 0%, #F0C75E 48%, #B8860B 100%)", glyph: PlatformGlyph.bagwork, iconSrc: "/icons/bagwork.png", menu: false },
   { key: "education", name: "Education", caption: "Learn the ecosystem", href: "/education", tone: "#22D3EE", iconBg: "linear-gradient(145deg, #67E8F9 0%, #22D3EE 48%, #0E7490 100%)", glyph: PlatformGlyph.education, iconSrc: "/icons/education.png", dock: true },
   { key: "support", name: "Support", caption: "Live tickets & chat", href: "/support", tone: "#A78BFA", iconBg: "linear-gradient(145deg, #C4B5FD 0%, #8B5CF6 48%, #5B21B6 100%)", glyph: PlatformGlyph.support, iconSrc: "/icons/support.png" },
@@ -238,16 +238,18 @@ export const PLATFORM_SECTIONS: PlatformSection[] = [
 ];
 
 export function isPublicPlatformApp(app: PlatformApp): boolean {
-  return app.visibility !== "admin";
+  return app.visibility !== "admin" && app.visibility !== "hidden";
 }
 
 export function publicPlatformApps(): PlatformApp[] {
   return PLATFORM_APPS.filter(isPublicPlatformApp);
 }
 
-/** Owner email (or desk-unlocked admin) sees unfinished surfaces. Everyone else gets the live apps. */
+/** Owner email (or desk-unlocked admin) sees unfinished surfaces. Everyone else gets the live apps. "hidden" is hidden for everyone. */
 export function visiblePlatformApps(showAdminSurfaces: boolean): PlatformApp[] {
-  return showAdminSurfaces ? PLATFORM_APPS : publicPlatformApps();
+  return showAdminSurfaces
+    ? PLATFORM_APPS.filter((a) => a.visibility !== "hidden")
+    : publicPlatformApps();
 }
 
 export function visiblePlatformMenu(showAdminSurfaces: boolean): PlatformApp[] {

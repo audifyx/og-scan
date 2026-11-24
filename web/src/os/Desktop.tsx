@@ -3744,7 +3744,9 @@ export default function Desktop(props: DesktopProps) {
             onOpenBuiltin={(kind, title) => openBuiltin(kind, title)}
           />
           <div className="oxos-phone__grid">
-            {[...desktopApps, ...installedAsApps]
+            {/* Phone shows the SAME catalog as desktop search (allApps) —
+                gates first, then everything else — not just the desktop grid. */}
+            {[...desktopApps, ...allApps.filter((a) => !desktopApps.some((d) => d.key === a.key))]
               .filter((a) => !foldered.has(a.key))
               .map((a) => (
                 <button key={a.key} type="button" className="oxos-phone__icon" onClick={() => openApp(a)}>
@@ -3769,7 +3771,7 @@ export default function Desktop(props: DesktopProps) {
             ))}
           </div>
           <div className="oxos-phone__dock">
-            {gates.slice(0, 3).map((a) => (
+            {gates.map((a) => (
               <button key={a.key} type="button" className="oxos-phone__dockbtn" title={a.name} onClick={() => openApp(a)}>
                 {<AppMark app={a} className="oxos-phone__mark" />}
               </button>
