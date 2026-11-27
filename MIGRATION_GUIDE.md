@@ -4,7 +4,7 @@ This guide explains how to apply the bagwork platform migrations to your Supabas
 
 ## Prerequisites
 
-- Supabase project ID: `sbp_4c2a8f6ecf5da31ffa9cede4744424ef03287dc1`
+- Supabase project ID: `<your-project-ref>` (find it in Project Settings in the Supabase dashboard)
 - Environment variables set:
   - `SUPABASE_URL`
   - `SUPABASE_ANON_KEY`
@@ -43,7 +43,7 @@ Updates the `bagwork_is_owner()` function to properly check admin status via `au
 ## Apply via CLI (if available)
 
 ```bash
-npx supabase link --project-ref sbp_4c2a8f6ecf5da31ffa9cede4744424ef03287dc1
+npx supabase link --project-ref <your-project-ref>
 npx supabase db push
 ```
 

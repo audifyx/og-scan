@@ -5,8 +5,16 @@ import { join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const SUPABASE_TOKEN = 'sbp_4c2a8f6ecf5da31ffa9cede4744424ef03287dc1';
-const PROJECT_ID = 'sbp_4c2a8f6ecf5da31ffa9cede4744424ef03287dc1';
+const SUPABASE_TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
+if (!SUPABASE_TOKEN) {
+  console.error('Set the SUPABASE_ACCESS_TOKEN environment variable (never commit tokens to git).');
+  process.exit(1);
+}
+const PROJECT_ID = process.env.SUPABASE_PROJECT_REF;
+if (!PROJECT_ID) {
+  console.error('Set the SUPABASE_PROJECT_REF environment variable.');
+  process.exit(1);
+}
 
 // Migration files in order
 const migrations = [

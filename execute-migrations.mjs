@@ -81,7 +81,7 @@ async function applyMigrations() {
       
       console.error('\n💡 Alternative: Apply migrations manually via Supabase Dashboard');
       console.error('   1. Go to https://app.supabase.com');
-      console.error('   2. Select project: sbp_4c2a8f6ecf5da31ffa9cede4744424ef03287dc1');
+      console.error('   2. Select your project in the dashboard');
       console.error('   3. Go to SQL Editor');
       console.error('   4. Create a new query and paste each migration file');
       console.error('   5. Execute in order');
