@@ -18,9 +18,13 @@ async function rpc(method, params) {
   return resilientRpc(method, params);
 }
 
-// One retry on null/throw — getTransaction is frequently rate-limited under load.
+// Two retries on null/throw — getTransaction is frequently rate-limited
+// under load. A dropped tx silently removes a trade from the PnL (seen
+// 2026-11-27: one stability run showed 0 BASKET positions instead of 1
+// because a single tx fetch failed). Backoff grows so a retry doesn't
+// re-hit the same throttle window.
 async function rpcTx(signature) {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const t = await rpc("getTransaction", [
         signature,
@@ -30,7 +34,7 @@ async function rpcTx(signature) {
     } catch {
       /* retry */
     }
-    if (attempt === 0) await new Promise((r) => setTimeout(r, 250));
+    if (attempt < 2) await new Promise((r) => setTimeout(r, 250 * (attempt + 1) * 2));
   }
   return null;
 }
