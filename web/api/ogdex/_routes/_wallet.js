@@ -213,7 +213,11 @@ export default async function handler(req, res) {
     if (lamports == null) degradedSources.push("balance");
     if (accs1 == null && accs2 == null) degradedSources.push("tokenAccounts");
     if (pnl == null) degradedSources.push("tradeHistory");
-    let tokenListComplete = !(accs1 == null && accs2 == null);
+    // Both program calls must succeed for the list to be complete — one
+    // failed call used to read as "no accounts under that program" (seen
+    // 2026-11-27: Token-2022 call failed while the Token call returned, and
+    // a real holding vanished with no degradation flag).
+    let tokenListComplete = accs1 != null && accs2 != null;
     let holdingsSource = tokenListComplete ? "token-accounts" : null;
     let txScan = null;
     const raw = [...(accs1?.value || []), ...(accs2?.value || [])];
@@ -261,7 +265,11 @@ export default async function handler(req, res) {
           byMint[h.mint].decimals = h.decimals;
         }
         holdingsSource = "tx-derived";
-        if (scan.complete) tokenListComplete = true;
+        // The fallback only counts as complete when it provably covered at
+        // least as much history as the PnL scan saw — a short-page
+        // truncation (seen 2026-11-27: 16 sigs scanned on a 209-sig wallet)
+        // must never be reported as a complete holdings list.
+        if (scan.complete && scan.scanned >= (pnl?.scanned ?? 0)) tokenListComplete = true;
       } catch {
         holdingsSource = "unknown";
         txScan = txScan || { scanned: 0, complete: false, hasMore: null, error: "tx-scan failed" };
@@ -371,6 +379,17 @@ export default async function handler(req, res) {
 
     let trades = [];
     if (pnl && pnl.positions) {
+      // Holdings are only trustworthy when the token-account index answered
+      // for BOTH programs, or the tx-derived fallback provably covered at
+      // least as much history as the PnL scan. A failed/partial holdings
+      // read must NEVER read as "holding is 0" — that is what killed real
+      // positions as phantoms (seen 2026-11-27: BASKET vanished whenever
+      // the token-account calls failed and the fallback scan truncated).
+      const holdingsComplete =
+        (accs1 != null && accs2 != null) ||
+        (holdingsSource === "tx-derived" &&
+          txScan?.complete === true &&
+          (txScan?.scanned ?? 0) >= (pnl?.scanned ?? 0));
       const enrich = (x) => {
         const h = holdByMint[x.mint];
         const md = meta[x.mint] || {};
@@ -414,7 +433,10 @@ export default async function handler(req, res) {
         // missed a transfer-out that closed the position. Trust the chain:
         // close the position, zero the mark, write off the cost basis.
         // Tokens were MOVED, not sold, so no realized P&L is fabricated.
-        if (holdingAmt === 0 && t.open && t.tokens > 0) {
+        // Guarded by holdingsComplete: when the holdings read itself
+        // failed or truncated, "holding is 0" is unproven — never kill
+        // on unknown data, trust the trade history instead.
+        if (holdingsComplete && holdingAmt === 0 && t.open && t.tokens > 0) {
           const phantomTokens = t.tokens;
           t.costWrittenOff = (t.costWrittenOff || 0) + (t.costUsd || 0);
           t.open = false;
@@ -497,9 +519,12 @@ export default async function handler(req, res) {
       // Drop phantom positions from the positions array too (same kill as the
       // perToken reconciliation above): a position survives only if its
       // perToken row is still open or the chain actually holds it.
+      // When holdings are incomplete, keep every PnL position — unknown
+      // holdings must never filter trade history out.
       {
         const rowByMint = new Map((pnl.perToken || []).map((t) => [t.mint, t]));
         pnl.positions = (pnl.positions || []).filter((p) => {
+          if (!holdingsComplete) return true;
           const t = rowByMint.get(p.mint);
           if (t) return Boolean(t.open || t.holding);
           return (holdByMint[p.mint]?.uiAmount || 0) > 0;

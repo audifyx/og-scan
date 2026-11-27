@@ -205,8 +205,12 @@ export function reduceTransactions(parsedTxs, { solPriceUsd = 0 } = {}) {
 // route marks tradeHistory degraded -> app shows "unavailable"). Retry like
 // rpcTx does. Also: Helius occasionally answers [] transiently for a wallet
 // with real history, and an empty first page was trusted as "wallet is
-// empty" (scanned 0, complete true) — so an empty FIRST page gets one more
-// try before we believe it.
+// empty" (scanned 0, complete true). Worse, 2026-11-27: a SHORT first page
+// (16 sigs on a 209-sig wallet) was trusted as end-of-history, so the scan
+// stopped at 16 with complete=true and the BASKET position vanished —
+// so ANY short page gets one retry of the same page before we believe it
+// is the end. A retry that comes back fuller wins; a retry that is also
+// short (or empty) confirms the end.
 async function rpcSigs(address, opts) {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -233,10 +237,16 @@ export async function computePnl(address, opts = {}) {
       ...(before ? { before } : {}),
     });
     if (page == null) throw new Error("trade_history_unavailable");
-    if (page.length === 0 && sigs.length === 0 && !before) {
-      // First page empty: one more try before believing the wallet is empty.
-      page = await rpcSigs(address, { limit: pageSize });
-      if (page == null) throw new Error("trade_history_unavailable");
+    if (page.length < pageSize) {
+      // Short page (incl. empty): one retry of the SAME page before
+      // believing it is the end of history. A fuller retry wins and the
+      // scan continues; an equally-short retry confirms the end.
+      const retry = await rpcSigs(address, {
+        limit: pageSize,
+        ...(before ? { before } : {}),
+      });
+      if (retry == null) throw new Error("trade_history_unavailable");
+      if (retry.length > page.length) page = retry;
     }
     if (page.length === 0) {
       exhausted = true;

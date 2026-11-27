@@ -98,6 +98,23 @@ export async function scanWalletTxs(address, { limit = 100, before = null } = {}
     if (src) source = src;
     const page = Array.isArray(result) ? result : null;
     if (page === null) break; // RPC failed — report partial, not empty.
+    if (page.length < pageSize) {
+      // Short page: Helius occasionally returns a truncated page
+      // transiently (seen 2026-11-27: a 16-sig page on a 209-sig wallet
+      // was trusted as complete, so the holdings fallback missed every
+      // mint older than the last 16 sigs). One retry of the same page;
+      // a fuller retry wins, an equally-short one confirms the end.
+      const r2 = await resilientRpcDetailed("getSignaturesForAddress", [address, ...params]);
+      if (r2.source) source = r2.source;
+      const page2 = Array.isArray(r2.result) ? r2.result : null;
+      if (page2 !== null && page2.length > page.length) {
+        for (const s of page2) signatures.push(s.signature);
+        if (page2.length < pageSize) { complete = true; break; }
+        cursor = page2[page2.length - 1]?.signature || null;
+        if (!cursor) { complete = true; break; }
+        continue;
+      }
+    }
     for (const s of page) signatures.push(s.signature);
     if (page.length < pageSize) { complete = true; break; }
     cursor = page[page.length - 1]?.signature || null;
