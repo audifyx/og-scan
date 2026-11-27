@@ -39,6 +39,9 @@ import swaps from "./ogdex/_routes/_swaps.js";
 import walletTx from "./ogdex/_routes/_wallet-tx.js";
 import llms from "./ogdex/_routes/_llms.js";
 import leaderboard from "./ogdex/_routes/_leaderboard.js";
+import trades from "./ogdex/_routes/_trades.js";
+import referralLeaderboard from "./ogdex/_routes/_referral-leaderboard.js";
+import limitOrders from "./ogdex/_routes/_limit-orders.js";
 import research from "./ogdex/_routes/_research.js";
 import replayTrades from "./ogdex/_routes/_replay.js";
 import platformStats from "./ogdex/_routes/_platform-stats.js";
@@ -54,7 +57,8 @@ import { createHmac, timingSafeEqual } from "crypto";
 const ROUTES = {
   admin, boosts, chart, kols, launch, launches,
   config: configRoute, listings, metadata, report, screener, signals, search, token, trade, track, wallet, watchlist, alerts, rpc, forensics, chat, ath, openapi,
-  "openapi.json": openapi, health, balance, safety, xray, swaps, "wallet-tx": walletTx, llms, "llms.txt": llms, leaderboard,
+  "openapi.json": openapi, health, balance, safety, xray, swaps, "wallet-tx": walletTx, llms, "llms.txt": llms, leaderboard, trades,
+  "referral-leaderboard": referralLeaderboard, "limit-orders": limitOrders,
   "alerts-run": alertsRun, research,
   "replay-trades": replayTrades,
   "tg-scan": tgScan,
@@ -71,7 +75,7 @@ const ROUTES = {
 };
 
 const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "llms", "llms.txt", "desk-unlock", "mcp-life-tick"]);
-const LIMITS = { chat: 12, forensics: 20, bundle: 20, report: 10, track: 30, rpc: 40, alerts: 20, watchlist: 20, admin: 30, mcp: 30, "replay-trades": 10, "tg-scan": 20, "tg-webhook": 30, "tg-stats": 30 };
+const LIMITS = { chat: 12, forensics: 20, bundle: 20, report: 10, track: 30, rpc: 40, alerts: 20, watchlist: 20, admin: 30, mcp: 30, "replay-trades": 10, "tg-scan": 20, "tg-webhook": 30, "tg-stats": 30, trades: 30, "referral-leaderboard": 30, "limit-orders": 20 };
 const DEFAULT_LIMIT = 60;
 const WINDOW_MS = 10_000;
 /** Soft API keys get a higher cap — never unlimited. */
