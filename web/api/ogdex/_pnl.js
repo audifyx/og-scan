@@ -195,6 +195,28 @@ export function reduceTransactions(parsedTxs, { solPriceUsd = 0 } = {}) {
 // returned empty positions for any wallet with more recent txs than the page
 // (e.g. 80), even when it still held the token. Bounded so a hyperactive
 // wallet cannot blow the response budget.
+// Signature pages are the one fatal point in the scan: resilientRpc returns
+// null (never throws) when Helius 429s/times out AND every public fallback
+// fails, and a single null page used to kill the whole PnL (throw ->
+// route marks tradeHistory degraded -> app shows "unavailable"). Retry like
+// rpcTx does. Also: Helius occasionally answers [] transiently for a wallet
+// with real history, and an empty first page was trusted as "wallet is
+// empty" (scanned 0, complete true) — so an empty FIRST page gets one more
+// try before we believe it.
+async function rpcSigs(address, opts) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const page = await rpc("getSignaturesForAddress", [address, opts]);
+      if (Array.isArray(page)) return page;
+      // null/undefined: total RPC failure — retry.
+    } catch {
+      /* retry */
+    }
+    if (attempt < 2) await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+  }
+  return null;
+}
+
 export async function computePnl(address, opts = {}) {
   const { sigLimit = 50, maxSigs = 300, priceMap = null } = opts;
   const pageSize = Math.min(sigLimit, 100);
@@ -202,11 +224,16 @@ export async function computePnl(address, opts = {}) {
   let before;
   let exhausted = false;
   while (sigs.length < maxSigs) {
-    const page = await rpc("getSignaturesForAddress", [
-      address,
-      { limit: pageSize, ...(before ? { before } : {}) },
-    ]);
+    let page = await rpcSigs(address, {
+      limit: pageSize,
+      ...(before ? { before } : {}),
+    });
     if (page == null) throw new Error("trade_history_unavailable");
+    if (page.length === 0 && sigs.length === 0 && !before) {
+      // First page empty: one more try before believing the wallet is empty.
+      page = await rpcSigs(address, { limit: pageSize });
+      if (page == null) throw new Error("trade_history_unavailable");
+    }
     if (page.length === 0) {
       exhausted = true;
       break;
@@ -219,7 +246,10 @@ export async function computePnl(address, opts = {}) {
     before = page[page.length - 1].signature;
   }
   const capped = sigs.slice(0, maxSigs);
-  const txs = await mapPool(capped, 8, (s) => rpcTx(s.signature));
+  // Concurrency 4, not 8: the route already runs balance + 2x token-account
+  // calls in parallel with this scan, so 8 concurrent tx fetches burst past
+  // Helius's 10 req/s free limit and 429 the whole scan.
+  const txs = await mapPool(capped, 4, (s) => rpcTx(s.signature));
   const parsed = txs.map((t) => parseTx(t, address));
   const sp = await solPrice();
   const { pos, swapsChrono, realizedSol, wins, closed } = reduceTransactions(parsed, {
