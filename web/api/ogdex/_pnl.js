@@ -188,14 +188,38 @@ export function reduceTransactions(parsedTxs, { solPriceUsd = 0 } = {}) {
 // are valued for unrealized PnL. Also returns the parsed `swaps` (newest
 // first) so /wallet can embed a trade tape without a second RPC round-trip.
 // Completeness: `complete` is true only when the sig scan covered the full
-// history (fewer sigs than sigLimit). When false, positions may be missing
+// history (the last page came back short). When false, positions may be missing
 // buys/sells/transfers outside the window — callers must not treat the PnL
 // as final (the wallet route reconciles open positions against live holdings).
+// The scan paginates (newest first) up to maxSigs: the old single-page cap
+// returned empty positions for any wallet with more recent txs than the page
+// (e.g. 80), even when it still held the token. Bounded so a hyperactive
+// wallet cannot blow the response budget.
 export async function computePnl(address, opts = {}) {
-  const { sigLimit = 50, priceMap = null } = opts;
-  const sigs = await rpc("getSignaturesForAddress", [address, { limit: sigLimit }]);
-  if (sigs == null) throw new Error("trade_history_unavailable");
-  const txs = await mapPool(sigs, 8, (s) => rpcTx(s.signature));
+  const { sigLimit = 50, maxSigs = 300, priceMap = null } = opts;
+  const pageSize = Math.min(sigLimit, 100);
+  const sigs = [];
+  let before;
+  let exhausted = false;
+  while (sigs.length < maxSigs) {
+    const page = await rpc("getSignaturesForAddress", [
+      address,
+      { limit: pageSize, ...(before ? { before } : {}) },
+    ]);
+    if (page == null) throw new Error("trade_history_unavailable");
+    if (page.length === 0) {
+      exhausted = true;
+      break;
+    }
+    sigs.push(...page);
+    if (page.length < pageSize) {
+      exhausted = true;
+      break;
+    }
+    before = page[page.length - 1].signature;
+  }
+  const capped = sigs.slice(0, maxSigs);
+  const txs = await mapPool(capped, 8, (s) => rpcTx(s.signature));
   const parsed = txs.map((t) => parseTx(t, address));
   const sp = await solPrice();
   const { pos, swapsChrono, realizedSol, wins, closed } = reduceTransactions(parsed, {
@@ -280,8 +304,8 @@ export async function computePnl(address, opts = {}) {
 
   const unrealizedUsd = unrealizedSol * sp;
   const swaps = [...swapsChrono].sort((a, b) => b.time - a.time);
-  const scanned = sigs.length;
-  const complete = scanned < sigLimit;
+  const scanned = capped.length;
+  const complete = exhausted && scanned < maxSigs;
 
   return {
     realizedPnlUsd: realizedSol * sp,
