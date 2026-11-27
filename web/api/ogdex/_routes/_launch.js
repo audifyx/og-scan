@@ -1,9 +1,9 @@
-import { send, resilientRpc, dbInsert, dbSelect, readBody, PLATFORM_FEE_WALLET } from "../_lib.js";
+import { send, resilientRpc, dbInsert, dbSelect, readBody, LAUNCH_FEE_WALLET } from "../_lib.js";
 
 /**
  * OG DEX Token Launcher backend.
  *
- * $0.90 launch fee on SOLANA launches only, paid in SOL to PLATFORM_FEE_WALLET,
+ * $0.90 launch fee on SOLANA launches only, paid in SOL to LAUNCH_FEE_WALLET,
  * verified on-chain via the fee transaction signature. Every other chain
  * (all 16 EVM chains) remains free.
  *
@@ -149,7 +149,7 @@ export default async function handler(req, res) {
       const solPrice = await solPriceUsd();
       const feeUsd = chain === "solana" ? FEE_USD : 0;
       return send(res, 200, {
-        ok: true, feeUsd, payWallet: PLATFORM_FEE_WALLET, solPrice,
+        ok: true, feeUsd, payWallet: LAUNCH_FEE_WALLET, solPrice,
         usdcMint: USDC_MINT, usdtMint: USDT_MINT, solMint: SOL_MINT,
       });
     }
@@ -357,7 +357,7 @@ async function handleRecord(body, res) {
 
 /**
  * Verify a fee payment transaction actually transferred >= $0.90 (allowing
- * small price drift) to PLATFORM_FEE_WALLET, in SOL or the chosen stablecoin.
+ * small price drift) to LAUNCH_FEE_WALLET, in SOL or the chosen stablecoin.
  */
 async function verifyFee(signature, payCurrency) {
   let tx;
@@ -373,7 +373,7 @@ async function verifyFee(signature, payCurrency) {
 
   if (payCurrency === "sol") {
     const keys = (tx.transaction?.message?.accountKeys || []).map((k) => (typeof k === "string" ? k : k.pubkey));
-    const idx = keys.indexOf(PLATFORM_FEE_WALLET);
+    const idx = keys.indexOf(LAUNCH_FEE_WALLET);
     if (idx < 0) return { ok: false, error: "payment wallet not found in transaction" };
     const pre = tx.meta?.preBalances?.[idx] ?? 0;
     const post = tx.meta?.postBalances?.[idx] ?? 0;
@@ -386,12 +386,12 @@ async function verifyFee(signature, payCurrency) {
     return { ok: true, usd: Number(usd.toFixed(2)), currency: "sol" };
   }
 
-  // Stablecoin (USDC / USDT): compare token balance deltas owned by PLATFORM_FEE_WALLET.
+  // Stablecoin (USDC / USDT): compare token balance deltas owned by LAUNCH_FEE_WALLET.
   const pre = tx.meta?.preTokenBalances || [];
   const post = tx.meta?.postTokenBalances || [];
   let best = 0;
   for (const pb of post) {
-    if (pb.owner !== PLATFORM_FEE_WALLET) continue;
+    if (pb.owner !== LAUNCH_FEE_WALLET) continue;
     if (!STABLES[pb.mint]) continue;
     const match = pre.find((x) => x.accountIndex === pb.accountIndex) || {};
     const before = Number(match.uiTokenAmount?.uiAmount || 0);

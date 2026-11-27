@@ -21,6 +21,10 @@ export const PAY_WALLET = "CicbPxARTDrwQ4XcxWsn6SYeG4FMJHirS633cZUJeQDh";
 // Platform fee wallet — launchpad fee + trading fee route here specifically
 // (kept distinct from PAY_WALLET, which is used for boosts/listings).
 export const PLATFORM_FEE_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
+// Launchpad fee wallet — the OrbitX fee wallet (trading fees + $0.90 launch
+// fee). Kept separate from PLATFORM_FEE_WALLET: the web DEX trading fee
+// still routes to the desk wallet there.
+export const LAUNCH_FEE_WALLET = "A9hzZsHgco5K92pjv2CrHzgzk9oHK1SuBb9rKzUkt2Uz";
 export const JUP = "https://lite-api.jup.ag";
 // Token holder/trade/safety intelligence function. v2 adds KOL + public-wallet
 // labeling and whale rollups. Switch back to "ogdex-intel" here to roll back.
